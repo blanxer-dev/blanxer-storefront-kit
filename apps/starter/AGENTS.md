@@ -88,7 +88,7 @@ First rename the worker: in `wrangler.jsonc` change `"name": "blanxer-storefront
 Print the live `*.workers.dev` link and open it.
 
 ### 9. Link the site to Blanxer
-- Save the link with `blanxer_set_storefront_url { url: "https://..." }`. The first call is a preview that returns a `confirm_token`. Show it to the merchant, and after their yes call again with `{ dry_run: false, confirm_token }` (or the merchant pastes it in Blanxer → avatar menu → **BlanxerAPI** → Your website). From then on SMS tracking links, the delivered email, flash-sale alerts, the product feed and the sitemap use the new site.
+- Save the link with `blanxer_set_storefront_url { url: "https://..." }`. The first call is a preview that returns a `confirm_token`. Show it to the merchant, and after their yes call again with `{ dry_run: false, confirm_token }` (or the merchant pastes it in Blanxer → avatar menu → **BlanxerAPI** → Your website). From then on the tracking link shown in the dashboard, order and delivered emails, flash-sale alerts, the product feed and the sitemap use the new site. (SMS messages use `bxr.sh` short links; whether those follow the new site is not yet confirmed.)
 - Register the product feed URL (`https://api.blanxer.com/public/product-feed/<store_id>.xml`) in Meta Commerce Manager / Google Merchant Center.
 - Submit `https://<site>/sitemap.xml` in Google Search Console; verify ownership with `blanxer_set_site_verification` (the site renders the tag).
 
@@ -96,7 +96,7 @@ Print the live `*.workers.dev` link and open it.
 Add the domain to the merchant's Cloudflare account and attach it to the Worker (custom domain), then update the link from step 9. If the domain currently points at Blanxer (Blanxer's custom-domain setup), explain that moving it switches shoppers from the Blanxer site to the new one; that's the merchant's decision. See https://developers.blanxer.com/deploy-cloudflare.md.
 
 ### 11. Retire the old subdomain site (optional, merchant's choice, only after step 9)
-`blanxer_update_appearance { store_visibility: 'hidden_on_subdomain' }` (or Blanxer → Appearance → Branding → Site under construction → Sub-domain). Say plainly: every page on `<sub>.blanxer.io` will show a placeholder, **including tracking links already sent for older orders**; new orders link to the new site; it can be switched back any time.
+`blanxer_update_appearance { store_visibility: 'hidden_on_subdomain' }` (or Blanxer → Appearance → Branding → Site under construction → Sub-domain). Say plainly: every page on `<sub>.blanxer.io` will show a placeholder, **including tracking links already sent for older orders, and possibly SMS tracking links (`bxr.sh`), which aren't confirmed to follow the new site yet**; new orders link to the new site; it can be switched back any time.
 
 ### 12. Live check and hand-over
 - On the live site: home, a product, checkout, `/payment/success`, `/payment/failed`, and `/track/<a real order id>`.
