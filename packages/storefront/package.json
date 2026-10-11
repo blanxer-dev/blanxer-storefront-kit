@@ -1,0 +1,107 @@
+{
+  "name": "@blanxer/storefront",
+  "version": "0.1.0",
+  "description": "Blanxer store data, the full Blanxer checkout, SEO helpers and site checks for custom Next.js storefronts.",
+  "keywords": [
+    "blanxer",
+    "nepal",
+    "ecommerce",
+    "storefront",
+    "checkout",
+    "nextjs",
+    "react",
+    "esewa",
+    "khalti",
+    "fonepay",
+    "cloudflare"
+  ],
+  "homepage": "https://developers.blanxer.com",
+  "bugs": {
+    "url": "https://github.com/blanxer-dev/blanxer-storefront-kit/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/blanxer-dev/blanxer-storefront-kit.git",
+    "directory": "packages/storefront"
+  },
+  "license": "MIT",
+  "author": "Blanxer Technology Pvt. Ltd. (https://blanxer.com)",
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "blanxer-storefront": "./dist/cli/index.js"
+  },
+  "exports": {
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "default": "./dist/react/index.js"
+    },
+    "./seo": {
+      "types": "./dist/seo/index.d.ts",
+      "default": "./dist/seo/index.js"
+    },
+    "./next": {
+      "types": "./dist/next/index.d.ts",
+      "default": "./dist/next/index.js"
+    },
+    "./image-loader": {
+      "types": "./dist/next/image-loader.d.ts",
+      "default": "./dist/next/image-loader.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css && chmod +x dist/cli/index.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "client-only": "^0.0.1",
+    "react-qr-code": "^2.2.0"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.35.5"
+  },
+  "peerDependencies": {
+    "next": ">=16.0.0",
+    "react": ">=19.0.0",
+    "react-dom": ">=19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "next": "16.4.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=20.9"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
