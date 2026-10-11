@@ -110,3 +110,13 @@ Add the domain to the merchant's Cloudflare account and attach it to the Worker 
 - Coupon refused at order time → the order must carry the coupon's `_id`, not its code (the package does this).
 - `403 error code: 1010` from the API on server-side fetches → make sure the package's fetch (with its User-Agent) is used; report it to Blanxer support.
 - More: https://developers.blanxer.com/troubleshooting.md
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
