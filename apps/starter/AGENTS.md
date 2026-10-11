@@ -1,5 +1,112 @@
-# AGENTS.md
+# AGENTS.md — Blanxer store website (BlanxerAPI)
 
-This is a Blanxer store website (BlanxerAPI): Next.js 16 App Router + `@blanxer/storefront`, deployed to Cloudflare Workers.
+This project is a Blanxer store website: Next.js 16 App Router + `@blanxer/storefront`, deployed to Cloudflare Workers. Every coding agent working here follows these rules and steps. Full docs: https://developers.blanxer.com/llms.txt
 
-Before changing anything, read and follow https://developers.blanxer.com/llms.txt (the rules and steps for building and deploying a Blanxer store website).
+The merchant gets their own Next.js website. **Blanxer stays the admin**: products, stock, orders, payments, delivery and SEO data live in Blanxer and are read through the public API. The site is the front end only, deployed to **the merchant's own Cloudflare account**.
+
+Three channels, each with one job:
+
+| Channel | Who | What for |
+|---|---|---|
+| Public API `https://api.blanxer.com` (no key) | the **site's code** | read store, catalog, delivery table; place orders and payments from the browser |
+| Blanxer MCP `https://mcp.blanxer.com/mcp` (OAuth) | **you**, in this chat | change the store: SEO text, products, photos, categories, coupons, delivery, the website link |
+| Blanxer-served XML | Google / Meta | product feed and catalog sitemap, built by Blanxer for the site's domain |
+
+The full docs are at https://developers.blanxer.com (agent index: https://developers.blanxer.com/llms.txt). Fetch a page when a step below points to it.
+
+## Hard rules (follow every time)
+
+1. **Next.js only.** TypeScript, App Router. If asked for another framework, say BlanxerAPI supports Next.js and continue in Next.js.
+2. **Start from the starter and keep `@blanxer/storefront`.** Restyle the checkout through its theme props, CSS variables and wrappers. **Never rewrite** the payment, delivery, coupon or order logic, and never call payment endpoints yourself. The checkout's **"Checkout Powered by Blanxer"** line is part of it: restyle it through `.bx-powered-by`, never remove or hide it.
+3. **Required routes, exact paths:** `/checkout`, `/payment/success`, `/payment/failed`, `/track/[id]`. Payment gateways send the shopper back to the last three; missing ones mean a 404 **after paying**.
+4. **The site sends its own origin as `url`** on orders and payments. The package does it; never hardcode a domain.
+5. **Orders, coupons, payment starts, hold release, back-in-stock, forms, cancel and review run in the browser** (client components via `@blanxer/storefront/client` or `/react`). Never from server components, route handlers or server actions: they are rate-limited per shopper IP.
+6. **No secrets in the site.** It needs no key. Never put an `sk_` API key, MCP token, dashboard login or gateway key in code, `.env` or the build. Never ask the merchant to paste a key. Store changes go through the Blanxer MCP.
+7. **No customer login.** Don't call `/customer/auth/*` or build account, login, wishlist or rewards pages. Custom sites use guest checkout.
+8. **Don't invent data.** Prices, stock, delivery charges and payment methods come only from the API. No sample products or placeholder prices in the deployed site.
+9. **Payment methods come from the store's settings** via the package. Never add or remove them by hand.
+10. **Use Blanxer's URL paths**: `/product/[slug]`, `/collections/[slug]`, `/brand/[slug]`, `/blogs`, `/blog/[slug]`, `/forms/[slug]`. The feed, sitemap, SMS and emails use them. **Don't build a product feed or catalog sitemap**: Blanxer serves both for the site's domain. Keep the starter's `/sitemap-catalog.xml` pass-through and `/sitemap.xml` index; only add the site's own extra pages to the index.
+11. **Optimise every image before it goes into the site** (see https://developers.blanxer.com/images-and-speed.md): `npx blanxer-storefront images`, AVIF + WebP, ×2 the largest display size, metadata stripped, `next/image` with width/height, `preload` only on each page's main (largest, first) image (Next.js 16 replaced `priority` with `preload`). **Product photos go into Blanxer through the MCP, never into the site.** No autoplay video backgrounds or GIF banners unless the merchant insists after hearing the speed cost. Fonts through `next/font`, at most 2 families.
+12. **The site's design lives in the site.** Don't use MCP page-builder or section tools (`blanxer_add_section`, `blanxer_update_section`, `blanxer_apply_page_template`, navigation/footer editors) to design a custom site; they change the Blanxer-hosted site. Exception: blog post bodies. `blanxer_create_blog_post` makes an empty post, and its body is written with `blanxer_add_section` / `blanxer_update_section` using `{ post_id }`. That is content the site shows, so use them for blog posts.
+13. **Confirm before bulk store changes.** Show the merchant the list (SEO for many products, imports, delivery charges) and get a yes. The MCP's own confirmations still apply.
+
+## Steps (confirm each with the merchant before moving on)
+
+### 1. Find the store and connect
+- Ask for the store subdomain (`mystore` in `mystore.blanxer.io`) or its link.
+- Read `https://api.blanxer.com/store/check_domain?domain=<subdomain>`. Show: store name, plan, product count (`/product/public/<_id>` length), and the payment methods the site will offer (rules in https://developers.blanxer.com/checkout.md).
+  - Plan not in `basic / premium / plus / platinum` → "your site will take Cash on Delivery only".
+  - `customer_program.enabled` → "shoppers check out as guests on the new site".
+- Connect the Blanxer MCP: add `https://mcp.blanxer.com/mcp` as a remote MCP server (Claude Code: `claude mcp add --transport http blanxer https://mcp.blanxer.com/mcp`; Claude Code users can instead install the skill: `/plugin marketplace add blanxer-dev/blanxer-agent-skills`, `/plugin install blanxer-website@blanxer`). The merchant signs in to Blanxer in the browser.
+- Run `blanxer_audit_seo` and look for catalog gaps (products without photos, prices, categories or SEO text). Show what's missing; fix later in step 4.
+
+### 2. Design brief
+Ask for reference sites, look and feel, pages, tone, and must-haves. Offer the store's logo, colours (`customization.theme`) and font (`customization.font`) as defaults. Agree on a short page list before building.
+
+### 3. Scaffold
+```bash
+npx degit blanxer-dev/blanxer-storefront-starter <folder>
+cd <folder>
+cp .env.example .env    # set BLANXER_STORE=<subdomain>; optional SITE_URL once the domain is known
+npm install
+./node_modules/.bin/next dev
+```
+Show the merchant the starter running with their real products before changing the design.
+
+### 4. Build
+- Pages and design with the package's data functions (`@blanxer/storefront/server`) and components (`@blanxer/storefront/react`). Theme the checkout; don't rewrite it.
+- Page metadata from `@blanxer/storefront/seo` (`productMetadata`, `categoryMetadata`, ...). SEO text is edited in Blanxer, not in the code.
+- Images: rule 11. Show a before/after size table, e.g. `hero.jpg 6.2 MB → hero.avif 180 KB`.
+- Store fixes through the MCP, confirmed first (rule 13): product and category SEO text, categories and brands the menus need, product photos the merchant sends, launch coupons, delivery places/charges. They reach the site through the API (allow ~60 s cache).
+
+### 5. Check before deploy
+```bash
+./node_modules/.bin/next build
+npx blanxer-storefront check            # with ./node_modules/.bin/next start running: add --lighthouse http://localhost:3000
+```
+It must pass: required routes, no secrets, no login code, browser-only order/payment calls, image budget (no file in `public/` over 300 KB or wider than 2560 px, no JPEG/PNG where AVIF/WebP fits, every image `next/image` with a size, a `preload` main image), Lighthouse mobile ≥ 90 with LCP < 2.5 s on home, a product page and checkout. Fix failures before deploying, or tell the merchant why one can't be fixed.
+
+### 6. Test checkout
+On the local production build:
+- Fill the checkout with phone `0000000000`: the API answers success **without creating an order** and the checkout shows "Test order accepted". This proves the form, delivery charge, coupon and order request work. (Because no order exists, no gateway or QR screen opens on this path.)
+- Check every enabled payment method appears for a COD and a non-COD place as expected (rules in https://developers.blanxer.com/checkout.md).
+- Open `/payment/success`, `/payment/failed` and `/track/<any order id>` directly: they must render.
+- The gateway and QR screens themselves are checked once, live, in step 12.
+
+### 7. Cloudflare sign-in
+```bash
+npx wrangler login
+```
+The browser opens and **the merchant signs in to their own Cloudflare account** and approves. You never see a password. No browser available → walk them through creating an API token (Workers edit) and `export CLOUDFLARE_API_TOKEN=...` in their own terminal.
+Check the build size first: the Workers free plan allows a 3 MiB (compressed) worker. If it's bigger, say so before deploying and offer trimming or the $5/month Workers paid plan. See https://developers.blanxer.com/deploy-cloudflare.md.
+
+### 8. Deploy
+First rename the worker: in `wrangler.jsonc` change `"name": "blanxer-storefront"` to the site's name (e.g. `mystore-site`) and the `WORKER_SELF_REFERENCE` service to match. `.env` is copied into the Worker, so `BLANXER_STORE` must be set there.
+```bash
+./node_modules/.bin/opennextjs-cloudflare build && ./node_modules/.bin/opennextjs-cloudflare deploy
+```
+Print the live `*.workers.dev` link and open it.
+
+### 9. Link the site to Blanxer
+- Save the link with `blanxer_set_storefront_url { url: "https://..." }`. The first call is a preview that returns a `confirm_token`. Show it to the merchant, and after their yes call again with `{ dry_run: false, confirm_token }` (or the merchant pastes it in Blanxer → avatar menu → **BlanxerAPI** → Your website). From then on SMS tracking links, the delivered email, flash-sale alerts, the product feed and the sitemap use the new site.
+- Register the product feed URL (`https://api.blanxer.com/public/product-feed/<store_id>.xml`) in Meta Commerce Manager / Google Merchant Center.
+- Submit `https://<site>/sitemap.xml` in Google Search Console; verify ownership with `blanxer_set_site_verification` (the site renders the tag).
+
+### 10. Custom domain (optional)
+Add the domain to the merchant's Cloudflare account and attach it to the Worker (custom domain), then update the link from step 9. If the domain currently points at Blanxer (Blanxer's custom-domain setup), explain that moving it switches shoppers from the Blanxer site to the new one; that's the merchant's decision. See https://developers.blanxer.com/deploy-cloudflare.md.
+
+### 11. Retire the old subdomain site (optional, merchant's choice, only after step 9)
+`blanxer_update_appearance { store_visibility: 'hidden_on_subdomain' }` (or Blanxer → Appearance → Branding → Site under construction → Sub-domain). Say plainly: every page on `<sub>.blanxer.io` will show a placeholder, **including tracking links already sent for older orders**; new orders link to the new site; it can be switched back any time.
+
+### 12. Live check and hand-over
+- On the live site: home, a product, checkout, `/payment/success`, `/payment/failed`, and `/track/<a real order id>`.
+- With the merchant's OK and their own phone number, place one COD order on the real store, then cancel it in the Blanxer dashboard.
+- For one online method the store uses, start a real order and open the gateway or QR screen, then stop without paying (close the QR screen, which releases the stock hold) and cancel the order in the dashboard.
+- Leave a short `README.md` in the project: how to run it locally, change the design, and redeploy (`opennextjs-cloudflare build && opennextjs-cloudflare deploy`).
+
+## When something goes wrong
+- 404 after paying → `/payment/success`, `/payment/failed` or `/track/[id]` is missing or renamed.
+- "Place not found" / COD refused → the delivery place must be one of the store's places exactly; COD only where that place allows it.
+- Coupon refused at order time → the order must carry the coupon's `_id`, not its code (the package does this).
+- `403 error code: 1010` from the API on server-side fetches → make sure the package's fetch (with its User-Agent) is used; report it to Blanxer support.
+- More: https://developers.blanxer.com/troubleshooting.md
