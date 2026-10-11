@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The Worker name becomes https://<name>.<account>.workers.dev. Change it to the store's name.
+  "name": "blanxer-storefront",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      // Must match "name" above.
+      "service": "blanxer-storefront"
+    }
+  ],
+  "observability": { "enabled": true }
+  // Optional ISR cache (see open-next.config.ts):
+  // "r2_buckets": [{ "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "<name>-cache" }]
+  //
+  // BLANXER_STORE / BLANXER_API come from .env (OpenNext copies them into the Worker).
+  // Never add secrets here: the site needs none.
+}

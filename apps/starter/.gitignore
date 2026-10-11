@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+
+# next.js / cloudflare
+.next/
+out/
+.open-next/
+.wrangler/
+next-env.d.ts
+*.tsbuildinfo
+cloudflare-env.d.ts
+
+# env (.env.example is committed; .env holds only BLANXER_STORE etc.)
+.env
+.env*.local
+.dev.vars*
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
