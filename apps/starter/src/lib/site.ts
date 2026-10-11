@@ -1,7 +1,7 @@
 import { cache } from 'react';
-import { getStore, siteOrigin } from '@blanxer/storefront/server';
-import { currencyLabel, formatCurrency } from '@blanxer/storefront/core';
-import type { Store } from '@blanxer/storefront/core';
+import { getStore, siteOrigin } from '@blanxer-dev/storefront/server';
+import { currencyLabel, formatCurrency } from '@blanxer-dev/storefront/core';
+import type { Store } from '@blanxer-dev/storefront/core';
 
 /** The full store config (server only: it contains plugin data the browser must not see). */
 export const store = cache((): Promise<Store> => getStore());

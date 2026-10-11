@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { getBlogPost } from '@blanxer/storefront/server';
-import { blogPostMetadata } from '@blanxer/storefront/seo';
+import { getBlogPost } from '@blanxer-dev/storefront/server';
+import { blogPostMetadata } from '@blanxer-dev/storefront/seo';
 import { origin, slugParam, store } from '@/lib/site';
 
 type Props = { params: Promise<{ slug: string }> };

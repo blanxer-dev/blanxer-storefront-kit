@@ -1,6 +1,6 @@
 # AGENTS.md — Blanxer store website (BlanxerAPI)
 
-This project is a Blanxer store website: Next.js 16 App Router + `@blanxer/storefront`, deployed to Cloudflare Workers. Every coding agent working here follows these rules and steps. Full docs: https://developers.blanxer.com/llms.txt
+This project is a Blanxer store website: Next.js 16 App Router + `@blanxer-dev/storefront`, deployed to Cloudflare Workers. Every coding agent working here follows these rules and steps. Full docs: https://developers.blanxer.com/llms.txt
 
 The merchant gets their own Next.js website. **Blanxer stays the admin**: products, stock, orders, payments, delivery and SEO data live in Blanxer and are read through the public API. The site is the front end only, deployed to **the merchant's own Cloudflare account**.
 
@@ -17,10 +17,10 @@ The full docs are at https://developers.blanxer.com (agent index: https://develo
 ## Hard rules (follow every time)
 
 1. **Next.js only.** TypeScript, App Router. If asked for another framework, say BlanxerAPI supports Next.js and continue in Next.js.
-2. **Start from the starter and keep `@blanxer/storefront`.** Restyle the checkout through its theme props, CSS variables and wrappers. **Never rewrite** the payment, delivery, coupon or order logic, and never call payment endpoints yourself. The checkout's **"Checkout Powered by Blanxer"** line is part of it: restyle it through `.bx-powered-by`, never remove or hide it. Keep the root layout's metadata from `storeMetadata`: its `generator: Blanxer Storefront` and `blanxer-store` tags are how Blanxer confirms the saved website link is this store's site.
+2. **Start from the starter and keep `@blanxer-dev/storefront`.** Restyle the checkout through its theme props, CSS variables and wrappers. **Never rewrite** the payment, delivery, coupon or order logic, and never call payment endpoints yourself. The checkout's **"Checkout Powered by Blanxer"** line is part of it: restyle it through `.bx-powered-by`, never remove or hide it. Keep the root layout's metadata from `storeMetadata`: its `generator: Blanxer Storefront` and `blanxer-store` tags are how Blanxer confirms the saved website link is this store's site.
 3. **Required routes, exact paths:** `/checkout`, `/payment/success`, `/payment/failed`, `/track/[id]`. Payment gateways send the shopper back to the last three; missing ones mean a 404 **after paying**.
 4. **The site sends its own origin as `url`** on orders and payments. The package does it; never hardcode a domain.
-5. **Orders, coupons, payment starts, hold release, back-in-stock, forms, cancel and review run in the browser** (client components via `@blanxer/storefront/client` or `/react`). Never from server components, route handlers or server actions: they are rate-limited per shopper IP.
+5. **Orders, coupons, payment starts, hold release, back-in-stock, forms, cancel and review run in the browser** (client components via `@blanxer-dev/storefront/client` or `/react`). Never from server components, route handlers or server actions: they are rate-limited per shopper IP.
 6. **No secrets in the site.** It needs no key. Never put an `sk_` API key, MCP token, dashboard login or gateway key in code, `.env` or the build. Never ask the merchant to paste a key. Store changes go through the Blanxer MCP.
 7. **No customer login.** Don't call `/customer/auth/*` or build account, login, wishlist or rewards pages. Custom sites use guest checkout.
 8. **Don't invent data.** Prices, stock, delivery charges and payment methods come only from the API. No sample products or placeholder prices in the deployed site.
@@ -54,8 +54,8 @@ npm install
 Show the merchant the starter running with their real products before changing the design.
 
 ### 4. Build
-- Pages and design with the package's data functions (`@blanxer/storefront/server`) and components (`@blanxer/storefront/react`). Theme the checkout; don't rewrite it.
-- Page metadata from `@blanxer/storefront/seo` (`productMetadata`, `categoryMetadata`, ...). SEO text is edited in Blanxer, not in the code.
+- Pages and design with the package's data functions (`@blanxer-dev/storefront/server`) and components (`@blanxer-dev/storefront/react`). Theme the checkout; don't rewrite it.
+- Page metadata from `@blanxer-dev/storefront/seo` (`productMetadata`, `categoryMetadata`, ...). SEO text is edited in Blanxer, not in the code.
 - Images: rule 11. Show a before/after size table, e.g. `hero.jpg 6.2 MB → hero.avif 180 KB`.
 - Store fixes through the MCP, confirmed first (rule 13): product and category SEO text, categories and brands the menus need, product photos the merchant sends, launch coupons, delivery places/charges. They reach the site through the API (allow ~60 s cache).
 

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { getProductsPage } from '@blanxer/storefront/server';
+import { getProductsPage } from '@blanxer-dev/storefront/server';
 import { ProductGrid } from '@/components/product-card';
 import { Pagination } from '@/components/pagination';
 import { store } from '@/lib/site';

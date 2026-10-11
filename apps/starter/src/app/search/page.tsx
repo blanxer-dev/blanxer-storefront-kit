@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { searchProducts } from '@blanxer/storefront/server';
+import { searchProducts } from '@blanxer-dev/storefront/server';
 import { ProductGrid } from '@/components/product-card';
 import { store } from '@/lib/site';
 

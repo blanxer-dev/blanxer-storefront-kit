@@ -1,5 +1,5 @@
 /**
- * @blanxer/storefront/seo — Next `Metadata` objects and JSON-LD from the SEO
+ * @blanxer-dev/storefront/seo — Next `Metadata` objects and JSON-LD from the SEO
  * fields merchants edit in Blanxer (product/category/brand `seo_title`,
  * `seo_description`, `seo_image`; landing page SEO; blog SEO) and the store's
  * Search Console / meta-tag plugins. Pure functions: usable in

@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import type { CSSProperties, ReactNode } from 'react';
-import '@blanxer/storefront/styles.css';
+import '@blanxer-dev/storefront/styles.css';
 import './globals.css';
-import { BlanxerProvider, Pixel } from '@blanxer/storefront/react';
-import { apiBase, getHomeSeo, toClientStore } from '@blanxer/storefront/server';
-import { storeMetadata } from '@blanxer/storefront/seo';
-import { storeFont, storeThemeColor } from '@blanxer/storefront/core';
+import { BlanxerProvider, Pixel } from '@blanxer-dev/storefront/react';
+import { apiBase, getHomeSeo, toClientStore } from '@blanxer-dev/storefront/server';
+import { storeMetadata } from '@blanxer-dev/storefront/seo';
+import { storeFont, storeThemeColor } from '@blanxer-dev/storefront/core';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { storeFontClass } from '@/lib/fonts';

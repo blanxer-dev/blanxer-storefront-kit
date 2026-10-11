@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { discountPercent, listPrice, type Product, type Store } from '@blanxer/storefront/core';
+import { discountPercent, listPrice, type Product, type Store } from '@blanxer-dev/storefront/core';
 import { price } from '@/lib/site';
 
 /** `eager`: above-the-fold cards (load now instead of lazily); `lcp`: the one most likely to be the page's LCP image. */

@@ -4,7 +4,7 @@
  *
  * Use globally in next.config.ts:
  *   images: { loader: 'custom', loaderFile: './src/lib/image-loader.ts' }
- * with src/lib/image-loader.ts: `export { default } from '@blanxer/storefront/image-loader'`.
+ * with src/lib/image-loader.ts: `export { default } from '@blanxer-dev/storefront/image-loader'`.
  *
  * Switch provider with NEXT_PUBLIC_BLANXER_IMAGE_LOADER = 'wsrv' (default) |
  * 'cloudflare' (Cloudflare Image Transformations on your zone, /cdn-cgi/image) | 'none'.

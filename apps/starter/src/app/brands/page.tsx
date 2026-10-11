@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getBrands } from '@blanxer/storefront/server';
+import { getBrands } from '@blanxer-dev/storefront/server';
 
 export const metadata: Metadata = { title: 'Brands' };
 

@@ -1,5 +1,5 @@
-import { CartView } from '@blanxer/storefront/react';
-import { noIndexMetadata } from '@blanxer/storefront/seo';
+import { CartView } from '@blanxer-dev/storefront/react';
+import { noIndexMetadata } from '@blanxer-dev/storefront/seo';
 
 export const metadata = noIndexMetadata('Cart');
 

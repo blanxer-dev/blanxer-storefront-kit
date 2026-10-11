@@ -1,5 +1,5 @@
 /**
- * @blanxer/storefront/client — calls that must run in the shopper's browser:
+ * @blanxer-dev/storefront/client — calls that must run in the shopper's browser:
  * orders, coupons, payment starts and checks, hold release, tracking, cancel,
  * review, back-in-stock, forms, flash-sale notify and Meta events.
  *
@@ -51,7 +51,7 @@ const enc = encodeURIComponent;
 
 // ---------------------------------------------------------------- orders
 
-/** `POST /order/:store_id`. Build `payload` with `buildOrderPayload` (from `@blanxer/storefront/core`). */
+/** `POST /order/:store_id`. Build `payload` with `buildOrderPayload` (from `@blanxer-dev/storefront/core`). */
 export const placeOrder = (storeId: string, payload: Record<string, any>): Promise<OrderResponse> =>
   call('POST', `/order/${storeId}`, payload);
 

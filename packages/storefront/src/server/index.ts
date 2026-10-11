@@ -1,10 +1,10 @@
 /**
- * @blanxer/storefront/server — store and catalog reads for Server Components,
+ * @blanxer-dev/storefront/server — store and catalog reads for Server Components,
  * `generateMetadata`, route handlers and build time.
  *
  * Every call is a GET with Next's data cache (`revalidate: 60` by default) and
  * a normal browser User-Agent. Nothing here places orders or starts payments:
- * those calls are browser-only (`@blanxer/storefront/client`).
+ * those calls are browser-only (`@blanxer-dev/storefront/client`).
  *
  * Env: BLANXER_STORE (subdomain, required), BLANXER_API (default https://api.blanxer.com),
  * SITE_URL (optional, the site's public origin; used for canonical URLs and robots/sitemaps).
@@ -31,7 +31,7 @@ export const storeHandle = (): string => {
   const v = String(process.env.BLANXER_STORE || '').trim();
   if (!v) {
     throw new Error(
-      '[@blanxer/storefront] BLANXER_STORE is not set. Add BLANXER_STORE=<your store subdomain> to .env (and to the Cloudflare Worker vars).',
+      '[@blanxer-dev/storefront] BLANXER_STORE is not set. Add BLANXER_STORE=<your store subdomain> to .env (and to the Cloudflare Worker vars).',
     );
   }
   return v;
@@ -98,7 +98,7 @@ export async function getStore(opts?: ServerFetchOptions): Promise<Store> {
   const handle = storeHandle();
   const store = await blanxerGet<Store>(`/store/check_domain?domain=${enc(handle)}`, opts);
   if (!store?._id) {
-    throw new Error(`[@blanxer/storefront] No Blanxer store found for BLANXER_STORE="${handle}" at ${apiBase()}.`);
+    throw new Error(`[@blanxer-dev/storefront] No Blanxer store found for BLANXER_STORE="${handle}" at ${apiBase()}.`);
   }
   storeIdMemo.set(handle, store._id);
   return store;

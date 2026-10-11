@@ -1,5 +1,5 @@
-import { OrderTracking } from '@blanxer/storefront/react';
-import { noIndexMetadata } from '@blanxer/storefront/seo';
+import { OrderTracking } from '@blanxer-dev/storefront/react';
+import { noIndexMetadata } from '@blanxer-dev/storefront/seo';
 
 export const metadata = noIndexMetadata('Track your order');
 

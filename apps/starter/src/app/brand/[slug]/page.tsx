@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getBrand } from '@blanxer/storefront/server';
-import { brandMetadata } from '@blanxer/storefront/seo';
+import { getBrand } from '@blanxer-dev/storefront/server';
+import { brandMetadata } from '@blanxer-dev/storefront/seo';
 import { ProductGrid } from '@/components/product-card';
 import { origin, slugParam, store } from '@/lib/site';
 

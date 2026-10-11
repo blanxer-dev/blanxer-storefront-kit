@@ -2,7 +2,7 @@
  * Plain starter design. Replace it freely: colours come from the store
  * (--brand, set in layout.tsx from customization.theme) and the font from
  * customization.font (src/lib/fonts.ts). The checkout and other package
- * components read the --bx-* variables (see @blanxer/storefront/styles.css).
+ * components read the --bx-* variables (see @blanxer-dev/storefront/styles.css).
  */
 :root {
   --bg: #ffffff;

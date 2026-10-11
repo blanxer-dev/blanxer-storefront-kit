@@ -31,15 +31,15 @@ describe('check: routes', () => {
 
 describe('check: checkout uses the package', () => {
   it('direct, aliased and via a local component', () => {
-    const direct = site({ 'app/checkout/page.tsx': `import { Checkout } from '@blanxer/storefront/react';\nexport default () => <Checkout />;` });
+    const direct = site({ 'app/checkout/page.tsx': `import { Checkout } from '@blanxer-dev/storefront/react';\nexport default () => <Checkout />;` });
     expect(rendersPackageCheckout(findPageFile(join(direct, 'app'), '/checkout')!, direct)).toBe(true);
 
-    const aliased = site({ 'app/checkout/page.tsx': `import { Money, Checkout as BxCheckout } from '@blanxer/storefront/react';\nexport default () => <BxCheckout theme={{}}/>;` });
+    const aliased = site({ 'app/checkout/page.tsx': `import { Money, Checkout as BxCheckout } from '@blanxer-dev/storefront/react';\nexport default () => <BxCheckout theme={{}}/>;` });
     expect(rendersPackageCheckout(findPageFile(join(aliased, 'app'), '/checkout')!, aliased)).toBe(true);
 
     const nested = site({
       'src/app/checkout/page.tsx': `import Shell from '@/components/checkout-shell';\nexport default () => <Shell />;`,
-      'src/components/checkout-shell.tsx': `'use client';\nimport { Checkout } from '@blanxer/storefront/react';\nexport default () => <div><Checkout/></div>;`,
+      'src/components/checkout-shell.tsx': `'use client';\nimport { Checkout } from '@blanxer-dev/storefront/react';\nexport default () => <div><Checkout/></div>;`,
     });
     expect(rendersPackageCheckout(findPageFile(join(nested, 'src/app'), '/checkout')!, nested)).toBe(true);
   });

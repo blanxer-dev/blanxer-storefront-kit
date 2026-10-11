@@ -118,13 +118,13 @@ function resolveLocalImport(fromFile: string, spec: string, root: string): strin
 
 /**
  * Does `file` (or a local module it imports, up to 3 levels deep) render the
- * package's `<Checkout>` from `@blanxer/storefront/react`?
+ * package's `<Checkout>` from `@blanxer-dev/storefront/react`?
  */
 export function rendersPackageCheckout(file: string, root: string, depth = 0, seen = new Set<string>()): boolean {
   if (seen.has(file)) return false;
   seen.add(file);
   const t = read(file);
-  const imp = /import\s*\{([^}]*)\}\s*from\s*['"]@blanxer\/storefront\/react['"]/g;
+  const imp = /import\s*\{([^}]*)\}\s*from\s*['"]@blanxer-dev\/storefront\/react['"]/g;
   let m: RegExpExecArray | null;
   while ((m = imp.exec(t))) {
     for (const part of m[1]!.split(',')) {
@@ -134,7 +134,7 @@ export function rendersPackageCheckout(file: string, root: string, depth = 0, se
       if (new RegExp(`<${local.replace(/\$/g, '\\$')}[\\s/>]`).test(t)) return true;
     }
   }
-  if (/export\s*\{[^}]*\bCheckout\b[^}]*\}\s*from\s*['"]@blanxer\/storefront\/react['"]/.test(t)) return true;
+  if (/export\s*\{[^}]*\bCheckout\b[^}]*\}\s*from\s*['"]@blanxer-dev\/storefront\/react['"]/.test(t)) return true;
   if (depth >= 3) return false;
   const specs = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
   while ((m = specs.exec(t))) {
@@ -177,7 +177,7 @@ export function nextImageIssues(src: string): { unsized: number[]; hasLcpHint: b
   const def = /import\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s*from\s*['"]next\/image['"]/g;
   let m: RegExpExecArray | null;
   while ((m = def.exec(src))) names.add(m[1]!);
-  if (/from\s*['"]@blanxer\/storefront\/react['"]/.test(src) && /\bBlanxerImage\b/.test(src)) names.add('BlanxerImage');
+  if (/from\s*['"]@blanxer-dev\/storefront\/react['"]/.test(src) && /\bBlanxerImage\b/.test(src)) names.add('BlanxerImage');
   for (const name of names) {
     for (const tag of jsxTags(src, name)) {
       const a = tag.attrs;
@@ -287,7 +287,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
   const pkg = JSON.parse(read(join(root, 'package.json')) || '{}');
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
   add(deps.next ? 'PASS' : 'FAIL', 'Next.js', deps.next ? `next ${deps.next}, App Router (${relative(root, appDir)})` : 'next is not a dependency');
-  add(deps['@blanxer/storefront'] ? 'PASS' : 'FAIL', '@blanxer/storefront', deps['@blanxer/storefront'] ? `using ${deps['@blanxer/storefront']}` : 'the site must use @blanxer/storefront for checkout and data');
+  add(deps['@blanxer-dev/storefront'] ? 'PASS' : 'FAIL', '@blanxer-dev/storefront', deps['@blanxer-dev/storefront'] ? `using ${deps['@blanxer-dev/storefront']}` : 'the site must use @blanxer-dev/storefront for checkout and data');
 
   // routes
   const routes = collectRoutes(appDir);
@@ -304,8 +304,8 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
       ok ? 'PASS' : 'FAIL',
       'Checkout from the package',
       ok
-        ? `${relative(root, checkoutPage)} renders <Checkout> from @blanxer/storefront/react`
-        : `${relative(root, checkoutPage)} must render <Checkout> from @blanxer/storefront/react (theme it, don't rewrite it)`,
+        ? `${relative(root, checkoutPage)} renders <Checkout> from @blanxer-dev/storefront/react`
+        : `${relative(root, checkoutPage)} must render <Checkout> from @blanxer-dev/storefront/react (theme it, don't rewrite it)`,
     );
   }
   const forbidden = FORBIDDEN_ROUTES.filter((r) => routes.has(r) || [...routes].some((x) => x.startsWith(`${r}/`)));
@@ -342,7 +342,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
   for (const f of srcFiles) {
     const t = read(f);
     const rel = relative(root, f);
-    if (/['"]@blanxer\/storefront\/client['"]/.test(t) && !hasUseClient(t)) {
+    if (/['"]@blanxer-dev\/storefront\/client['"]/.test(t) && !hasUseClient(t)) {
       if (ROUTE_FILE.test(f) || hasUseServer(t) || /(?:^|[\\/])middleware\.|(?:^|[\\/])proxy\./.test(f)) serverImports.push(rel);
       else softImports.push(rel);
     }
@@ -350,10 +350,10 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
     if (d) directCalls.push(`${rel}:${t.slice(0, d.index).split('\n').length}`);
     if (/fetch\([^)]*\/order\/\$\{/.test(t)) directCalls.push(`${rel} (POST /order)`);
   }
-  if (serverImports.length) add('FAIL', 'Order/payment calls are browser-only', `@blanxer/storefront/client imported by server code: ${serverImports.join(', ')}`);
+  if (serverImports.length) add('FAIL', 'Order/payment calls are browser-only', `@blanxer-dev/storefront/client imported by server code: ${serverImports.join(', ')}`);
   else if (softImports.length)
     add('WARN', 'Order/payment calls are browser-only', `imported by files without "use client" (fine only if they are used from client components): ${softImports.join(', ')}`);
-  else add('PASS', 'Order/payment calls are browser-only', '@blanxer/storefront/client is only imported from "use client" files');
+  else add('PASS', 'Order/payment calls are browser-only', '@blanxer-dev/storefront/client is only imported from "use client" files');
   add(
     directCalls.length ? 'FAIL' : 'PASS',
     'Checkout logic not re-implemented',

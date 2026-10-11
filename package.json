@@ -2,7 +2,7 @@
   "name": "blanxer-storefront-kit",
   "private": true,
   "version": "0.0.0",
-  "description": "@blanxer/storefront (npm package) and the Blanxer storefront starter (Next.js 16 + Cloudflare).",
+  "description": "@blanxer-dev/storefront (npm package) and the Blanxer storefront starter (Next.js 16 + Cloudflare).",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,9 +13,9 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "npm run build -w @blanxer/storefront",
-    "test": "npm test -w @blanxer/storefront",
-    "typecheck": "npm run typecheck -w @blanxer/storefront",
+    "build": "npm run build -w @blanxer-dev/storefront",
+    "test": "npm test -w @blanxer-dev/storefront",
+    "typecheck": "npm run typecheck -w @blanxer-dev/storefront",
     "build:starter": "npm run build -w blanxer-storefront-starter",
     "check": "npm run check -w blanxer-storefront-starter"
   },

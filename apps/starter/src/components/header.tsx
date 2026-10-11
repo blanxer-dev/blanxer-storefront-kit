@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { storeName, type Store } from '@blanxer/storefront/core';
+import { storeName, type Store } from '@blanxer-dev/storefront/core';
 import { usableHref } from '@/lib/site';
 import { CartLink } from './cart-link';
 

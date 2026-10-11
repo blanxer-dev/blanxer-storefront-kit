@@ -21,7 +21,7 @@ export const BlanxerContext = createContext<BlanxerContextValue | null>(null);
 /** Store, store id, API base and `notify` from the nearest `<BlanxerProvider>`. */
 export function useBlanxer(): BlanxerContextValue {
   const v = useContext(BlanxerContext);
-  if (!v) throw new Error('[@blanxer/storefront] Wrap your app in <BlanxerProvider store={…}> (see the starter app/layout.tsx).');
+  if (!v) throw new Error('[@blanxer-dev/storefront] Wrap your app in <BlanxerProvider store={…}> (see the starter app/layout.tsx).');
   return v;
 }
 

@@ -21,7 +21,7 @@
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
-    "@blanxer/storefront": "^0.1.0",
+    "@blanxer-dev/storefront": "^0.1.0",
     "next": "16.4.0",
     "react": "19.3.0",
     "react-dom": "19.3.0"

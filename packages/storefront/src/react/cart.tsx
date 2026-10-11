@@ -67,7 +67,7 @@ const CartContext = createContext<CartContextValue | null>(null);
 
 export function useCart(): CartContextValue {
   const v = useContext(CartContext);
-  if (!v) throw new Error('[@blanxer/storefront] useCart() needs <BlanxerProvider> (or <CartProvider>) above it.');
+  if (!v) throw new Error('[@blanxer-dev/storefront] useCart() needs <BlanxerProvider> (or <CartProvider>) above it.');
   return v;
 }
 

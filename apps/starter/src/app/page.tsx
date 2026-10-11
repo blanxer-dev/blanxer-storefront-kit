@@ -1,7 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { getCategory, getSaleProducts } from '@blanxer/storefront/server';
-import { organizationJsonLd } from '@blanxer/storefront/seo';
+import { getCategory, getSaleProducts } from '@blanxer-dev/storefront/server';
+import { organizationJsonLd } from '@blanxer-dev/storefront/seo';
 import { ProductGrid } from '@/components/product-card';
 import { JsonLd } from '@/components/json-ld';
 import { origin, store, usableHref } from '@/lib/site';

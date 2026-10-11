@@ -51,7 +51,7 @@ const cssVars = (t: BlanxerTheme) =>
 export interface BlanxerProviderProps {
   /** Store from `getClientStore()` (server). Don't pass the raw `getStore()` document to the browser. */
   store: Store;
-  /** API base, normally `apiBase()` from `@blanxer/storefront/server`. Default https://api.blanxer.com. */
+  /** API base, normally `apiBase()` from `@blanxer-dev/storefront/server`. Default https://api.blanxer.com. */
   apiBase?: string;
   /** Override the CSS variables (see BlanxerTheme). */
   theme?: BlanxerTheme;

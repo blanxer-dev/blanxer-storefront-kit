@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getProduct } from '@blanxer/storefront/server';
-import { breadcrumbJsonLd, productJsonLd, productMetadata } from '@blanxer/storefront/seo';
-import { AddToCart } from '@blanxer/storefront/react';
+import { getProduct } from '@blanxer-dev/storefront/server';
+import { breadcrumbJsonLd, productJsonLd, productMetadata } from '@blanxer-dev/storefront/seo';
+import { AddToCart } from '@blanxer-dev/storefront/react';
 import { JsonLd } from '@/components/json-ld';
 import { origin, slugParam, store } from '@/lib/site';
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getForm } from '@blanxer/storefront/server';
-import { BlanxerForm } from '@blanxer/storefront/react';
+import { getForm } from '@blanxer-dev/storefront/server';
+import { BlanxerForm } from '@blanxer-dev/storefront/react';
 import { slugParam } from '@/lib/site';
 
 type Props = { params: Promise<{ slug: string }> };

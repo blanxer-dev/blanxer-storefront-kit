@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { storeName, type Store } from '@blanxer/storefront/core';
+import { storeName, type Store } from '@blanxer-dev/storefront/core';
 import { usableHref } from '@/lib/site';
 
 const SOCIAL: Array<[key: string, label: string]> = [

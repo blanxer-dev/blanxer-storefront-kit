@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getCategory } from '@blanxer/storefront/server';
-import { breadcrumbJsonLd, categoryMetadata } from '@blanxer/storefront/seo';
+import { getCategory } from '@blanxer-dev/storefront/server';
+import { breadcrumbJsonLd, categoryMetadata } from '@blanxer-dev/storefront/seo';
 import { ProductGrid } from '@/components/product-card';
 import { JsonLd } from '@/components/json-ld';
 import { origin, slugParam, store } from '@/lib/site';

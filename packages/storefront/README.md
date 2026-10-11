@@ -1,11 +1,11 @@
-# @blanxer/storefront
+# @blanxer-dev/storefront
 
 Store data, the full Blanxer checkout, SEO helpers and site checks for custom Next.js websites of Blanxer stores (BlanxerAPI). Blanxer stays the admin: products, stock, orders, payments, delivery and SEO text live in Blanxer and are read through the public API (`https://api.blanxer.com`, no key).
 
 Start from the starter instead of wiring this by hand: [`blanxer-dev/blanxer-storefront-starter`](https://github.com/blanxer-dev/blanxer-storefront-starter). Docs: https://developers.blanxer.com (agents: https://developers.blanxer.com/llms.txt).
 
 ```bash
-npm install @blanxer/storefront
+npm install @blanxer-dev/storefront
 ```
 
 Requires Next.js ≥ 16 (App Router), React ≥ 19, Node ≥ 20.9. ESM with TypeScript types.
@@ -30,7 +30,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 
 ## Subpaths
 
-### `@blanxer/storefront/server` (Server Components, `generateMetadata`, route handlers)
+### `@blanxer-dev/storefront/server` (Server Components, `generateMetadata`, route handlers)
 
 | Export | Returns |
 |---|---|
@@ -54,13 +54,13 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 
 `opts` is `{ revalidate?: number | false }` (default 60). Responses are also kept per server process / Worker isolate for the same 60 s, so a Cloudflare Worker without an incremental-cache binding still reads the catalog about once a minute, not once per page view.
 
-### `@blanxer/storefront/client` (browser only)
+### `@blanxer-dev/storefront/client` (browser only)
 
 `placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + Blanxer CAPI relay with one event id), plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
 
 `url` on orders and payments is always the site's own origin (`window.location.origin`); gateways return through the API to `<url>/payment/success` or `<url>/payment/failed`.
 
-### `@blanxer/storefront/react` (client components; unstyled behaviour + optional default CSS)
+### `@blanxer-dev/storefront/react` (client components; unstyled behaviour + optional default CSS)
 
 | Component / hook | Props |
 |---|---|
@@ -82,7 +82,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 | `<Money amount>`, `useMoney()`, `<BlanxerImage>` | store currency label; `next/image` with the Blanxer loader |
 | `QrPaymentModal`, `FonepayCheckoutModal`, `PaymentCloseConfirm`, `usePaymentHold`, `formatTimeLeft`, `qrSeconds` | the in-page payment screens `Checkout` uses |
 
-Styling: import `@blanxer/storefront/styles.css` once (optional), then override `--bx-*` variables (`--bx-primary`, `--bx-bg`, `--bx-fg`, `--bx-muted`, `--bx-border`, `--bx-surface`, `--bx-danger`, `--bx-success`, `--bx-radius`, `--bx-font`) or the `bx-*` classes. `BlanxerProvider` sets `--bx-primary` from the store's theme colour; its `theme` prop wins over that.
+Styling: import `@blanxer-dev/storefront/styles.css` once (optional), then override `--bx-*` variables (`--bx-primary`, `--bx-bg`, `--bx-fg`, `--bx-muted`, `--bx-border`, `--bx-surface`, `--bx-danger`, `--bx-success`, `--bx-radius`, `--bx-font`) or the `bx-*` classes. `BlanxerProvider` sets `--bx-primary` from the store's theme colour; its `theme` prop wins over that.
 
 #### "Checkout Powered by Blanxer"
 
@@ -105,11 +105,11 @@ There is no prop to remove it. Restyle it through `.bx-powered-by`; don't hide i
 - eSewa and NPX: auto-posted form. Khalti, Fonepay and Nabil card: redirect. Blanxer QR and Fonepay QR: QR modal with a countdown from `hold_seconds` (minus 20 s), auto-check every 5 s and on return to the tab. Checkout by Fonepay: bank list on mobile, QR on desktop, Fonepay websocket + check every 10 s. Closing a live QR asks first and then releases the hold; expiry releases it too.
 - The cart is cleared when the storefront clears it: right after the order for COD and redirect gateways, and only after the payment is confirmed for the in-page QR methods.
 
-## `@blanxer/storefront/seo`
+## `@blanxer-dev/storefront/seo`
 
 `storeMetadata(store, { origin?, homeSeo? })`, `productMetadata(product, store, { origin? })`, `categoryMetadata(store, category, { origin? })`, `brandMetadata(store, brand, page?, { origin? })`, `blogPostMetadata(post, store, { origin? })`, `noIndexMetadata(title)`, `verificationMetadata(store)` (Search Console and other `meta_tags` plugin tags), `productJsonLd`, `organizationJsonLd`, `breadcrumbJsonLd`, `jsonLd(data)` (safe serialiser). They read the SEO fields merchants edit in Blanxer (`seo_title`, `seo_description`, `seo_image`). Canonical URLs are only emitted when the origin is known.
 
-## `@blanxer/storefront/next`
+## `@blanxer-dev/storefront/next`
 
 ```ts
 // app/sitemap.xml/route.ts          export const GET = sitemapIndexRoute();      // + { extra: ['/sitemap-pages.xml'] }
@@ -117,13 +117,13 @@ There is no prop to remove it. Restyle it through `.bx-powered-by`; don't hide i
 // app/robots.txt/route.ts           export const GET = robotsRoute();
 ```
 
-`blanxerImageLoader` / `createImageLoader(provider)`: `next/image` loader. Remote images go through `https://wsrv.nl/?url=…&w=…&q=…&output=webp` (or `/cdn-cgi/image/…` with `cloudflare`); local files and SVGs are returned as they are. For a global loader: `images: { loader: 'custom', loaderFile: './src/lib/image-loader.ts' }` with `export { default } from '@blanxer/storefront/image-loader'`.
+`blanxerImageLoader` / `createImageLoader(provider)`: `next/image` loader. Remote images go through `https://wsrv.nl/?url=…&w=…&q=…&output=webp` (or `/cdn-cgi/image/…` with `cloudflare`); local files and SVGs are returned as they are. For a global loader: `images: { loader: 'custom', loaderFile: './src/lib/image-loader.ts' }` with `export { default } from '@blanxer-dev/storefront/image-loader'`.
 
 ## Extra subpaths
 
-- `@blanxer/storefront/core`: the pure logic (delivery, COD rule, coupons, payment method list, order payload, custom fields, validation, variants, formatting, store helpers, types). Safe on server and client.
-- `@blanxer/storefront/image-loader`: the default loader as a default export (for `loaderFile`).
-- `@blanxer/storefront/styles.css`: default styles.
+- `@blanxer-dev/storefront/core`: the pure logic (delivery, COD rule, coupons, payment method list, order payload, custom fields, validation, variants, formatting, store helpers, types). Safe on server and client.
+- `@blanxer-dev/storefront/image-loader`: the default loader as a default export (for `loaderFile`).
+- `@blanxer-dev/storefront/styles.css`: default styles.
 
 ## CLI
 
@@ -132,7 +132,7 @@ npx blanxer-storefront check [dir] [--lighthouse <url>[,<url>…]] [--offline] [
 npx blanxer-storefront images <in> <out> [--max-width 2560] [--quality 75] [--formats avif,webp]
 ```
 
-`check` prints a PASS/FAIL table and exits 1 on any failure: Next.js + the package present; all contract routes (`/`, `/products`, `/product/[slug]`, `/collections/[slug]`, `/brand/[slug]`, `/brands`, `/search`, `/sale`, `/cart`, `/checkout`, `/payment/success`, `/payment/failed`, `/track/[id]`, `/forms/[slug]`, `/blogs`, `/blog/[slug]`, `/sitemap.xml`, `/sitemap-catalog.xml`, `/robots.txt`); `/checkout` renders the package `<Checkout>`; no account/login/wishlist/rewards/`/p/` pages; no secrets (`sk_` keys, gateway keys, plugin tokens, passwords, JWTs) in source, env files, `wrangler` config or `.next`/`.open-next` output; no `/customer/auth|account|wishlist|rewards`; `@blanxer/storefront/client` not imported by server files; no direct payment/coupon/hold API calls; image budget in `public/` (no file over 300 KB or wider than 2560 px, no JPEG/PNG where AVIF/WebP fits); no raw `<img>`; every `<Image>` sized (`width`+`height` or `fill`), with a warning when no image is marked as the LCP image; the store resolves and its delivery places and payment methods are listed; Worker size after an OpenNext build. `--lighthouse http://localhost:3000` audits home, one product page and `/checkout` (mobile, needs ≥ 90 and LCP < 2.5 s; runs `npx lighthouse`, needs Chrome).
+`check` prints a PASS/FAIL table and exits 1 on any failure: Next.js + the package present; all contract routes (`/`, `/products`, `/product/[slug]`, `/collections/[slug]`, `/brand/[slug]`, `/brands`, `/search`, `/sale`, `/cart`, `/checkout`, `/payment/success`, `/payment/failed`, `/track/[id]`, `/forms/[slug]`, `/blogs`, `/blog/[slug]`, `/sitemap.xml`, `/sitemap-catalog.xml`, `/robots.txt`); `/checkout` renders the package `<Checkout>`; no account/login/wishlist/rewards/`/p/` pages; no secrets (`sk_` keys, gateway keys, plugin tokens, passwords, JWTs) in source, env files, `wrangler` config or `.next`/`.open-next` output; no `/customer/auth|account|wishlist|rewards`; `@blanxer-dev/storefront/client` not imported by server files; no direct payment/coupon/hold API calls; image budget in `public/` (no file over 300 KB or wider than 2560 px, no JPEG/PNG where AVIF/WebP fits); no raw `<img>`; every `<Image>` sized (`width`+`height` or `fill`), with a warning when no image is marked as the LCP image; the store resolves and its delivery places and payment methods are listed; Worker size after an OpenNext build. `--lighthouse http://localhost:3000` audits home, one product page and `/checkout` (mobile, needs ≥ 90 and LCP < 2.5 s; runs `npx lighthouse`, needs Chrome).
 
 `images` resizes (never enlarges) to `--max-width`, strips EXIF/GPS, writes AVIF (quality − 20) and WebP (quality) copies, copies SVGs, and prints a before/after table. Needs `sharp` (an optional dependency of this package).
 

@@ -1,6 +1,6 @@
 /*
- * @blanxer/storefront default styles. Optional: import it once
- * (`import '@blanxer/storefront/styles.css'`) and override the variables, or
+ * @blanxer-dev/storefront default styles. Optional: import it once
+ * (`import '@blanxer-dev/storefront/styles.css'`) and override the variables, or
  * skip it and style the `bx-*` classes yourself. Behaviour never depends on CSS.
  */
 :where(:root) {

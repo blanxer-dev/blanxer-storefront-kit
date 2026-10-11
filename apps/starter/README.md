@@ -1,6 +1,6 @@
 # Blanxer storefront starter
 
-A plain, fast Next.js 16 (App Router, TypeScript) website for a [Blanxer](https://blanxer.com) store, ready to restyle and deploy to your own Cloudflare account. Blanxer stays the admin: products, stock, orders, payments, delivery charges and SEO text come from Blanxer through the public API, and the checkout is Blanxer's own checkout from [`@blanxer/storefront`](https://www.npmjs.com/package/@blanxer/storefront).
+A plain, fast Next.js 16 (App Router, TypeScript) website for a [Blanxer](https://blanxer.com) store, ready to restyle and deploy to your own Cloudflare account. Blanxer stays the admin: products, stock, orders, payments, delivery charges and SEO text come from Blanxer through the public API, and the checkout is Blanxer's own checkout from [`@blanxer-dev/storefront`](https://www.npmjs.com/package/@blanxer-dev/storefront).
 
 Building with an AI agent? Point it at https://developers.blanxer.com/llms.txt (Claude Code: `/plugin marketplace add blanxer-dev/blanxer-agent-skills`, then `/plugin install blanxer-website@blanxer`).
 
@@ -62,7 +62,7 @@ There is no `/account`, `/login` or `/p/[slug]`: custom sites use guest checkout
 
 ## Caching on Cloudflare
 
-Pages read Blanxer at most once a minute (`revalidate = 60`). `open-next.config.ts` ships without an incremental-cache binding so a first deploy needs no extra Cloudflare resources; `@blanxer/storefront` keeps API responses for 60 s inside each Worker isolate. For full ISR, add an R2 bucket as described in `open-next.config.ts` and `wrangler.jsonc`.
+Pages read Blanxer at most once a minute (`revalidate = 60`). `open-next.config.ts` ships without an incremental-cache binding so a first deploy needs no extra Cloudflare resources; `@blanxer-dev/storefront` keeps API responses for 60 s inside each Worker isolate. For full ISR, add an R2 bucket as described in `open-next.config.ts` and `wrangler.jsonc`.
 
 ## Deploy
 

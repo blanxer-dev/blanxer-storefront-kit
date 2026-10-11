@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useCart } from '@blanxer/storefront/react';
+import { useCart } from '@blanxer-dev/storefront/react';
 
 export function CartLink() {
   const { count, hydrated } = useCart();

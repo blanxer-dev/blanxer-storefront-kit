@@ -1,5 +1,5 @@
-import { PaymentFailed } from '@blanxer/storefront/react';
-import { noIndexMetadata } from '@blanxer/storefront/seo';
+import { PaymentFailed } from '@blanxer-dev/storefront/react';
+import { noIndexMetadata } from '@blanxer-dev/storefront/seo';
 
 export const metadata = noIndexMetadata('Payment failed');
 

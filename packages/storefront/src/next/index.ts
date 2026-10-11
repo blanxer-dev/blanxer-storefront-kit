@@ -1,5 +1,5 @@
 /**
- * @blanxer/storefront/next — route handlers and the image loader.
+ * @blanxer-dev/storefront/next — route handlers and the image loader.
  *
  *   app/sitemap.xml/route.ts          export const GET = sitemapIndexRoute();
  *   app/sitemap-catalog.xml/route.ts  export const GET = catalogSitemapRoute();
