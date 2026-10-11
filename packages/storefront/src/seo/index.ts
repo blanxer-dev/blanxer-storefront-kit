@@ -79,6 +79,10 @@ export function storeMetadata(
     ...(opts.origin ? { alternates: { canonical: abs(opts.origin, '/') } } : {}),
     robots: { index: true, follow: true },
     ...v,
+    // Marks the site as a BlanxerAPI site for this store. Blanxer's nightly check reads these
+    // two tags to confirm a saved website link really serves this store; keep them.
+    generator: 'Blanxer Storefront',
+    other: { ...(v.other || {}), 'blanxer-store': String(store._id || '') },
   };
 }
 
