@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { pluginMap, storeThemeColor } from '../core/store.js';
 import type { Store } from '../core/types.js';
-import { configureClient, initMetaCapi, pingAnalytics } from '../client/index.js';
+import { PIXEL_ID_RE, captureFbclid, configureClient, initMetaCapi, pingAnalytics } from '../client/index.js';
 import { CartProvider } from './cart.js';
 import { BlanxerContext, type Notice } from './context.js';
 
@@ -83,7 +83,13 @@ export function BlanxerProvider({ store, apiBase, theme, notify, children }: Bla
   useEffect(() => {
     if (!store?._id) return;
     pingAnalytics(store._id);
-    initMetaCapi({ enabled: pluginMap(store).has('meta_capi'), store_id: store._id });
+    const plugins = pluginMap(store);
+    initMetaCapi({
+      enabled: PIXEL_ID_RE.test(String(plugins.get('fb_pixel') ?? '').trim()) && plugins.has('meta_capi'),
+      consentRequired: plugins.get('tracking_consent')?.enabled === true,
+      store_id: store._id,
+    });
+    captureFbclid();
   }, [store?._id]);
 
   // `?promo=CODE` anywhere on the site is remembered and auto-applied at checkout.

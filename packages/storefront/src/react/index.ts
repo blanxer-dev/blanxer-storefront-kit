@@ -23,6 +23,6 @@ export type { OrderTrackingProps } from './tracking.js';
 export { BlanxerForm } from './form.js';
 export type { BlanxerFormField } from './form.js';
 export { StockAlertForm as BackInStockForm } from './stock-alert.js';
-export { Pixel } from './pixel.js';
+export { Pixel, TrackingConsent } from './pixel.js';
 export { Money, useMoney } from './money.js';
 export { BlanxerImage } from './image.js';

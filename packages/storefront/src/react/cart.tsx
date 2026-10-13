@@ -195,11 +195,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const addToCart = (payload: CartItem) => {
     const key = payload.id || `${payload.product}_${payload.variant}`;
     const hit = items.find((el) => el.id === key);
+    const qty = payload.quantity || 1;
+    const unit = (payload.price || 0) + (payload.customization_charge || 0);
     trackEvent('AddToCart', {
       content_name: payload.product_name,
       content_ids: [contentId(payload)],
+      contents: [{ id: contentId(payload), quantity: qty, item_price: unit }],
       content_type: 'product',
-      value: payload.price,
+      value: unit * qty,
       currency: 'NPR',
     });
     const next = hit

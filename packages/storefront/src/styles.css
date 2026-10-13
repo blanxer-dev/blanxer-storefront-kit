@@ -214,3 +214,8 @@ button.bx-star { cursor: pointer; }
 .bx-toast--success { background: var(--bx-success); color: #fff; }
 .bx-toast-title { margin: 0; font-weight: 600; font-size: 0.9rem; }
 .bx-toast-message { margin: 2px 0 0; font-size: 0.85rem; opacity: .95; }
+
+/* tracking consent banner (<Pixel> with the store's tracking_consent plugin) */
+.bx-consent { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 1000; max-width: 720px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; background: var(--bx-bg); color: var(--bx-fg); border: 1px solid var(--bx-border); border-radius: var(--bx-radius); box-shadow: 0 8px 24px rgba(0,0,0,.12); font-size: 0.9rem; }
+.bx-consent p { flex: 1 1 260px; margin: 0; }
+.bx-consent-actions { display: flex; gap: 8px; }

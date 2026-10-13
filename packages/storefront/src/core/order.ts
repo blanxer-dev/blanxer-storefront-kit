@@ -19,11 +19,16 @@ export interface CheckoutFormValues {
   [key: string]: string | undefined;
 }
 
+/** The `meta` block of the create-order body (see `buildOrderMeta`). */
 export interface OrderMeta {
-  event_id: string;
+  /** @deprecated older versions shared an event id; the backend now returns `purchase_event_id`. */
+  event_id?: string;
   fbp?: string;
   fbc?: string;
+  fbclid?: string;
   event_source_url?: string;
+  /** false = the shopper declined tracking: the backend sends no Conversions API events for the order */
+  consent?: boolean;
 }
 
 /** A cart line's custom fields count only if at least one entry is non-empty. */

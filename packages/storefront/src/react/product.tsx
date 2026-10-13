@@ -547,10 +547,12 @@ export function AddToCart({
   useEffect(() => {
     if (!product?._id || viewed.current === product._id) return;
     viewed.current = product._id;
+    // parent id as product_group: the feed groups every product under its own id
     trackEvent('ViewContent', {
       content_ids: [product._id],
+      contents: [{ id: product._id, quantity: 1, item_price: Number(product.price || 0) }],
       content_name: product.name,
-      content_type: 'product',
+      content_type: 'product_group',
       value: product.price,
       currency: 'NPR',
     });

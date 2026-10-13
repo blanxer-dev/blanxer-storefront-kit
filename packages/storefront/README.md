@@ -56,7 +56,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 
 ### `@blanxer-dev/storefront/client` (browser only)
 
-`placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + Blanxer CAPI relay with one event id), plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
+`placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + GTM dataLayer + Blanxer CAPI relay with one event id; Purchase is never relayed), `firePurchase(order.meta)` (browser Purchase with the id and value the backend returned; the backend sends its own server Purchase), `pushMetaEvent` / `dlPush` (GTM dataLayer), `setConsent` / `getConsent`, `rememberCheckoutUser`, `localOrderMeta`, `savePendingPurchase` / `takePendingPurchase`, plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
 
 `url` on orders and payments is always the site's own origin (`window.location.origin`); gateways return through the API to `<url>/payment/success` or `<url>/payment/failed`.
 
@@ -78,7 +78,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 | `<OrderTracking>` | `orderId`, `fromCheckout?`, `className?` |
 | `<BlanxerForm>` | `form` (from `getForm()`), `className?`, `onSubmitted?` |
 | `<StockAlertForm>` (alias `BackInStockForm`) | `product`, `variantId?`, `className?` |
-| `<Pixel>` | `store?`; loads Meta Pixel, GA4, GTM and Clarity from the store's plugins |
+| `<Pixel>` | `store?`. Loads the Meta Pixel (digits-only id, once; skipped if GTM already set up the same pixel), GA4, GTM and Clarity from the store's plugins. Pushes `bx_page_view` to GTM on every route change. With the store's `tracking_consent` plugin it shows `<TrackingConsent>` and holds the pixel until the shopper accepts |
 | `<Money amount>`, `useMoney()`, `<BlanxerImage>` | store currency label; `next/image` with the Blanxer loader |
 | `QrPaymentModal`, `FonepayCheckoutModal`, `PaymentCloseConfirm`, `usePaymentHold`, `formatTimeLeft`, `qrSeconds` | the in-page payment screens `Checkout` uses |
 
@@ -101,7 +101,12 @@ There is no prop to remove it. Restyle it through `.bx-powered-by`; don't hide i
 - Payment methods: COD only for places whose flag is `true` or `'Y'`; online methods only on `basic`/`premium`/`plus`/`platinum` plans, each when the store has it on (`QR_Dynamic`, `FonepayCheckout`, `QR`, `Esewa`, `FonePay`, `Khalti`, `NPX`, `nbank_card`). Card is never offered.
 - Coupons: apply by code (also `?promo=` anywhere on the site), client rules for minimum order, COD-only/online-only and places, discount for flat/percent/shipping types; the order carries the coupon's `_id`, never the code.
 - Custom fields on cart lines (`label|||type|||value`, image upload through `POST /product/:store/:product/file`, `customization_charge`), print lines, cart selection (only ticked lines are ordered).
-- Order body exactly as the storefront sends it, `url = window.location.origin`, with the Meta `meta` block; `sessionStorage.checkout_order_id` + the pending Purchase event for `/payment/success`.
+- Order body exactly as the storefront sends it, `url = window.location.origin`, with the Meta `meta` block (`fbp`, `fbc`, `fbclid`, consent); `sessionStorage.checkout_order_id` + the pending Purchase (the backend's `order.meta`) for `/payment/success`.
+- **Meta Purchase is owned by the backend.**
+  - **COD:** it sends Purchase when the order is created.
+  - **Online payments:** it sends Purchase when the payment is verified.
+  - **The browser:** the pixel fires once with the same `purchase_event_id`, so Meta keeps one.
+  - **Every event is also pushed to GTM's `dataLayer`** in GA4 ecommerce shape (`view_item`, `add_to_cart`, `begin_checkout`, `add_payment_info`, `purchase`, …) with `meta_event_id`. Agencies can add page-level tags in GTM without code.
 - eSewa and NPX: auto-posted form. Khalti, Fonepay and Nabil card: redirect. Blanxer QR and Fonepay QR: QR modal with a countdown from `hold_seconds` (minus 20 s), auto-check every 5 s and on return to the tab. Checkout by Fonepay: bank list on mobile, QR on desktop, Fonepay websocket + check every 10 s. Closing a live QR asks first and then releases the hold; expiry releases it too.
 - The cart is cleared when the storefront clears it: right after the order for COD and redirect gateways, and only after the payment is confirmed for the in-page QR methods.
 

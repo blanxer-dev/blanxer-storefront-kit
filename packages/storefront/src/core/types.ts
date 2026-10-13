@@ -189,8 +189,23 @@ export interface PaymentMethod {
   display_name: string;
 }
 
+/** Meta Purchase payload returned by create-order: the browser pixel fires
+ * Purchase with exactly these values; the server sends its own with the same id. */
+export interface OrderPurchaseMeta {
+  purchase_event_id: string;
+  value: number;
+  currency: string;
+  content_type?: string;
+  content_ids: string[];
+  contents: { id: string; quantity: number; item_price: number }[];
+  num_items: number;
+  order_id: string;
+}
+
 export interface OrderResponse extends Loose {
   _id?: string;
+  /** Meta Purchase payload (backends from 2026-10). */
+  meta?: OrderPurchaseMeta;
   order_number?: number | string;
   total_price?: number;
   delivery_charge?: number;

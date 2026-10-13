@@ -20,11 +20,14 @@ import type { Coupon, DeliveryTable, OrderResponse, PaymentMethodName } from '..
 import {
   applyCoupon,
   buildOrderMeta,
+  firePurchase,
   followPayment,
   getDeliveryCharges,
-  getEventId,
-  pixelTrack,
+  localOrderMeta,
   placeOrder,
+  rememberCheckoutUser,
+  savePendingPurchase,
+  splitName,
   startPayment,
   trackEvent,
 } from '../client/index.js';
@@ -237,10 +240,36 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   useEffect(() => {
     if (!lines.length || initiateFired.current) return;
     initiateFired.current = true;
-    const ids = Array.from(new Set(lines.map(contentId)));
-    trackEvent('InitiateCheckout', { content_ids: ids, content_type: 'product', value: quote.payable, currency: 'NPR', num_items: ids.length });
+    trackEvent('InitiateCheckout', checkoutContents());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length]);
+
+  // Catalog-matching line ids with quantities, for InitiateCheckout / AddPaymentInfo.
+  const checkoutContents = () => {
+    const contents = lines.map((l: any) => ({
+      id: contentId(l),
+      quantity: l.quantity || 1,
+      item_price: (l.price || 0) + (l.customization_charge || 0),
+    }));
+    return {
+      content_ids: Array.from(new Set(contents.map((c) => c.id))),
+      contents,
+      content_type: 'product',
+      value: quote.payable,
+      currency: 'NPR',
+      num_items: contents.reduce((s, c) => s + c.quantity, 0),
+    };
+  };
+
+  // AddPaymentInfo once, when the shopper picks a method themselves.
+  const paymentInfoFired = useRef(false);
+  const choosePaymentMethod = (name: string) => {
+    setPaymentMethod(name);
+    if (!paymentInfoFired.current && lines.length) {
+      paymentInfoFired.current = true;
+      trackEvent('AddPaymentInfo', checkoutContents());
+    }
+  };
 
   const set = (key: keyof CheckoutFormValues) => (e: { target: { value: string } }) => {
     const v = e.target.value;
@@ -297,7 +326,13 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     placingRef.current = true;
     setSubmitting(true);
     try {
-      const eventId = getEventId();
+      // matching data for Meta (this browser session only)
+      rememberCheckoutUser({
+        email: values.customer_email,
+        phone: values.customer_phone_number,
+        city: values.customer_address_city,
+        ...splitName(values.customer_full_name),
+      });
       const payload = buildOrderPayload({
         store,
         lines,
@@ -305,7 +340,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         paymentMethod,
         url: window.location.origin,
         couponId: quote.coupon.valid && coupon?._id ? coupon._id : '',
-        meta: buildOrderMeta(eventId),
+        meta: buildOrderMeta(),
       });
       const res = await placeOrder(storeId, payload);
 
@@ -319,28 +354,20 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
 
       setOrderPlaced(true);
       onOrderPlaced?.(res, paymentMethod);
-      const ids = Array.from(new Set(payload.products.map((p: any) => contentId(p))));
-      const purchase = {
-        content_ids: ids,
-        content_type: 'product',
-        value: quote.payable,
-        currency: 'NPR',
-        num_items: payload.products.length,
-        event_id: eventId,
-        email: values.customer_email,
-        phone: values.customer_phone_number,
-      };
+      // The backend's Purchase payload (same id + value as its server event);
+      // built locally only against an older backend.
+      const purchase =
+        res.meta || localOrderMeta(lines as any, quote.payable, String(res.order_number || ''));
       try {
         sessionStorage.setItem(STORAGE_KEYS.checkoutOrderId, res._id);
-        sessionStorage.setItem(STORAGE_KEYS.pixelPurchasePending, JSON.stringify(purchase));
       } catch {
         /* storage blocked */
       }
+      savePendingPurchase(purchase);
 
       if (paymentFlow(paymentMethod) === 'none') {
-        // COD: the server already sent the CAPI Purchase; fire the browser pixel with the same id.
-        const { event_id, email: _e, phone: _p, ...custom } = purchase;
-        pixelTrack('Purchase', custom, { eventID: event_id });
+        // COD: the server already sent its Purchase; the pixel fires with the same id.
+        firePurchase(purchase);
         try {
           sessionStorage.removeItem(STORAGE_KEYS.checkoutOrderId);
           sessionStorage.removeItem(STORAGE_KEYS.pixelPurchasePending);
@@ -472,7 +499,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
               <div className="bx-payment-methods" role="radiogroup" aria-label={l.paymentSection}>
                 {methods.map((m) => (
                   <label key={m.name} className={cx('bx-payment-method', paymentMethod === m.name && 'bx-payment-method--active')} data-method={m.name}>
-                    <input type="radio" name="bx-payment-method" value={m.name} checked={paymentMethod === m.name} onChange={() => setPaymentMethod(m.name)} />
+                    <input type="radio" name="bx-payment-method" value={m.name} checked={paymentMethod === m.name} onChange={() => choosePaymentMethod(m.name)} />
                     {paymentMethodIcons?.[m.name] ? <span className="bx-payment-icon">{paymentMethodIcons[m.name]}</span> : null}
                     <span className="bx-payment-name">{m.display_name}</span>
                   </label>

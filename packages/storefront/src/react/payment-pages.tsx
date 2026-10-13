@@ -3,7 +3,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { STORAGE_KEYS } from '../core/config.js';
-import { trackEvent } from '../client/index.js';
+import { firePurchase, takePendingPurchase } from '../client/index.js';
 import { cx } from './ui.js';
 
 /**
@@ -22,12 +22,10 @@ export function PaymentSuccess({ className, children }: { className?: string; ch
     try {
       orderId = sessionStorage.getItem(STORAGE_KEYS.checkoutOrderId);
       sessionStorage.removeItem(STORAGE_KEYS.checkoutOrderId);
-      const raw = sessionStorage.getItem(STORAGE_KEYS.pixelPurchasePending);
-      if (raw) {
-        const { event_id, email, phone, ...custom } = JSON.parse(raw);
-        trackEvent('Purchase', custom, { eventId: event_id, email, phone });
-        sessionStorage.removeItem(STORAGE_KEYS.pixelPurchasePending);
-      }
+      // read once, so a refresh doesn't fire it again; the server already
+      // sent its Purchase (same id) when the payment was verified
+      const pending = takePendingPurchase();
+      if (pending) firePurchase(pending);
     } catch {
       /* storage blocked */
     }
@@ -48,6 +46,10 @@ export function PaymentSuccess({ className, children }: { className?: string; ch
 
 /** `/payment/failed`. Pass `method` (from `?method=`) to show the card-specific reasons. */
 export function PaymentFailed({ method, homeHref = '/', className }: { method?: string; homeHref?: string; className?: string }) {
+  // the payment didn't go through: no Purchase for it later
+  useEffect(() => {
+    takePendingPurchase();
+  }, []);
   const isCard = method === 'card';
   return (
     <div className={cx('bx-result bx-result--failed', className)}>
