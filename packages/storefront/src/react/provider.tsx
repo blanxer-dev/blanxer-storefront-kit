@@ -86,7 +86,6 @@ export function BlanxerProvider({ store, apiBase, theme, notify, children }: Bla
     const plugins = pluginMap(store);
     initMetaCapi({
       enabled: PIXEL_ID_RE.test(String(plugins.get('fb_pixel') ?? '').trim()) && plugins.has('meta_capi'),
-      consentRequired: plugins.get('tracking_consent')?.enabled === true,
       store_id: store._id,
     });
     captureFbclid();
