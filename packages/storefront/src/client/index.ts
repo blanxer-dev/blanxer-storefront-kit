@@ -11,7 +11,7 @@ import 'client-only';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
-import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderResponse } from '../core/types.js';
+import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
 
@@ -236,20 +236,51 @@ export function pingAnalytics(storeId: string): void {
 
 // ---------------------------------------------------------------- Meta pixel + Conversions API
 
-export type MetaEventName = 'ViewContent' | 'AddToCart' | 'InitiateCheckout' | 'Purchase' | 'Search' | 'PageView';
+export type MetaEventName =
+  | 'PageView'
+  | 'ViewContent'
+  | 'Search'
+  | 'AddToCart'
+  | 'AddToWishlist'
+  | 'InitiateCheckout'
+  | 'AddPaymentInfo'
+  | 'Purchase'
+  | 'Lead'
+  | 'Contact'
+  | 'CompleteRegistration';
 
-type MetaConfig = { enabled: boolean; store_id: string };
+type MetaConfig = {
+  /** the store has the Conversions API (`meta_capi` plugin) */
+  enabled: boolean;
+  store_id: string;
+  /** the store asks shoppers before tracking (`tracking_consent` plugin) */
+  consentRequired?: boolean;
+};
+
+export type MetaUser = {
+  email?: string;
+  phone?: string;
+  first_name?: string;
+  last_name?: string;
+  city?: string;
+  external_id?: string;
+};
 
 declare global {
   interface Window {
     __META_CAPI__?: MetaConfig;
     fbq?: (...args: any[]) => void;
+    dataLayer?: any[];
   }
 }
 
-/** Turn the CAPI relay on/off for this page (BlanxerProvider calls it from the store's `meta_capi` plugin). */
+export const PIXEL_ID_RE = /^\d{10,20}$/;
+
+const inBrowser = () => typeof window !== 'undefined';
+
+/** Store config for Meta events (BlanxerProvider calls it from the store's plugins). */
 export const initMetaCapi = (cfg: MetaConfig) => {
-  if (typeof window !== 'undefined') window.__META_CAPI__ = cfg;
+  if (inBrowser()) window.__META_CAPI__ = cfg;
 };
 
 export const getEventId = (): string => {
@@ -267,25 +298,168 @@ const readCookie = (name: string): string => {
   return m ? decodeURIComponent(m[1]!) : '';
 };
 
-/** The `meta` block of the order body: lets the backend fire the COD Purchase deduped with the browser pixel. */
-export const buildOrderMeta = (eventId: string) => ({
-  event_id: eventId,
-  fbp: readCookie('_fbp'),
-  fbc: readCookie('_fbc'),
-  event_source_url: typeof window !== 'undefined' ? window.location.href : '',
-});
+// consent ------------------------------------------------------------
+
+const CONSENT_KEY = 'bx_tracking_consent';
+
+export const getConsent = (): 'granted' | 'denied' | 'unknown' => {
+  try {
+    const v = localStorage.getItem(CONSENT_KEY);
+    return v === 'granted' || v === 'denied' ? v : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+};
+
+/** True unless the store asks for consent and the shopper hasn't given it. */
+export const hasConsent = () => !(inBrowser() && window.__META_CAPI__?.consentRequired) || getConsent() === 'granted';
+
+export const setConsent = (v: 'granted' | 'denied') => {
+  try {
+    localStorage.setItem(CONSENT_KEY, v);
+  } catch {
+    /* private mode */
+  }
+  if (inBrowser() && window.fbq) window.fbq('consent', v === 'granted' ? 'grant' : 'revoke');
+};
+
+// ad click id ---------------------------------------------------------
+
+const FBCLID_KEY = 'bx_fbclid';
+
+/** Keep the Meta ad click id from the landing URL (the pixel's `_fbc` cookie may be blocked). */
+export const captureFbclid = () => {
+  try {
+    const fbclid = new URLSearchParams(window.location.search).get('fbclid');
+    if (fbclid) localStorage.setItem(FBCLID_KEY, JSON.stringify({ fbclid, ts: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+};
+
+const fbIds = () => {
+  let click: { fbclid: string; ts: number } | null = null;
+  try {
+    const v = JSON.parse(localStorage.getItem(FBCLID_KEY) || 'null');
+    if (v?.fbclid && Date.now() - v.ts < 90 * 24 * 60 * 60 * 1000) click = v;
+  } catch {
+    /* ignore */
+  }
+  return {
+    fbp: readCookie('_fbp'),
+    fbc: readCookie('_fbc') || (click ? `fb.1.${click.ts}.${click.fbclid}` : ''),
+    fbclid: click?.fbclid || '',
+  };
+};
+
+// shopper (matching) ---------------------------------------------------
+
+const USER_KEY = 'bx_meta_user';
+
+/** Checkout details, kept for this browser session so server events can match the shopper. */
+export const rememberCheckoutUser = (u: MetaUser) => {
+  try {
+    sessionStorage.setItem(USER_KEY, JSON.stringify(u));
+  } catch {
+    /* ignore */
+  }
+};
+
+const metaUser = (): MetaUser => {
+  try {
+    return JSON.parse(sessionStorage.getItem(USER_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+};
+
+export const splitName = (full?: string) => {
+  const parts = String(full || '').trim().split(/\s+/).filter(Boolean);
+  return { first_name: parts[0] || undefined, last_name: parts.length > 1 ? parts[parts.length - 1] : undefined };
+};
+
+// GTM dataLayer ---------------------------------------------------------
+
+const GA4_EVENT: Record<string, string> = {
+  ViewContent: 'view_item',
+  Search: 'search',
+  AddToCart: 'add_to_cart',
+  AddToWishlist: 'add_to_wishlist',
+  InitiateCheckout: 'begin_checkout',
+  AddPaymentInfo: 'add_payment_info',
+  Purchase: 'purchase',
+  Lead: 'generate_lead',
+  Contact: 'contact',
+  CompleteRegistration: 'sign_up',
+};
+
+export const dlPush = (data: Record<string, any>) => {
+  if (!inBrowser()) return;
+  try {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(data);
+  } catch {
+    /* ignore */
+  }
+};
+
+/**
+ * Mirror a Meta event into GTM's dataLayer (GA4 ecommerce shape, plus
+ * `meta_event_id` so a Meta tag in GTM can dedupe with ours).
+ */
+export const pushMetaEvent = (eventName: string, cd: Record<string, any> = {}, eventId?: string) => {
+  const event = GA4_EVENT[eventName];
+  if (!event) return;
+  const list: any[] = cd.contents?.length ? cd.contents : (cd.content_ids || []).map((id: string) => ({ id }));
+  const items = list.map((c: any) => ({
+    item_id: c.id,
+    ...(list.length === 1 && cd.content_name ? { item_name: cd.content_name } : {}),
+    ...(c.item_price !== undefined ? { price: c.item_price } : {}),
+    quantity: c.quantity ?? 1,
+  }));
+  const head = {
+    event,
+    meta_event_name: eventName,
+    ...(eventId ? { meta_event_id: eventId } : {}),
+    ...(cd.search_string ? { search_term: cd.search_string } : {}),
+  };
+  if (!items.length && cd.value === undefined) return dlPush(head);
+  dlPush({ ecommerce: null });
+  dlPush({
+    ...head,
+    ecommerce: {
+      currency: cd.currency || 'NPR',
+      ...(cd.value !== undefined ? { value: cd.value } : {}),
+      ...(cd.order_id ? { transaction_id: cd.order_id } : {}),
+      items,
+    },
+  });
+};
+
+// tracking ---------------------------------------------------------------
+
+/** The `meta` block of the order body: lets the backend send the Purchase
+ * matched to this browser. Nothing identifying without consent. The argument
+ * is ignored (older versions shared an event id; the backend now returns it). */
+export const buildOrderMeta = (_legacyEventId?: string) => {
+  const event_source_url = inBrowser() ? window.location.href : '';
+  if (!hasConsent()) return { consent: false, event_source_url };
+  return { ...fbIds(), event_source_url, consent: true };
+};
 
 /** Browser pixel only (no-op when the pixel is not loaded). */
 export const pixelTrack = (event: MetaEventName, data?: Record<string, any>, options?: { eventID?: string }) => {
-  if (typeof window === 'undefined' || !window.fbq) return;
+  if (!inBrowser() || !window.fbq) return;
   if (!data) window.fbq('track', event);
   else if (!options) window.fbq('track', event, data);
   else window.fbq('track', event, data, options);
 };
 
 /**
- * Track a Meta event on the pixel and, when the store has the `meta_capi`
- * plugin, relay it to Blanxer's CAPI endpoint with the same event id.
+ * Track a Meta event on the pixel and GTM's dataLayer and, when the store has
+ * the `meta_capi` plugin (and the shopper hasn't declined tracking), relay it
+ * to Blanxer's CAPI endpoint with the same event id. Purchase is never
+ * relayed: the backend sends it from the real order (use `firePurchase`).
  * Returns the event id.
  */
 export function trackEvent(
@@ -295,8 +469,9 @@ export function trackEvent(
 ): string {
   const eventId = options.eventId || getEventId();
   pixelTrack(event, customData, { eventID: eventId });
-  const cfg = typeof window !== 'undefined' ? window.__META_CAPI__ : undefined;
-  if (cfg?.enabled && cfg.store_id) {
+  pushMetaEvent(event, customData, eventId);
+  const cfg = inBrowser() ? window.__META_CAPI__ : undefined;
+  if (cfg?.enabled && cfg.store_id && event !== 'Purchase' && event !== 'PageView' && hasConsent()) {
     try {
       fetch(`${base()}/public/meta-event/${cfg.store_id}`, {
         method: 'POST',
@@ -306,8 +481,8 @@ export function trackEvent(
           event_name: event,
           event_id: eventId,
           event_source_url: window.location.href,
-          fbp: readCookie('_fbp'),
-          fbc: readCookie('_fbc'),
+          ...fbIds(),
+          ...metaUser(),
           ...(options.email ? { email: options.email } : {}),
           ...(options.phone ? { phone: options.phone } : {}),
           custom_data: customData,
@@ -319,3 +494,61 @@ export function trackEvent(
   }
   return eventId;
 }
+
+/** Browser Purchase for an order, with the backend's `meta` (same id + value as its server event). */
+export const firePurchase = (meta: OrderPurchaseMeta) => {
+  const custom = {
+    value: meta.value,
+    currency: meta.currency || 'NPR',
+    content_type: 'product',
+    content_ids: meta.content_ids,
+    contents: meta.contents,
+    num_items: meta.num_items,
+    order_id: meta.order_id,
+  };
+  pixelTrack('Purchase', custom, { eventID: meta.purchase_event_id });
+  pushMetaEvent('Purchase', custom, meta.purchase_event_id);
+};
+
+/** Purchase payload built locally, only when an older backend didn't return `meta`. */
+export const localOrderMeta = (
+  lines: { product: string; variant?: string; quantity: number; price?: number }[],
+  value: number,
+  orderId = '',
+): OrderPurchaseMeta => {
+  const contents = lines.map((l) => ({
+    id: l.variant ? `${l.product}_${l.variant}` : l.product,
+    quantity: l.quantity || 1,
+    item_price: Number(l.price || 0),
+  }));
+  return {
+    purchase_event_id: getEventId(),
+    value,
+    currency: 'NPR',
+    content_ids: Array.from(new Set(contents.map((c) => c.id))),
+    contents,
+    num_items: contents.reduce((s, c) => s + c.quantity, 0),
+    order_id: orderId,
+  };
+};
+
+/** Paid methods: keep the Purchase for `/payment/success`. */
+export const savePendingPurchase = (meta: OrderPurchaseMeta) => {
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.pixelPurchasePending, JSON.stringify(meta));
+  } catch {
+    /* storage blocked */
+  }
+};
+
+/** Read (and remove) the pending Purchase; null for payloads saved by older versions. */
+export const takePendingPurchase = (): OrderPurchaseMeta | null => {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEYS.pixelPurchasePending);
+    sessionStorage.removeItem(STORAGE_KEYS.pixelPurchasePending);
+    const meta = raw ? JSON.parse(raw) : null;
+    return meta?.purchase_event_id ? meta : null;
+  } catch {
+    return null;
+  }
+};
