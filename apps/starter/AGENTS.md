@@ -27,21 +27,32 @@ The full docs are at https://developers.blanxer.com (agent index: https://develo
 9. **Payment methods come from the store's settings** via the package. Never add or remove them by hand.
 10. **Use Blanxer's URL paths**: `/product/[slug]`, `/collections/[slug]`, `/brand/[slug]`, `/blogs`, `/blog/[slug]`, `/forms/[slug]`. The feed, sitemap, SMS and emails use them. **Don't build a product feed or catalog sitemap**: Blanxer serves both for the site's domain. Keep the starter's `/sitemap-catalog.xml` pass-through and `/sitemap.xml` index; only add the site's own extra pages to the index.
 11. **Optimise every image before it goes into the site** (see https://developers.blanxer.com/api-docs/images-and-speed.md): `npx blanxer-storefront images`, AVIF + WebP, ×2 the largest display size, metadata stripped, `next/image` with width/height, `preload` only on each page's main (largest, first) image (Next.js 16 replaced `priority` with `preload`). **Product photos go into Blanxer through the MCP, never into the site.** No autoplay video backgrounds or GIF banners unless the merchant insists after hearing the speed cost. Fonts through `next/font`, at most 2 families.
-12. **The site's design lives in the site.** Don't use MCP page-builder or section tools (`blanxer_add_section`, `blanxer_update_section`, `blanxer_apply_page_template`, navigation/footer editors) to design a custom site; they change the Blanxer-hosted site. Exception: blog post bodies. `blanxer_create_blog_post` makes an empty post, and its body is written with `blanxer_add_section` / `blanxer_update_section` using `{ post_id }`. That is content the site shows, so use them for blog posts.
+12. **The site's design lives in the site.** Don't use MCP page-builder or section tools (`blanxer_add_section`, `blanxer_update_section`, `blanxer_apply_page_template`, navigation/footer editors) to design a custom site; they change the Blanxer-hosted site. Exception: blog post bodies. `blanxer_create_blog_post` makes an empty post, and its body is written with `blanxer_add_section` / `blanxer_update_section` using `{ post_id }`. That is content the site shows, so use them for blog posts. **The design comes from the merchant's brief** (step 2): ask for reference sites first, and don't copy the Blanxer-hosted storefront unless they ask.
 13. **Confirm before bulk store changes.** Show the merchant the list (SEO for many products, imports, delivery charges) and get a yes. The MCP's own confirmations still apply.
 
 ## Steps (confirm each with the merchant before moving on)
 
-### 1. Find the store and connect
+**Keep a progress file.** As soon as the site's folder exists, keep `BLANXER-PROGRESS.md` in it: the store, the design brief, what's decided and the step you're on. Update it after every step. If a session starts without the earlier conversation (the merchant restarted, or says "let's continue the website"), read it first and carry on from there instead of starting over.
+
+### 1. Connect the Blanxer MCP first, then find the store
+- **Before anything else, make sure the Blanxer MCP is connected**, so the merchant never has to restart in the middle of the work:
+  - **Its tools (`blanxer_…`) are already there:** if they need a sign-in, the merchant runs `/mcp`, picks `blanxer` and signs in to Blanxer in the browser. No restart.
+  - **Not there:** add it: `claude mcp add --transport http blanxer https://mcp.blanxer.com/mcp`, or install the skill (`/plugin marketplace add blanxer-dev/blanxer-agent-skills`, then `/plugin install blanxer-website@blanxer`). **Claude Code only loads a new MCP server when it starts**, so ask the merchant to restart **now**, while nothing is lost: type `/exit`, then run `claude -c` from the same folder Claude Code was started in. `claude -c` reopens this same conversation with its history. Give them the exact line (`cd <that folder> && claude -c`). Then `/mcp` → `blanxer` → sign in.
+  - **Other agents:** Codex resumes with `codex resume --last`. Cursor, Gemini CLI and claude.ai: add `https://mcp.blanxer.com/mcp` as a remote MCP server. If the tool needs a restart, write `BLANXER-PROGRESS.md` first.
 - Ask for the store subdomain (`mystore` in `mystore.blanxer.io`) or its link.
 - Read `https://api.blanxer.com/store/check_domain?domain=<subdomain>`. Show: store name, plan, product count (`/product/public/<_id>` length), and the payment methods the site will offer (rules in https://developers.blanxer.com/api-docs/checkout.md).
   - Plan not in `basic / premium / plus / platinum` → "your site will take Cash on Delivery only".
   - `customer_program.enabled` → "shoppers check out as guests on the new site".
-- Connect the Blanxer MCP: add `https://mcp.blanxer.com/mcp` as a remote MCP server (Claude Code: `claude mcp add --transport http blanxer https://mcp.blanxer.com/mcp`; Claude Code users can instead install the skill: `/plugin marketplace add blanxer-dev/blanxer-agent-skills`, `/plugin install blanxer-website@blanxer`). The merchant signs in to Blanxer in the browser.
 - Run `blanxer_audit_seo` and look for catalog gaps (products without photos, prices, categories or SEO text). Show what's missing; fix later in step 4.
 
-### 2. Design brief
-Ask for reference sites, look and feel, pages, tone, and must-haves. Offer the store's logo, colours (`customization.theme`) and font (`customization.font`) as defaults. Agree on a short page list before building.
+### 2. Design brief (ask, don't copy)
+**Ask the merchant before you design anything:**
+- 2–3 websites whose look they like (links or screenshots), or "something like <brand>";
+- colours and mood, the pages they need, the tone, and any must-haves.
+
+No references? Offer 3 short, clearly different style directions and let them pick.
+
+**Don't copy their current Blanxer-hosted storefront** (its layout, its sections, or `blanxer_get_site_design`). They are building a new site because they want something different. Reuse it only if they ask to keep their current look. Offer the store's logo, colours (`customization.theme`) and font (`customization.font`) as defaults, not as the design. Agree on a short page list and write the brief into `BLANXER-PROGRESS.md` before building.
 
 ### 3. Scaffold
 ```bash
