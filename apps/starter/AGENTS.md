@@ -69,7 +69,7 @@ Show the merchant the starter running with their real products before changing t
 - Pages and design with the package's data functions (`@blanxer-dev/storefront/server`) and components (`@blanxer-dev/storefront/react`). Theme the checkout; don't rewrite it.
 - Page metadata from `@blanxer-dev/storefront/seo` (`productMetadata`, `categoryMetadata`, ...). SEO text is edited in Blanxer, not in the code.
 - Images: rule 11. Show a before/after size table, e.g. `hero.jpg 6.2 MB → hero.avif 180 KB`.
-- Store fixes through the MCP, confirmed first (rule 13): product and category SEO text, categories and brands the menus need, product photos the merchant sends, launch coupons, delivery places/charges. They reach the site through the API (allow ~60 s cache).
+- Store fixes through the MCP, confirmed first (rule 14): product and category SEO text, categories and brands the menus need, product photos the merchant sends, launch offers or coupons, delivery places/charges. They reach the site through the API (allow ~60 s cache).
 
 ### 5. Check before deploy
 ```bash
