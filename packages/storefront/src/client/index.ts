@@ -253,8 +253,6 @@ type MetaConfig = {
   /** the store has the Conversions API (`meta_capi` plugin) */
   enabled: boolean;
   store_id: string;
-  /** the store asks shoppers before tracking (`tracking_consent` plugin) */
-  consentRequired?: boolean;
 };
 
 export type MetaUser = {
@@ -296,31 +294,6 @@ const readCookie = (name: string): string => {
   if (typeof document === 'undefined') return '';
   const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]!) : '';
-};
-
-// consent ------------------------------------------------------------
-
-const CONSENT_KEY = 'bx_tracking_consent';
-
-export const getConsent = (): 'granted' | 'denied' | 'unknown' => {
-  try {
-    const v = localStorage.getItem(CONSENT_KEY);
-    return v === 'granted' || v === 'denied' ? v : 'unknown';
-  } catch {
-    return 'unknown';
-  }
-};
-
-/** True unless the store asks for consent and the shopper hasn't given it. */
-export const hasConsent = () => !(inBrowser() && window.__META_CAPI__?.consentRequired) || getConsent() === 'granted';
-
-export const setConsent = (v: 'granted' | 'denied') => {
-  try {
-    localStorage.setItem(CONSENT_KEY, v);
-  } catch {
-    /* private mode */
-  }
-  if (inBrowser() && window.fbq) window.fbq('consent', v === 'granted' ? 'grant' : 'revoke');
 };
 
 // ad click id ---------------------------------------------------------
@@ -439,13 +412,12 @@ export const pushMetaEvent = (eventName: string, cd: Record<string, any> = {}, e
 // tracking ---------------------------------------------------------------
 
 /** The `meta` block of the order body: lets the backend send the Purchase
- * matched to this browser. Nothing identifying without consent. The argument
- * is ignored (older versions shared an event id; the backend now returns it). */
-export const buildOrderMeta = (_legacyEventId?: string) => {
-  const event_source_url = inBrowser() ? window.location.href : '';
-  if (!hasConsent()) return { consent: false, event_source_url };
-  return { ...fbIds(), event_source_url, consent: true };
-};
+ * matched to this browser. The argument is ignored (older versions shared an
+ * event id; the backend now returns it). */
+export const buildOrderMeta = (_legacyEventId?: string) => ({
+  ...fbIds(),
+  event_source_url: inBrowser() ? window.location.href : '',
+});
 
 /** Browser pixel only (no-op when the pixel is not loaded). */
 export const pixelTrack = (event: MetaEventName, data?: Record<string, any>, options?: { eventID?: string }) => {
@@ -457,7 +429,7 @@ export const pixelTrack = (event: MetaEventName, data?: Record<string, any>, opt
 
 /**
  * Track a Meta event on the pixel and GTM's dataLayer and, when the store has
- * the `meta_capi` plugin (and the shopper hasn't declined tracking), relay it
+ * the `meta_capi` plugin, relay it
  * to Blanxer's CAPI endpoint with the same event id. Purchase is never
  * relayed: the backend sends it from the real order (use `firePurchase`).
  * Returns the event id.
@@ -471,7 +443,7 @@ export function trackEvent(
   pixelTrack(event, customData, { eventID: eventId });
   pushMetaEvent(event, customData, eventId);
   const cfg = inBrowser() ? window.__META_CAPI__ : undefined;
-  if (cfg?.enabled && cfg.store_id && event !== 'Purchase' && event !== 'PageView' && hasConsent()) {
+  if (cfg?.enabled && cfg.store_id && event !== 'Purchase' && event !== 'PageView') {
     try {
       fetch(`${base()}/public/meta-event/${cfg.store_id}`, {
         method: 'POST',

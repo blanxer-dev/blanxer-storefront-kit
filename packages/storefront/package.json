@@ -1,6 +1,6 @@
 {
   "name": "@blanxer-dev/storefront",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Blanxer store data, the full Blanxer checkout, SEO helpers and site checks for custom Next.js storefronts.",
   "keywords": [
     "blanxer",
