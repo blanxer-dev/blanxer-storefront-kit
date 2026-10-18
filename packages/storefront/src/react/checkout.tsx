@@ -40,7 +40,7 @@ import { useBlanxer } from './context.js';
 import { useCart } from './cart.js';
 import { CartLines } from './cart-lines.js';
 import { useCartQuote, useOffers } from './offers.js';
-import { OfferCodeField, OfferSummary } from './offer-ui.js';
+import { OfferCodeField, OfferGiftPicker, OfferSummary } from './offer-ui.js';
 import { useMoney } from './money.js';
 import { FonepayCheckoutModal, QrPaymentModal, type FonepayCheckoutData, type QrPaymentData } from './payment-modals.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
@@ -246,7 +246,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   // Stores on Offers read it in OffersProvider instead.
   const autoApplied = useRef(false);
   useEffect(() => {
-    if (!lines.length || autoApplied.current || offersOn) return;
+    if (!lines.length || autoApplied.current || offersOn || !offers.ready) return;
     let promo = '';
     try {
       promo = new URLSearchParams(window.location.search).get('promo') || localStorage.getItem(STORAGE_KEYS.promoCode) || '';
@@ -258,7 +258,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     setCouponCode(promo.toUpperCase());
     fetchCoupon(promo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines.length, offersOn]);
+  }, [lines.length, offersOn, offers.ready]);
 
   const initiateFired = useRef(false);
   useEffect(() => {
@@ -566,6 +566,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         <aside className="bx-checkout-summary" aria-label={l.summary}>
           <h2 className="bx-section-title">{l.summary}</h2>
           <CartLines selectable editable quote={offerQuote} />
+          <OfferGiftPicker quote={offerQuote} />
           {offersOn && lines.length ? <OfferCodeField request={cq.request} quote={offerQuote} error={codeError} /> : null}
           {offerQuote ? (
             <OfferSummary
@@ -612,7 +613,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           )}
           {store?.checkout?.extras?.checkout_note ? <p className="bx-checkout-note">{store.checkout.extras.checkout_note}</p> : null}
 
-          {store?.plan && !offersOn ? (
+          {store?.plan && offers.ready && !offersOn ? (
             <div className="bx-promo">
               <TextInput
                 label={l.promo}

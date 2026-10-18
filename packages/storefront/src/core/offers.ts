@@ -767,3 +767,78 @@ export const offersPageLists = (offers: PublicOffer[]) => {
 /** A badge colour setting as CSS (`success` and `theme` map to the kit's variables). */
 export const badgeColor = (value?: string) =>
   value === 'success' ? 'var(--bx-success)' : value === 'theme' || !value ? 'var(--bx-primary)' : value;
+
+// ---------------------------------------------------------------- orders (tracking)
+
+export interface OrderOfferRow {
+  promotion_id: string;
+  /** "Buy more, save more · Kurtas · 15%", "Dashain 10% off · DASHAIN10" */
+  label: string;
+  amount: number;
+  kind: OfferKind;
+}
+
+/**
+ * What the offers did on a placed order (public order view), for tracking pages. null for
+ * orders without offers (older orders): show their discount as before.
+ * `other` is any discount on top of the offers (member tier, staff discount).
+ */
+export const orderOfferSummary = (order: any) => {
+  const promos: any[] = Array.isArray(order?.promotions) ? order.promotions : [];
+  if (!promos.length) return null;
+  const rows: OrderOfferRow[] = promos
+    .filter((p) => p?.class !== 'delivery' && Number(p?.amount) > 0)
+    .map((p) => {
+      const tier = p.detail?.tier;
+      const tierText = tier ? ` · ${tier.value_type === 'percent' ? `${tier.value}%` : `${rs(Number(tier.value) || 0)} off`}` : '';
+      return {
+        promotion_id: String(p.promotion_id || ''),
+        label: `${p.title || 'Offer'}${p.code ? ` · ${p.code}` : ''}${tierText}`,
+        amount: Number(p.amount) || 0,
+        kind: p.kind,
+      };
+    });
+  const offered = rows.reduce((t, r) => t + r.amount, 0);
+  const dValue = Number(order?.discount?.d_value) || 0;
+  const before = order?.delivery_charge_before_promo;
+  const after = Number(order?.delivery_charge) || 0;
+  const waived = before != null && Number(before) > after ? Number(before) - after : 0;
+  return {
+    rows,
+    /** discount beyond the offers (d_value carries both) */
+    other: Math.max(0, Math.round((dValue - offered) * 100) / 100),
+    delivery: { before: before != null ? Number(before) : null, after, waived },
+  };
+};
+
+/** Free units on an order line (gifts, free Y units). */
+export const orderLineFree = (line: any) => {
+  const qty = Number(line?.quantity) || 0;
+  const free = Math.min(qty, Number(line?.free_qty) || 0);
+  return { free, allFree: qty > 0 && free >= qty };
+};
+
+// ---------------------------------------------------------------- unavailable endpoints
+
+/** `GET /public/promotions` answer, or null when it isn't one (an HTML page, an older backend). */
+export const offersResponseOf = (raw: unknown): OffersResponse | null => {
+  const r = raw as any;
+  if (!r || typeof r !== 'object' || typeof r.enabled !== 'boolean') return null;
+  return {
+    enabled: r.enabled,
+    data: r.enabled && Array.isArray(r.data) ? r.data : [],
+    settings: r.settings && typeof r.settings === 'object' ? r.settings : {},
+    server_time: typeof r.server_time === 'string' ? r.server_time : new Date().toISOString(),
+  };
+};
+
+/** The quote from a `POST …/quote` answer; null when the store isn't on Offers or it isn't a quote. */
+export const quoteOf = (raw: unknown): Quote | null => {
+  const r = raw as any;
+  const d = r?.data;
+  if (!r || typeof r !== 'object' || r.enabled !== true || !d || !Array.isArray(d.lines) || !d.totals) return null;
+  return d as Quote;
+};
+
+/** Offers off, as for a store not on Offers. */
+export const OFFERS_OFF: OffersResponse = { enabled: false, data: [], settings: {}, server_time: '' };

@@ -12,7 +12,7 @@ import 'client-only';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
-import type { OffersResponse, Quote, QuoteRequest, QuoteResponse } from '../core/offers.js';
+import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
@@ -90,33 +90,72 @@ export const applyCoupon = (body: {
 
 // ---------------------------------------------------------------- offers
 
+let offersNoted = false;
+/** One console.debug line per page load when the offers endpoints aren't there (older backend). */
+const noteOffersOff = (why: unknown) => {
+  if (offersNoted) return;
+  offersNoted = true;
+  try {
+    console.debug('[@blanxer-dev/storefront] offers unavailable, using coupons:', (why as any)?.status || (why as any)?.message || String(why));
+  } catch {
+    /* no console */
+  }
+};
+
+const isAbort = (e: unknown) => (e as any)?.name === 'AbortError';
+
 /**
  * Live (and starting within 30 days) public offers, the store's display settings and the
  * server time. `enabled: false` → the store isn't on Offers: use the coupon calls above.
+ * Never throws: a 404 (older backend), a network error or a non-JSON answer is "offers off".
  */
 export const getOffers = (storeId: string, init?: RequestInit): Promise<OffersResponse> =>
-  call<any>('GET', `/public/promotions/${storeId}`, undefined, init).then(offersBody);
+  offersCall(`/public/promotions/${storeId}`, init);
 
-/** Same, only the offers that touch one product (badges, product-page blocks). */
+/** Same, only the offers that touch one product (badges, product-page blocks). Never throws. */
 export const getProductOffers = (storeId: string, productId: string, init?: RequestInit): Promise<OffersResponse> =>
-  call<any>('GET', `/public/promotions/${storeId}/product/${enc(productId)}`, undefined, init).then(offersBody);
+  offersCall(`/public/promotions/${storeId}/product/${enc(productId)}`, init);
 
-const offersBody = (res: any): OffersResponse => ({
-  enabled: !!res?.enabled,
-  data: Array.isArray(res?.data) ? res.data : [],
-  settings: res?.settings || {},
-  server_time: res?.server_time || new Date().toISOString(),
-});
+const offersCall = async (path: string, init?: RequestInit): Promise<OffersResponse> => {
+  try {
+    const res = offersResponseOf(await call<any>('GET', path, undefined, init));
+    if (!res) noteOffersOff('not an offers answer');
+    return res || OFFERS_OFF;
+  } catch (e) {
+    if (!isAbort(e)) noteOffersOff(e);
+    return OFFERS_OFF;
+  }
+};
+
+/** Thrown by `quoteCart` when the server is busy (rate limit, 5xx): keep the offers, try again later. */
+export class QuoteUnavailableError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`Quote unavailable (${status})`);
+    this.name = 'QuoteUnavailableError';
+    this.status = status;
+  }
+}
 
 /**
  * The cart priced by the server: per-line offers, gift lines, the code result, delivery,
  * totals and upsell messages. Build `body` with `buildQuoteRequest` (from
- * `@blanxer-dev/storefront/core`). Resolves to null when the store isn't on Offers.
+ * `@blanxer-dev/storefront/core`). Resolves to null when the store isn't on Offers, and
+ * also for a 404, a network error or a non-JSON answer (offers off). Throws
+ * `QuoteUnavailableError` for a rate limit or a server error.
  * Rate-limited per IP: debounce it (the react `useCartQuote` hook does).
  */
 export const quoteCart = async (storeId: string, body: QuoteRequest, init?: RequestInit): Promise<Quote | null> => {
-  const res = await call<QuoteResponse>('POST', `/public/promotions/${storeId}/quote`, body, init);
-  return res?.enabled && res.data ? res.data : null;
+  try {
+    const q = quoteOf(await call<any>('POST', `/public/promotions/${storeId}/quote`, body, init));
+    return q;
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    const status = (e as any)?.status;
+    if (status === 429 || status >= 500) throw new QuoteUnavailableError(status);
+    noteOffersOff(e);
+    return null;
+  }
 };
 
 // ---------------------------------------------------------------- payments

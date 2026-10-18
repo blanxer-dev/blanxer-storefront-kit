@@ -19,6 +19,7 @@ export {
   BundleOffer,
   ProductOffers,
   OfferProgress,
+  OfferGiftPicker,
   OfferMessages,
   OfferCodeField,
   useOfferCode,

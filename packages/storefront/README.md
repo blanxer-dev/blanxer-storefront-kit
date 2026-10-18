@@ -148,11 +148,15 @@ npx blanxer-storefront images <in> <out> [--max-width 2560] [--quality 75] [--fo
 
 Stores with Blanxer's **Offers** plugin (automatic discounts, codes, buy more save more, buy X get Y, bundles, free gifts, free delivery) are priced by the server. The rule for every site: **show the quote, never compute a discount.**
 
-**Is the store on Offers?** `GET /public/promotions/:store_id` answers `{ enabled, data, settings, server_time }`. `enabled: false` (or an older backend without the endpoint) keeps today's coupon flow (`applyCoupon`, `couponId` on the order) exactly as before. `useOffers().enabled` is that flag in React; `toClientStore` passes the plugin's public `{ enabled, display }` so the first render already knows.
+**Is the store on Offers?** Only stores whose document carries the `offers` plugin are asked (`toClientStore` passes its public `{ enabled, display }`); for every other store the package makes no offers call and the checkout is the 0.1.3 coupon flow (`applyCoupon`, `couponId` on the order) from the first render. Stores with the plugin are asked `GET /public/promotions/:store_id` (`{ enabled, data, settings, server_time }`); `useOffers().enabled` is true only when that answer says so. A 404 (a backend without Offers), a network error or a non-JSON answer from `/public/promotions` or `/quote` means offers off: coupon flow, no error UI, one `console.debug` line per page load (the browser still logs its own line for a 404 response). `getOffers` / `getProductOffers` never throw; `quoteCart` resolves null in those cases and throws `QuoteUnavailableError` only for a rate limit or a 5xx (offers stay on; the order is priced by the server anyway). Until the answer arrives, `Checkout` shows neither the coupon field nor the code field.
 
 **The quote.** `POST /public/promotions/:store_id/quote` with `buildQuoteRequest({ lines, code, place, paymentMethod, phone, removedOffers, giftChoices })`: product ids, variants and quantities only. Lines the server added (`added_by`: gifts, free items) are shown and never sent back. The answer has `lines` (per-line `allocations`, `net`, `free_qty`), `applications` (one per offer used), `code` (`applied` / `rejected` with the server's `message`), `delivery` (`before`, `discount`, `after`, `pending` until the place is known), `totals` (`gross`, `promo_discount`, `goods`, `delivery`, `total`) and `messages` (upsells with `data.remaining_amount` / `threshold` for progress bars). Customization charges are not in the quote; add them to `totals` as the cart does. Rate-limited (300 / 10 min / IP): use `useCartQuote`, which debounces, re-quotes when the lines, code, place, payment or phone change, aborts the request it replaces and never shows a stale answer.
 
 **The order.** `buildOrderPayload({ ..., offers: { code, removedOffers, giftChoices } })` sends `code`, `removed_offers` and `gift_choices` (and an empty `coupon`). The server prices the order again. A code it rejects comes back as a field error `{ fields: { code } }`; `codeFieldError(err)` reads it and `Checkout` shows it under the code field. The response carries `offers { applications, code, totals }`.
+
+**Gift choice.** When a gift offer has several items (or an item with several options), `OfferGiftPicker` (in `CartView` and `Checkout`) lets the shopper pick one; the pick goes to the quote and the order as `gift_choices: { offerId: 'productId|variantId' }` and the server adds that gift.
+
+**Tracking.** `OrderTracking` shows one row per offer on orders priced by Offers (tiers with their level, e.g. "· 15%", on orders that carry it), any discount on top as "Discount", free units ("Free" / "1 free") and a waived delivery charge struck through. Older orders keep the single discount row. Helpers: `orderOfferSummary(order)`, `orderLineFree(line)`.
 
 **React.**
 
@@ -163,14 +167,13 @@ Stores with Blanxer's **Offers** plugin (automatic discounts, codes, buy more sa
 | `useProductOffers(productId)` | the offers that touch one product |
 | `<OfferBadges product>`, `<OfferCardHint product>` | card / gallery badges and the line under the price (`product`: `_id`, `price`, `categories`, variant ids) |
 | `<ProductOffers product>` | tier table, delivery / gift / code notes with countdowns, "Bundle & save" (`<OfferTierTable>`, `<OfferNotes>`, `<BundleOffer>` on their own) |
+| `<OfferGiftPicker quote>` | pick a gift when a gift offer has several |
 | `<OfferProgress quote>`, `<OfferMessages quote>`, `<OfferSummary quote>`, `<OfferCodeField request quote>` (`useOfferCode` for your own field) | cart / checkout pieces; `CartView` and `Checkout` use them automatically |
 | `<OffersList offers? offerHref?>`, `<OfferTopBar>`, `<OffersLink>`, `<OfferCodeChip code>` | the Offers page, the top bar and the nav link |
 
 Each component respects the store's display settings (`badges`, `badge_style`, `badge_corner`, `saving_as`, `colors`, `pdp_tiers`, `pdp_notes`, `pdp_bundle`, `pdp_delivery`, `cart_progress`, `cart_upsell`, `cart_savings`, `code_field`, `top_bar`, `offers_page`, `countdowns`) and renders nothing when the store isn't on Offers. Restyle with the `bx-offer-*` classes; badge colours come in as `--bx-offer-tone`.
 
 **Core helpers** (`/core`, no discount maths): `buildQuoteRequest`, `quoteKey`, `quotePayment`, `offerOrderFields`, `codeFieldError`, `createLatest` (newest-request-wins), `quoteSavings`, `summaryRows`, `quoteLineFor`, `lineOffers`, `addedLines`, `upsellMessages`, `upsellProgress`, `cartMilestones`, `milestoneBar`, `offersForProduct`, `productBadges`, `productHint`, `tierRows` (active tier from the quote), `offerHeadline`, `offerTagline`, `offerConditionsText`, `offersDisplay`, `offersPlugin`.
-
-Known gap: the public order view (`/track/[id]`) doesn't return the order's offers yet, so tracking shows one "Discount" row with the total.
 
 ## Deviations from the storefront and the contract
 

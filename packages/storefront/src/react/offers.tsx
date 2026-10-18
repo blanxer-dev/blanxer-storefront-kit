@@ -28,9 +28,15 @@ import { useBlanxer } from './context.js';
 import { useCart } from './cart.js';
 
 export interface OffersContextValue {
-  /** the list has loaded (or failed: then `enabled` stays on the store's hint) */
+  /**
+   * we know whether the store is on Offers. Until then `enabled` is false and the checkout
+   * shows neither the coupon field nor the code field.
+   */
   ready: boolean;
-  /** the store is on Offers (from `GET /public/promotions`); false → coupon flow */
+  /**
+   * the store is on Offers: its plugin is on and `GET /public/promotions` said so. Any
+   * failure (404 from an older backend, network, a non-JSON answer) → false → coupon flow.
+   */
   enabled: boolean;
   offers: PublicOffer[];
   display: OffersDisplay;
@@ -49,6 +55,8 @@ export interface OffersContextValue {
   /** Forget the code, removals and gift picks (after an order is placed). */
   clearChoices: () => void;
   refresh: () => void;
+  /** Turn offers off for this page (the quote endpoint isn't there): the coupon flow takes over. */
+  disable: () => void;
 }
 
 const OffersContext = createContext<OffersContextValue | null>(null);
@@ -68,6 +76,7 @@ const OFF: OffersContextValue = {
   chooseGift: () => {},
   clearChoices: () => {},
   refresh: () => {},
+  disable: () => {},
 };
 
 /** Offers state from the nearest `<BlanxerProvider>` (or empty values outside one). */
@@ -107,16 +116,23 @@ const loadOffers = (storeId: string, force = false): Promise<OffersResponse> => 
 export function OffersProvider({ children }: { children: ReactNode }) {
   const { store, storeId } = useBlanxer();
   const hint = offersPlugin(store);
+  // no offers plugin on the store → coupon flow at once, without asking the API
+  const asks = !!hint?.enabled;
   const [list, setList] = useState<OffersResponse | null>(null);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(!asks);
+  const [disabled, setDisabled] = useState(false);
   const [code, setCodeState] = useState('');
   const [removedOffers, setRemoved] = useState<string[]>([]);
   const [giftChoices, setGifts] = useState<Record<string, string>>({});
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    if (!storeId) return;
+    if (!storeId || !asks) {
+      setReady(true);
+      return;
+    }
     let alive = true;
+    // getOffers never throws: a missing endpoint or a bad answer comes back as offers off
     loadOffers(storeId, tick > 0)
       .then((res) => alive && setList(res))
       .catch(() => alive && setList(null))
@@ -124,7 +140,7 @@ export function OffersProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false;
     };
-  }, [storeId, tick]);
+  }, [storeId, tick, asks]);
 
   // the code: `?promo=` on this URL wins, else what's saved (BlanxerProvider saves `?promo=` too)
   useEffect(() => {
@@ -188,14 +204,15 @@ export function OffersProvider({ children }: { children: ReactNode }) {
     writeStorage(STORAGE_KEYS.offerChoices, '');
   }, []);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
+  const disable = useCallback(() => setDisabled(true), []);
 
-  const enabled = list ? list.enabled : !!hint?.enabled;
+  const enabled = asks && !disabled && !!list?.enabled;
   const value = useMemo<OffersContextValue>(
     () => ({
       ready,
       enabled,
       offers: enabled ? list?.data || [] : [],
-      display: offersDisplay(list?.enabled ? list.settings : hint?.display),
+      display: offersDisplay(enabled ? list?.settings : hint?.display),
       clockOffset: list?.server_time ? new Date(list.server_time).getTime() - Date.now() : 0,
       code: enabled ? code : '',
       setCode,
@@ -206,9 +223,10 @@ export function OffersProvider({ children }: { children: ReactNode }) {
       chooseGift,
       clearChoices,
       refresh,
+      disable,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, enabled, list, hint?.enabled, code, removedOffers, giftChoices, setCode, removeOffer, restoreOffer, chooseGift, clearChoices, refresh],
+    [ready, enabled, list, hint?.enabled, code, removedOffers, giftChoices, setCode, removeOffer, restoreOffer, chooseGift, clearChoices, refresh, disable],
   );
 
   return <OffersContext.Provider value={value}>{children}</OffersContext.Provider>;
@@ -344,6 +362,12 @@ export function useCartQuote(opts: UseCartQuoteOptions = {}): CartQuoteState {
           .run((signal) => quoteCart(storeId, request, { signal }))
           .then((r) => {
             if (r.stale) return;
+            if (!r.value) {
+              // the endpoint isn't there (or the store left Offers): the coupon flow takes over
+              offers.disable();
+              setLoading(false);
+              return;
+            }
             quoteCache.set(cacheKey, { at: Date.now(), quote: r.value });
             setState({ key, quote: r.value });
             setError(null);

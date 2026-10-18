@@ -9,7 +9,7 @@ import { addedLines, isFreeLine, lineOffers, quoteLineFor, type Quote } from '..
 import { useCart } from './cart.js';
 import { useMoney } from './money.js';
 import { useCartQuote, useOffers } from './offers.js';
-import { OfferCodeField, OfferMessages, OfferProgress, OfferSummary } from './offer-ui.js';
+import { OfferCodeField, OfferGiftPicker, OfferMessages, OfferProgress, OfferSummary } from './offer-ui.js';
 import { Button, cx } from './ui.js';
 
 /** `label|||type|||value` → "label: value" for display. */
@@ -219,6 +219,7 @@ function OffersCartView({ checkoutHref, className }: { checkoutHref: string; cla
     <div className={cx('bx-cart bx-cart--offers', className)} aria-busy={loading || undefined}>
       <OfferProgress quote={quote} />
       <CartLines quote={quote} />
+      <OfferGiftPicker quote={quote} />
       <OfferMessages quote={quote} />
       <div className="bx-cart-footer bx-cart-footer--offers">
         {n ? <OfferCodeField request={request} quote={quote} collapsed /> : null}

@@ -469,6 +469,80 @@ export function ProductOffers({ product, className }: { product: Pick<Product, '
 
 // ---------------------------------------------------------------- cart
 
+/** One gift offer's choices: each item, and each option of an item that has several. */
+function GiftChoice({ offer, current, className }: { offer: PublicOffer; current: string; className?: string }) {
+  const { storeId } = useBlanxer();
+  const { chooseGift, display } = useOffers();
+  const items = offer.gift?.items || [];
+  const [products, setProducts] = useState<Array<Product | null>>([]);
+  useEffect(() => {
+    if (!storeId || !items.length) return;
+    let alive = true;
+    Promise.all(items.map((i) => loadProduct(storeId, String(i.product_id)))).then((ps) => alive && setProducts(ps));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId, offer.id]);
+  const options = useMemo(() => {
+    const out: Array<{ key: string; product: string; variant: string; label: string }> = [];
+    items.forEach((it, i) => {
+      const p = products[i];
+      if (!p) return;
+      const vs = variantsOf(p);
+      const pick = it.variant_id ? vs.filter((v) => v._id === it.variant_id) : vs;
+      if (!pick.length) out.push({ key: `${p._id}|`, product: p._id, variant: '', label: p.name });
+      else for (const v of pick) out.push({ key: `${p._id}|${v._id}`, product: p._id, variant: v._id, label: `${p.name} · ${v.option_name}` });
+    });
+    return out;
+  }, [products, items]);
+  if (options.length < 2) return null;
+  return (
+    <fieldset className={cx('bx-offer-gift-choice', className)} style={toneVar('gift', display.colors)}>
+      <legend className="bx-offer-gift-choice-title">Choose your free gift · {offer.title}</legend>
+      <div className="bx-chips">
+        {options.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            className={cx('bx-chip', current === o.key && 'bx-chip--active')}
+            aria-pressed={current === o.key}
+            onClick={() => chooseGift(offer.id, o.product, o.variant)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+/**
+ * Gift pickers for gift offers with several items (or options): shown once the gift applies
+ * or the quote says the shopper can pick one. The pick goes to the quote and the order as
+ * `gift_choices` (`{ offerId: 'productId|variantId' }`); the server adds the gift.
+ */
+export function OfferGiftPicker({ quote, className }: { quote: Quote | null; className?: string }) {
+  const { enabled, offers, giftChoices, removedOffers } = useOffers();
+  if (!enabled || !quote) return null;
+  const list = offers.filter((o) => {
+    if (o.kind !== 'gift' || o.state !== 'live' || !o.gift?.items?.length || removedOffers.includes(o.id)) return false;
+    const given = quote.lines.some((l) => l.added_by === o.id);
+    const eligible = quote.messages.some((m) => m.type === 'eligible' && m.promotion_id === o.id);
+    return given || eligible;
+  });
+  if (!list.length) return null;
+  return (
+    <div className={cx('bx-offer-gift-picker', className)}>
+      {list.map((o) => {
+        const line = quote.lines.find((l) => l.added_by === o.id);
+        const current = giftChoices[o.id] || (line ? `${line.product_id}|${line.variant_id || ''}` : '');
+        return <GiftChoice key={o.id} offer={o} current={current} />;
+      })}
+    </div>
+  );
+}
+
 /** Spend progress (free delivery, gifts) from the quote. Hidden when the setting is off. */
 export function OfferProgress({ quote, className }: { quote: Quote | null; className?: string }) {
   const { enabled, offers, display } = useOffers();

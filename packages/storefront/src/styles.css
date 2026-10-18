@@ -213,6 +213,9 @@
 .bx-offer-line-tag--gift { border-color: color-mix(in srgb, #db2777 50%, transparent); color: #db2777; }
 .bx-offer-gift-line { background: color-mix(in srgb, #db2777 5%, var(--bx-bg)); border-radius: var(--bx-radius); padding: 8px 0; }
 .bx-cart-line-was { display: block; text-align: right; color: var(--bx-muted); font-weight: 400; font-size: 0.8rem; }
+.bx-offer-gift-picker { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.bx-offer-gift-choice { margin: 0; padding: 10px 12px; border: 1px dashed color-mix(in srgb, var(--bx-offer-tone) 45%, var(--bx-border)); border-radius: var(--bx-radius); }
+.bx-offer-gift-choice-title { padding: 0 4px; font-size: 0.82rem; font-weight: 600; color: var(--bx-offer-tone); }
 .bx-offer-removed { font-size: 0.82rem; color: var(--bx-muted); }
 .bx-offer-messages { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .bx-offer-message { padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--bx-primary) 25%, var(--bx-border)); background: color-mix(in srgb, var(--bx-primary) 5%, var(--bx-bg)); border-radius: var(--bx-radius); font-size: 0.84rem; color: var(--bx-primary); }
