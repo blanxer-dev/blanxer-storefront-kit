@@ -1,7 +1,8 @@
 /**
  * @blanxer-dev/storefront/client — calls that must run in the shopper's browser:
- * orders, coupons, payment starts and checks, hold release, tracking, cancel,
- * review, back-in-stock, forms, flash-sale notify and Meta events.
+ * orders, coupons, offers and the cart quote, payment starts and checks, hold
+ * release, tracking, cancel, review, back-in-stock, forms, flash-sale notify and
+ * Meta events.
  *
  * Importing this from a Server Component, route handler or server action is a
  * build error on purpose (per-IP rate limits and gateway return URLs depend on
@@ -11,7 +12,8 @@ import 'client-only';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
-import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse } from '../core/types.js';
+import type { OffersResponse, Quote, QuoteRequest, QuoteResponse } from '../core/offers.js';
+import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
 
@@ -85,6 +87,37 @@ export const applyCoupon = (body: {
   code: string;
   products: { product: string; variant: string; quantity: number }[];
 }): Promise<Coupon> => call('POST', `/public/coupon`, body);
+
+// ---------------------------------------------------------------- offers
+
+/**
+ * Live (and starting within 30 days) public offers, the store's display settings and the
+ * server time. `enabled: false` → the store isn't on Offers: use the coupon calls above.
+ */
+export const getOffers = (storeId: string, init?: RequestInit): Promise<OffersResponse> =>
+  call<any>('GET', `/public/promotions/${storeId}`, undefined, init).then(offersBody);
+
+/** Same, only the offers that touch one product (badges, product-page blocks). */
+export const getProductOffers = (storeId: string, productId: string, init?: RequestInit): Promise<OffersResponse> =>
+  call<any>('GET', `/public/promotions/${storeId}/product/${enc(productId)}`, undefined, init).then(offersBody);
+
+const offersBody = (res: any): OffersResponse => ({
+  enabled: !!res?.enabled,
+  data: Array.isArray(res?.data) ? res.data : [],
+  settings: res?.settings || {},
+  server_time: res?.server_time || new Date().toISOString(),
+});
+
+/**
+ * The cart priced by the server: per-line offers, gift lines, the code result, delivery,
+ * totals and upsell messages. Build `body` with `buildQuoteRequest` (from
+ * `@blanxer-dev/storefront/core`). Resolves to null when the store isn't on Offers.
+ * Rate-limited per IP: debounce it (the react `useCartQuote` hook does).
+ */
+export const quoteCart = async (storeId: string, body: QuoteRequest, init?: RequestInit): Promise<Quote | null> => {
+  const res = await call<QuoteResponse>('POST', `/public/promotions/${storeId}/quote`, body, init);
+  return res?.enabled && res.data ? res.data : null;
+};
 
 // ---------------------------------------------------------------- payments
 
@@ -186,7 +219,11 @@ export async function checkPayment(kind: 'qr' | 'fonepay_checkout', transaction:
 export const getDeliveryCharges = (storeId: string): Promise<DeliveryTable> =>
   call('GET', `/public/delivery_charge/${storeId}`);
 
-export const getFlashSaleForProduct = (storeId: string, productId: string): Promise<FlashSaleForProduct> =>
+/** One active product by id or slug (bundle blocks, gift pickers). */
+export const getProductPublic = (storeId: string, idOrSlug: string): Promise<Product> =>
+  call('GET', `/product/public/${storeId}/${enc(idOrSlug)}`);
+
+export const getFlashSaleForProduct =(storeId: string, productId: string): Promise<FlashSaleForProduct> =>
   call('GET', `/public/flash-sale/${storeId}/product/${productId}`);
 
 export const notifyFlashSale = (

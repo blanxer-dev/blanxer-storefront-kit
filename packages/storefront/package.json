@@ -1,13 +1,14 @@
 {
   "name": "@blanxer-dev/storefront",
-  "version": "0.1.3",
-  "description": "Blanxer store data, the full Blanxer checkout, SEO helpers and site checks for custom Next.js storefronts.",
+  "version": "0.2.0",
+  "description": "Blanxer store data, the full Blanxer checkout, offers, SEO helpers and site checks for custom Next.js storefronts.",
   "keywords": [
     "blanxer",
     "nepal",
     "ecommerce",
     "storefront",
     "checkout",
+    "offers",
     "nextjs",
     "react",
     "esewa",
@@ -33,6 +34,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "bin": {

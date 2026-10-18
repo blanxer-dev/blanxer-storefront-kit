@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { storeName, type Store } from '@blanxer-dev/storefront/core';
+import { OfferTopBar, OffersLink } from '@blanxer-dev/storefront/react';
 import { usableHref } from '@/lib/site';
 import { CartLink } from './cart-link';
 
@@ -18,6 +19,8 @@ export function Header({ store }: { store: Store }) {
 
   return (
     <header className="header">
+      {/* Offers the store puts in its top bar (Offers settings → Top bar). */}
+      <OfferTopBar />
       {c.top_bar_text ? (
         <div className="topbar">
           {usableHref(c.top_bar_goto) ? <Link href={usableHref(c.top_bar_goto)!}>{c.top_bar_text}</Link> : c.top_bar_text}
@@ -34,6 +37,8 @@ export function Header({ store }: { store: Store }) {
               {it.label}
             </Link>
           ))}
+          {/* Only for stores on Offers with the Offers page turned on. */}
+          <OffersLink href="/offers" className="header-nav-offers" />
         </nav>
         <form action="/search" className="header-search" role="search">
           <input name="q" type="search" placeholder="Search products" aria-label="Search products" minLength={3} />

@@ -4,14 +4,14 @@ Everything a custom website for a [Blanxer](https://blanxer.com) store needs (Bl
 
 | Folder | What | Published as |
 |---|---|---|
-| [`packages/storefront`](packages/storefront) | `@blanxer-dev/storefront`: server data functions, browser calls (orders, payments, coupons, holds), React components (cart, product form, the full checkout, payment result and order-tracking pages), SEO helpers, Next route handlers and image loader, and the `blanxer-storefront` CLI (`check`, `images`) | npm [`@blanxer-dev/storefront`](https://www.npmjs.com/package/@blanxer-dev/storefront) |
+| [`packages/storefront`](packages/storefront) | `@blanxer-dev/storefront`: server data functions, browser calls (orders, payments, coupons, holds), React components (cart, product form, offers, the full checkout, payment result and order-tracking pages), SEO helpers, Next route handlers and image loader, and the `blanxer-storefront` CLI (`check`, `images`) | npm [`@blanxer-dev/storefront`](https://www.npmjs.com/package/@blanxer-dev/storefront) |
 | [`apps/starter`](apps/starter) | Next.js 16 App Router starter with every required route, store branding, SEO, and the Cloudflare (OpenNext) setup | GitHub [`blanxer-dev/blanxer-storefront-starter`](https://github.com/blanxer-dev/blanxer-storefront-starter) (this folder, copied out) |
 
 Docs: https://developers.blanxer.com · agent index: https://developers.blanxer.com/llms.txt · Claude Code skill: `/plugin marketplace add blanxer-dev/blanxer-agent-skills` then `/plugin install blanxer-website@blanxer`.
 
 ## Working in this repo
 
-npm workspaces. The starter depends on `@blanxer-dev/storefront@^0.1.0`, which npm links to `packages/storefront` here and installs from npm when the starter is used on its own.
+npm workspaces. The starter depends on `@blanxer-dev/storefront@^0.2.0`, which npm links to `packages/storefront` here and installs from npm when the starter is used on its own.
 
 ```bash
 npm install

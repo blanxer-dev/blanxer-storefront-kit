@@ -12,6 +12,7 @@
 import { BROWSER_USER_AGENT, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { toClientStore } from '../core/store.js';
+import type { OffersResponse } from '../core/offers.js';
 import type { DeliveryTable, Product, ProductsPage, Store, StoreCategory } from '../core/types.js';
 
 export { toClientStore };
@@ -241,6 +242,22 @@ export async function getDeliveryCharges(opts?: ServerFetchOptions): Promise<Del
   const id = await getStoreId();
   const res = await blanxerGet<DeliveryTable>(`/public/delivery_charge/${id}`, opts);
   return { defaults: res?.defaults || [], places: res?.places || [] };
+}
+
+/**
+ * Public offers (stores on Offers): live and starting within 30 days, display settings and
+ * the server time. `enabled: false` when the store isn't on Offers. Cached 30 s by default;
+ * the cart's prices always come from the browser's quote, never from this list.
+ */
+export async function getOffers(opts: ServerFetchOptions = { revalidate: 30 }): Promise<OffersResponse> {
+  const id = await getStoreId();
+  const res = await blanxerGet<any>(`/public/promotions/${id}`, opts);
+  return {
+    enabled: !!res?.enabled,
+    data: Array.isArray(res?.data) ? res.data : [],
+    settings: res?.settings || {},
+    server_time: res?.server_time || new Date().toISOString(),
+  };
 }
 
 /** Live and upcoming flash sales. Not cached by default (units change by the second). */

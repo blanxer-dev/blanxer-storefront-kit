@@ -6,6 +6,26 @@ export type { Notice, NoticeType, BlanxerContextValue } from './context.js';
 export { CartProvider, useCart } from './cart.js';
 export type { CartContextValue } from './cart.js';
 export { CartLines, CartView } from './cart-lines.js';
+export { OffersProvider, useOffers, useProductOffers, useCartQuote, useOfferClock } from './offers.js';
+export type { OffersContextValue, UseCartQuoteOptions, CartQuoteState } from './offers.js';
+export {
+  OfferBadges,
+  OfferCardHint,
+  OfferTopBar,
+  OffersLink,
+  OfferTierTable,
+  OfferNotes,
+  OfferCodeChip,
+  BundleOffer,
+  ProductOffers,
+  OfferProgress,
+  OfferMessages,
+  OfferCodeField,
+  useOfferCode,
+  OfferSummary,
+  OffersList,
+} from './offer-ui.js';
+export type { OfferBadgesProps, OfferCodeFieldProps, OfferCodeState, OfferSummaryProps, OffersListProps } from './offer-ui.js';
 export type { CartLinesProps } from './cart-lines.js';
 export { AddToCart, VariantPicker, CustomFields, QuantityPicker, useProductSelection } from './product.js';
 export type { AddToCartProps, AddToCartLabels, ProductSelection } from './product.js';

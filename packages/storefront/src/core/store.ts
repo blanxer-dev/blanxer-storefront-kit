@@ -49,8 +49,16 @@ export const pluginMap = (store?: Partial<Store> | null): Map<string, any> => {
 const yes = (v: unknown) => (v ? 'yes' : '');
 
 /** Plugins whose details are safe and needed in the browser. Everything else
- * (tokens for third-party integrations) stays on the server. */
-const BROWSER_PLUGINS = ['fb_pixel', 'ga', 'gtm', 'meta_tags', 'meta_capi', 'clarity', 'whatsapp_chat', 'product_custom_options'];
+ * (tokens for third-party integrations) stays on the server. `offers` carries only
+ * `{ enabled, display }` (how offers look; never offer rules). */
+const BROWSER_PLUGINS = ['fb_pixel', 'ga', 'gtm', 'meta_tags', 'meta_capi', 'clarity', 'whatsapp_chat', 'product_custom_options', 'offers'];
+
+/** What of a plugin's details may reach the browser. */
+const browserDetails = (p: StorePlugin) => {
+  if (p.name === 'meta_capi') return true;
+  if (p.name === 'offers') return { enabled: p.details?.enabled !== false, display: p.details?.display || {} };
+  return p.details;
+};
 
 /**
  * The part of the store document the browser needs (checkout settings,
@@ -81,7 +89,7 @@ export const toClientStore = (store: Store): Store => {
     },
     plugins: (store.plugins || [])
       .filter((p) => BROWSER_PLUGINS.includes(p.name))
-      .map((p) => ({ name: p.name, details: p.name === 'meta_capi' ? true : p.details })),
+      .map((p) => ({ name: p.name, details: browserDetails(p) })),
     customer_program: {
       back_in_stock: { enabled: !!store.customer_program?.back_in_stock?.enabled },
     },

@@ -7,6 +7,7 @@ import type { Store } from '../core/types.js';
 import { PIXEL_ID_RE, captureFbclid, configureClient, initMetaCapi, pingAnalytics } from '../client/index.js';
 import { CartProvider } from './cart.js';
 import { BlanxerContext, type Notice } from './context.js';
+import { OffersProvider } from './offers.js';
 
 /** CSS variables the package's `bx-*` styles read. Anything you leave out keeps its default. */
 export interface BlanxerTheme {
@@ -61,7 +62,8 @@ export interface BlanxerProviderProps {
 }
 
 /**
- * Root client provider: store context, the cart (CartProvider), API base for
+ * Root client provider: store context, the cart (CartProvider), offers
+ * (OffersProvider: the store's offers, the shopper's code), API base for
  * browser calls, `?promo=` capture, the Blanxer session ping, the Meta CAPI
  * switch, theme variables and toasts.
  */
@@ -117,7 +119,9 @@ export function BlanxerProvider({ store, apiBase, theme, notify, children }: Bla
           __html: `:where(:root){${defaults}}${overrides ? `:root{${overrides}}` : ''}`,
         }}
       />
-      <CartProvider>{children}</CartProvider>
+      <CartProvider>
+        <OffersProvider>{children}</OffersProvider>
+      </CartProvider>
       {!notify && toasts.length > 0 ? (
         <div className="bx-toasts" role="status" aria-live="polite">
           {toasts.map((t) => (

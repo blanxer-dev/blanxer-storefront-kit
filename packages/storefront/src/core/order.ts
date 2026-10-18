@@ -1,3 +1,4 @@
+import { isAddedLine, offerOrderFields } from './offers.js';
 import type { CartItem, Store } from './types.js';
 
 /** The checkout form values (same keys the storefront form uses). */
@@ -57,8 +58,13 @@ export interface BuildOrderInput {
   paymentMethod: string;
   /** The site's own origin (`window.location.origin`). Gateways return to `<url>/payment/success|failed`. */
   url: string;
-  /** Coupon `_id` when the applied coupon is currently valid, else ''. Never the code. */
+  /** Coupon `_id` when the applied coupon is currently valid, else ''. Never the code. Stores not on Offers only. */
   couponId?: string;
+  /**
+   * Stores on Offers: the shopper's code (one per order), automatic offers they removed and
+   * the gift picked per offer. The server prices the order again; lines it added are never sent.
+   */
+  offers?: { code?: string | null; removedOffers?: string[]; giftChoices?: Record<string, string> };
   meta?: OrderMeta;
 }
 
@@ -66,9 +72,9 @@ export interface BuildOrderInput {
  * `POST /order/:store_id` body, field for field as the Blanxer storefront
  * (`src/features/checkout/index.tsx` on main cabd695) sends it.
  */
-export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, couponId, meta }: BuildOrderInput) => {
+export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, couponId, offers, meta }: BuildOrderInput) => {
   const payload: Record<string, any> = {
-    products: lines.map((el) => ({
+    products: lines.filter((el) => !isAddedLine(el)).map((el) => ({
       product: el.product,
       variant: el.variant,
       quantity: el.quantity,
@@ -95,7 +101,8 @@ export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, co
     company_name: values.company_name,
     paymentMethod,
     url,
-    coupon: couponId || '',
+    coupon: offers ? '' : couponId || '',
+    ...(offers ? offerOrderFields(offers) : {}),
   };
   // JSON.stringify drops undefined; do it here too so the object equals what goes on the wire.
   for (const k of Object.keys(payload)) if (payload[k] === undefined) delete payload[k];

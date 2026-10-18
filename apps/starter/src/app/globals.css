@@ -117,3 +117,14 @@ h2 { font-size: 1.3rem; }
 
 /* package components inside the starter */
 .bx-checkout, .bx-track, .bx-result, .bx-form { padding-top: 24px; padding-bottom: 24px; }
+
+/* offers (package components: bx-offer-*; colours from the store's offer settings) */
+.header-nav-offers { color: var(--brand); font-weight: 600; }
+.card-media .card-badge { top: auto; bottom: 8px; }
+.card .bx-offer-hint { margin: 0; }
+.gallery-main .bx-offer-badges { top: 12px; }
+.offers-head { padding: 24px; margin-bottom: 20px; border: 1px solid var(--line); border-radius: var(--radius); background: color-mix(in srgb, var(--brand) 5%, var(--bg)); }
+.offers-head p { margin: 0; }
+.bx-cart--offers .bx-cart-footer { max-width: 420px; margin-left: auto; }
+/* `.section` resets the side padding of `.container` when both are on one element */
+.section.container { padding-left: 20px; padding-right: 20px; }
