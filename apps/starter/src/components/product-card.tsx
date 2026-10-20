@@ -1,7 +1,16 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { discountPercent, listPrice, type Product, type Store } from '@blanxer-dev/storefront/core';
+import { OfferBadges, OfferCardHint } from '@blanxer-dev/storefront/react';
 import { price } from '@/lib/site';
+
+/** What offer badges need of a product (keeps the page payload small). */
+const offerRef = (p: Product) => ({
+  _id: p._id,
+  price: p.price ?? p.min_price ?? null,
+  categories: (p.categories || []).map(String),
+  variants: (p.variants || []).map((v) => ({ _id: v._id })),
+});
 
 /** `eager`: above-the-fold cards (load now instead of lazily); `lcp`: the one most likely to be the page's LCP image. */
 export function ProductCard({ product, store, eager = false, lcp = false }: { product: Product; store: Store; eager?: boolean; lcp?: boolean }) {
@@ -21,6 +30,8 @@ export function ProductCard({ product, store, eager = false, lcp = false }: { pr
             fetchPriority={lcp ? 'high' : undefined}
           />
         ) : null}
+        {/* Offer badges (stores on Offers; style, corner and colours from the store's offer settings). */}
+        <OfferBadges product={offerRef(product)} />
         {off > 0 ? <span className="card-badge">{off}% off</span> : null}
         {product.in_stock === false ? <span className="card-badge card-badge--muted">Sold out</span> : null}
       </div>
@@ -29,6 +40,7 @@ export function ProductCard({ product, store, eager = false, lcp = false }: { pr
         {p > 0 ? (maxPrice > p ? `${price(store, p)} – ${price(store, maxPrice)}` : price(store, p)) : null}
         {compareAtPrice > p ? <s>{price(store, compareAtPrice)}</s> : null}
       </p>
+      <OfferCardHint product={offerRef(product)} />
     </Link>
   );
 }

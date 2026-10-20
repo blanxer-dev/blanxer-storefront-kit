@@ -4,6 +4,10 @@
  * on main cabd695). Behaviour is fixed; restyle it with the `bx-*` classes,
  * CSS variables (`<BlanxerProvider theme>`), `labels`, `className` and the
  * header/footer slots. Never re-implement this logic in a site.
+ *
+ * Stores on Offers: the summary, code field and Place Order amount come from the server's
+ * cart quote (`useCartQuote`), and the order carries the code, removed offers and gift
+ * picks. Other stores keep the coupon flow unchanged.
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,6 +16,7 @@ import { STORAGE_KEYS } from '../core/config.js';
 import { quoteCheckout } from '../core/checkout.js';
 import { deliveryPlaces } from '../core/delivery.js';
 import { fieldError, errorMessage } from '../core/http.js';
+import { codeFieldError } from '../core/offers.js';
 import { buildOrderPayload, contentId, initialCheckoutValues, type CheckoutFormValues } from '../core/order.js';
 import { isInPageMethod, paymentFlow } from '../core/payments.js';
 import { todayISODate } from '../core/format.js';
@@ -34,6 +39,8 @@ import {
 import { useBlanxer } from './context.js';
 import { useCart } from './cart.js';
 import { CartLines } from './cart-lines.js';
+import { useCartQuote, useOffers } from './offers.js';
+import { OfferCodeField, OfferGiftPicker, OfferSummary } from './offer-ui.js';
 import { useMoney } from './money.js';
 import { FonepayCheckoutModal, QrPaymentModal, type FonepayCheckoutData, type QrPaymentData } from './payment-modals.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
@@ -143,6 +150,9 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const [qr, setQr] = useState<QrPaymentData | null>(null);
   const [fonepay, setFonepay] = useState<FonepayCheckoutData | null>(null);
   const [testOrder, setTestOrder] = useState(false);
+  const offers = useOffers();
+  const offersOn = offers.enabled;
+  const [codeError, setCodeError] = useState('');
 
   // coupon
   const [couponCode, setCouponCode] = useState('');
@@ -186,6 +196,19 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   });
   const methods = quote.paymentMethods;
 
+  // Offers: the server prices the order (lines, code, delivery place, payment, phone).
+  const cq = useCartQuote({
+    lines,
+    place: values.customer_address_city,
+    paymentMethod,
+    phone: values.customer_phone_number,
+    enabled: offersOn && !orderPlaced,
+  });
+  const offerQuote = offersOn ? cq.quote : null;
+  const customization = quote.customization;
+  const payable = offerQuote ? offerQuote.totals.total + customization : quote.payable;
+  useEffect(() => setCodeError(''), [offers.code]);
+
   // Preselect the first method; if the chosen one disappears (e.g. a place without COD), move to the first.
   const methodNames = methods.map((m) => m.name).join(',');
   useEffect(() => {
@@ -220,9 +243,10 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   };
 
   // `?promo=` (stored by BlanxerProvider, or on this URL) is applied once when the order has lines.
+  // Stores on Offers read it in OffersProvider instead.
   const autoApplied = useRef(false);
   useEffect(() => {
-    if (!lines.length || autoApplied.current) return;
+    if (!lines.length || autoApplied.current || offersOn || !offers.ready) return;
     let promo = '';
     try {
       promo = new URLSearchParams(window.location.search).get('promo') || localStorage.getItem(STORAGE_KEYS.promoCode) || '';
@@ -234,7 +258,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     setCouponCode(promo.toUpperCase());
     fetchCoupon(promo);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lines.length]);
+  }, [lines.length, offersOn, offers.ready]);
 
   const initiateFired = useRef(false);
   useEffect(() => {
@@ -255,7 +279,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       content_ids: Array.from(new Set(contents.map((c) => c.id))),
       contents,
       content_type: 'product',
-      value: quote.payable,
+      value: payable,
       currency: 'NPR',
       num_items: contents.reduce((s, c) => s + c.quantity, 0),
     };
@@ -340,6 +364,14 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         paymentMethod,
         url: window.location.origin,
         couponId: quote.coupon.valid && coupon?._id ? coupon._id : '',
+        // a code the latest quote rejected isn't sent (the shopper sees why); with no quote yet the server decides
+        offers: offersOn
+          ? {
+              code: !offerQuote || offerQuote.code?.status === 'applied' ? offers.code : '',
+              removedOffers: offers.removedOffers,
+              giftChoices: offers.giftChoices,
+            }
+          : undefined,
         meta: buildOrderMeta(),
       });
       const res = await placeOrder(storeId, payload);
@@ -357,7 +389,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       // The backend's Purchase payload (same id + value as its server event);
       // built locally only against an older backend.
       const purchase =
-        res.meta || localOrderMeta(lines as any, quote.payable, String(res.order_number || ''));
+        res.meta || localOrderMeta(lines as any, payable, String(res.order_number || ''));
+      if (offersOn) offers.clearChoices();
       try {
         sessionStorage.setItem(STORAGE_KEYS.checkoutOrderId, res._id);
       } catch {
@@ -389,6 +422,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         if (m) fe[k] = m;
       }
       setErrors(fe);
+      const codeMsg = codeFieldError(err);
+      if (codeMsg) setCodeError(codeMsg);
       const fieldKeys = Object.keys(fe);
       const generic = (err as any)?.body?.message || (!fieldKeys.length ? errorMessage(err) : fieldError(err, 'products'));
       if (generic) notify({ type: 'error', title: 'Error creating order', message: generic });
@@ -424,6 +459,21 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       autoComplete="address-level2"
     />
   );
+  const d = offerQuote?.delivery;
+  const deliveryNote =
+    d && d.discount > 0 && values.customer_address_city ? (
+      <p className="bx-offer-delivery-note">
+        {d.after === 0 ? (
+          <>
+            Delivery to {values.customer_address_city} is <strong>free</strong> on this order.
+          </>
+        ) : (
+          <>
+            Delivery offer: <strong>-{money(d.discount)}</strong> on this order.
+          </>
+        )}
+      </p>
+    ) : null;
   const addressFields = (
     <div className="bx-grid-2">
       <TextInput label="Address" required placeholder="eg: kathmandu, tinkune" value={values.customer_address} onChange={set('customer_address')} error={errors.customer_address} autoComplete="street-address" />
@@ -464,6 +514,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
             {receiverInfo ? (
               <>
                 {cityField}
+                {deliveryNote}
                 {addressFields}
               </>
             ) : null}
@@ -489,6 +540,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
             <section className="bx-section">
               <h2 className="bx-section-title">{l.addressSection}</h2>
               {cityField}
+              {deliveryNote}
               {addressFields}
             </section>
           ) : null}
@@ -513,7 +565,19 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
 
         <aside className="bx-checkout-summary" aria-label={l.summary}>
           <h2 className="bx-section-title">{l.summary}</h2>
-          <CartLines selectable editable />
+          <CartLines selectable editable quote={offerQuote} />
+          <OfferGiftPicker quote={offerQuote} />
+          {offersOn && lines.length ? <OfferCodeField request={cq.request} quote={offerQuote} error={codeError} /> : null}
+          {offerQuote ? (
+            <OfferSummary
+              quote={offerQuote}
+              customization={customization}
+              showDelivery
+              place={values.customer_address_city}
+              className={cx(!cq.fresh && 'bx-offer-summary--updating')}
+              labels={{ subtotal: l.subtotal, total: l.total, free: l.free, saving: (a) => `You're saving ${a}` }}
+            />
+          ) : (
           <dl className="bx-totals">
             <div className="bx-total-row">
               <dt>{l.subtotal}</dt>
@@ -546,9 +610,10 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
               <dd>{money(quote.payable)}</dd>
             </div>
           </dl>
+          )}
           {store?.checkout?.extras?.checkout_note ? <p className="bx-checkout-note">{store.checkout.extras.checkout_note}</p> : null}
 
-          {store?.plan ? (
+          {store?.plan && offers.ready && !offersOn ? (
             <div className="bx-promo">
               <TextInput
                 label={l.promo}
@@ -582,8 +647,9 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           {testOrder ? <p className="bx-notice">Test order accepted — no order was created for this test phone/email.</p> : null}
 
           <Button type="submit" className="bx-place-order" loading={submitting} disabled={submitting || !paymentMethod || !lines.length}>
-            {l.placeOrder}
+            {offerQuote ? `${l.placeOrder} · ${money(payable)}` : l.placeOrder}
           </Button>
+          {offersOn ? <p className="bx-muted bx-offer-recheck">Prices and offers are checked again when you place the order.</p> : null}
           {/* Part of the checkout on every BlanxerAPI site: restyle through .bx-powered-by, never remove. */}
           <p className="bx-powered-by">
             Checkout Powered by{' '}

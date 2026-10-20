@@ -27,6 +27,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 - **Server reads** (`/server`) use `fetch(..., { next: { revalidate: 60 } })` with a normal browser `User-Agent`.
 - **The checkout is not rewritten by sites.** Restyle it (classes, CSS variables, `labels`, slots); the behaviour is fixed.
 - **No customer login.** Nothing in the package calls `/customer/auth`, accounts, wishlist or rewards.
+- **Offers are priced by the server.** For stores on Offers, every total, line saving, gift line, free delivery and code result comes from the cart quote. Nothing in the package (or a site) computes a discount itself. See [Offers](#offers).
 
 ## Subpaths
 
@@ -46,6 +47,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 | `getSaleProducts()` | products on sale |
 | `getDeliveryCharges()` | `{ defaults, places }` |
 | `getFlashSales(opts?)` | `{ server_time, sales }` (not cached by default) |
+| `getOffers(opts?)` | `{ enabled, data: PublicOffer[], settings, server_time }` (cached 30 s; `enabled: false` when the store isn't on Offers) |
 | `getBlogPosts({ cursor, category, tag, author, q })` / `getBlogPost(slug)` | `{ items, next_cursor, has_more, all_categories }` / post or `null` |
 | `getForm(slug)` | form or `null` |
 | `getHomeSeo()` | `{ seo_title, seo_description, seo_image }` from the Blanxer landing page |
@@ -56,7 +58,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 
 ### `@blanxer-dev/storefront/client` (browser only)
 
-`placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + GTM dataLayer + Blanxer CAPI relay with one event id; Purchase is never relayed), `firePurchase(order.meta)` (browser Purchase with the id and value the backend returned; the backend sends its own server Purchase), `pushMetaEvent` / `dlPush` (GTM dataLayer), `setConsent` / `getConsent`, `rememberCheckoutUser`, `localOrderMeta`, `savePendingPurchase` / `takePendingPurchase`, plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
+`placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `getOffers(storeId)`, `getProductOffers(storeId, productId)`, `quoteCart(storeId, body)` → `Quote | null`, `getProductPublic(storeId, idOrSlug)`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + GTM dataLayer + Blanxer CAPI relay with one event id; Purchase is never relayed), `firePurchase(order.meta)` (browser Purchase with the id and value the backend returned; the backend sends its own server Purchase), `pushMetaEvent` / `dlPush` (GTM dataLayer), `rememberCheckoutUser`, `localOrderMeta`, `savePendingPurchase` / `takePendingPurchase`, plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
 
 `url` on orders and payments is always the site's own origin (`window.location.origin`); gateways return through the API to `<url>/payment/success` or `<url>/payment/failed`.
 
@@ -64,10 +66,10 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 
 | Component / hook | Props |
 |---|---|
-| `<BlanxerProvider>` | `store` (from `getClientStore()`/`toClientStore()`), `apiBase?`, `theme?: BlanxerTheme`, `notify?: (n: Notice) => void`, `children`. Includes the cart, `?promo=` capture, the session ping, Meta CAPI switch, CSS variables and toasts |
+| `<BlanxerProvider>` | `store` (from `getClientStore()`/`toClientStore()`), `apiBase?`, `theme?: BlanxerTheme`, `notify?: (n: Notice) => void`, `children`. Includes the cart, offers (`OffersProvider`), `?promo=` capture, the session ping, Meta CAPI switch, CSS variables and toasts |
 | `useBlanxer()` / `useStore()` | `{ store, storeId, apiBase, notify }` / store |
 | `CartProvider`, `useCart()` | cart in localStorage `cart_items` (+ selection in `cart_selection`): `items`, `selectedItems`, `count`, `totalPrice`, `addToCart`, `removeFromCart`, `removeLine`, `setQuantity`, `toggleSelection`, `selectAll`, `deselectAll`, `removeSelectedFromCart`, `resetCart`, `hydrated`, `open`/`setOpen` |
-| `<CartLines>` | `selectable?`, `editable?`, `productHref?`, `className?`, `empty?` |
+| `<CartLines>` | `selectable?`, `editable?`, `productHref?`, `className?`, `empty?`, `quote?` (stores on Offers: line offers and server-added gift lines) |
 | `<CartView>` | `checkoutHref?`, `continueHref?`, `className?` |
 | `<AddToCart>` | `product`, `selection?`, `showPrice?`, `showVariants?`, `showCustomFields?`, `showQuantity?`, `showFlashSale?`, `showStockAlert?`, `checkoutHref?`, `labels?: { add, checkout, outOfStock, comingSoon, added }`, `onAdded?`, `className?`, `children?` |
 | `useProductSelection(product)`, `<VariantPicker selection>`, `<CustomFields selection>`, `<QuantityPicker selection>` | build your own product form from the same state (`ProductSelection`) |
@@ -78,7 +80,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 | `<OrderTracking>` | `orderId`, `fromCheckout?`, `className?` |
 | `<BlanxerForm>` | `form` (from `getForm()`), `className?`, `onSubmitted?` |
 | `<StockAlertForm>` (alias `BackInStockForm`) | `product`, `variantId?`, `className?` |
-| `<Pixel>` | `store?`. Loads the Meta Pixel (digits-only id, once; skipped if GTM already set up the same pixel), GA4, GTM and Clarity from the store's plugins. Pushes `bx_page_view` to GTM on every route change. With the store's `tracking_consent` plugin it shows `<TrackingConsent>` and holds the pixel until the shopper accepts |
+| `<Pixel>` | `store?`. Loads the Meta Pixel (digits-only id, once; skipped if GTM already set up the same pixel), GA4, GTM and Clarity from the store's plugins. Pushes `bx_page_view` to GTM on every route change. |
 | `<Money amount>`, `useMoney()`, `<BlanxerImage>` | store currency label; `next/image` with the Blanxer loader |
 | `QrPaymentModal`, `FonepayCheckoutModal`, `PaymentCloseConfirm`, `usePaymentHold`, `formatTimeLeft`, `qrSeconds` | the in-page payment screens `Checkout` uses |
 
@@ -99,9 +101,10 @@ There is no prop to remove it. Restyle it through `.bx-powered-by`; don't hide i
 - Fields and validation: full name, 10-digit phone, optional alternate phone (10 digits if typed), email (required and validated when `checkout.extras.email_required`), order note, City/District (the store's delivery places), address, landmark. Sender name/phone/email when `checkout.receiver_info` (sender email required when `checkout.extras.sender_email_required`), company name + PAN when `checkout.pan`, delivery date (from today) when `checkout.estimated_delivery`. Server field errors are shown on their fields.
 - Delivery charge by total cart weight: brackets ≤1, ≤2, ≤3, ≤5, ≤10, >10 kg; a place value of `-1` uses the store default. Recomputed on every change (the storefront's stale weight memo is fixed).
 - Payment methods: COD only for places whose flag is `true` or `'Y'`; online methods only on `basic`/`premium`/`plus`/`platinum` plans, each when the store has it on (`QR_Dynamic`, `FonepayCheckout`, `QR`, `Esewa`, `FonePay`, `Khalti`, `NPX`, `nbank_card`). Card is never offered.
-- Coupons: apply by code (also `?promo=` anywhere on the site), client rules for minimum order, COD-only/online-only and places, discount for flat/percent/shipping types; the order carries the coupon's `_id`, never the code.
+- Coupons (stores not on Offers): apply by code (also `?promo=` anywhere on the site), client rules for minimum order, COD-only/online-only and places, discount for flat/percent/shipping types; the order carries the coupon's `_id`, never the code.
+- Offers (stores on Offers): the summary, code field, delivery line and Place Order amount come from the server's quote; the order carries `code`, `removed_offers` and `gift_choices` (see [Offers](#offers)).
 - Custom fields on cart lines (`label|||type|||value`, image upload through `POST /product/:store/:product/file`, `customization_charge`), print lines, cart selection (only ticked lines are ordered).
-- Order body exactly as the storefront sends it, `url = window.location.origin`, with the Meta `meta` block (`fbp`, `fbc`, `fbclid`, consent); `sessionStorage.checkout_order_id` + the pending Purchase (the backend's `order.meta`) for `/payment/success`.
+- Order body exactly as the storefront sends it, `url = window.location.origin`, with the Meta `meta` block (`fbp`, `fbc`, `fbclid`); `sessionStorage.checkout_order_id` + the pending Purchase (the backend's `order.meta`) for `/payment/success`.
 - **Meta Purchase is owned by the backend.**
   - **COD:** it sends Purchase when the order is created.
   - **Online payments:** it sends Purchase when the payment is verified.
@@ -140,6 +143,37 @@ npx blanxer-storefront images <in> <out> [--max-width 2560] [--quality 75] [--fo
 `check` prints a PASS/FAIL table and exits 1 on any failure: Next.js + the package present; all contract routes (`/`, `/products`, `/product/[slug]`, `/collections/[slug]`, `/brand/[slug]`, `/brands`, `/search`, `/sale`, `/cart`, `/checkout`, `/payment/success`, `/payment/failed`, `/track/[id]`, `/forms/[slug]`, `/blogs`, `/blog/[slug]`, `/sitemap.xml`, `/sitemap-catalog.xml`, `/robots.txt`); `/checkout` renders the package `<Checkout>`; no account/login/wishlist/rewards/`/p/` pages; no secrets (`sk_` keys, gateway keys, plugin tokens, passwords, JWTs) in source, env files, `wrangler` config or `.next`/`.open-next` output; no `/customer/auth|account|wishlist|rewards`; `@blanxer-dev/storefront/client` not imported by server files; no direct payment/coupon/hold API calls; image budget in `public/` (no file over 300 KB or wider than 2560 px, no JPEG/PNG where AVIF/WebP fits); no raw `<img>`; every `<Image>` sized (`width`+`height` or `fill`), with a warning when no image is marked as the LCP image; the store resolves and its delivery places and payment methods are listed; Worker size after an OpenNext build. `--lighthouse http://localhost:3000` audits home, one product page and `/checkout` (mobile, needs ≥ 90 and LCP < 2.5 s; runs `npx lighthouse`, needs Chrome).
 
 `images` resizes (never enlarges) to `--max-width`, strips EXIF/GPS, writes AVIF (quality − 20) and WebP (quality) copies, copies SVGs, and prints a before/after table. Needs `sharp` (an optional dependency of this package).
+
+## Offers
+
+Stores with Blanxer's **Offers** plugin (automatic discounts, codes, buy more save more, buy X get Y, bundles, free gifts, free delivery) are priced by the server. The rule for every site: **show the quote, never compute a discount.**
+
+**Is the store on Offers?** Only stores whose document carries the `offers` plugin are asked (`toClientStore` passes its public `{ enabled, display }`); for every other store the package makes no offers call and the checkout is the 0.1.3 coupon flow (`applyCoupon`, `couponId` on the order) from the first render. Stores with the plugin are asked `GET /public/promotions/:store_id` (`{ enabled, data, settings, server_time }`); `useOffers().enabled` is true only when that answer says so. A 404 (a backend without Offers), a network error or a non-JSON answer from `/public/promotions` or `/quote` means offers off: coupon flow, no error UI, one `console.debug` line per page load (the browser still logs its own line for a 404 response). `getOffers` / `getProductOffers` never throw; `quoteCart` resolves null in those cases and throws `QuoteUnavailableError` only for a rate limit or a 5xx (offers stay on; the order is priced by the server anyway). Until the answer arrives, `Checkout` shows neither the coupon field nor the code field.
+
+**The quote.** `POST /public/promotions/:store_id/quote` with `buildQuoteRequest({ lines, code, place, paymentMethod, phone, removedOffers, giftChoices })`: product ids, variants and quantities only. Lines the server added (`added_by`: gifts, free items) are shown and never sent back. The answer has `lines` (per-line `allocations`, `net`, `free_qty`), `applications` (one per offer used), `code` (`applied` / `rejected` with the server's `message`), `delivery` (`before`, `discount`, `after`, `pending` until the place is known), `totals` (`gross`, `promo_discount`, `goods`, `delivery`, `total`) and `messages` (upsells with `data.remaining_amount` / `threshold` for progress bars). Customization charges are not in the quote; add them to `totals` as the cart does. Rate-limited (300 / 10 min / IP): use `useCartQuote`, which debounces, re-quotes when the lines, code, place, payment or phone change, aborts the request it replaces and never shows a stale answer.
+
+**The order.** `buildOrderPayload({ ..., offers: { code, removedOffers, giftChoices } })` sends `code`, `removed_offers` and `gift_choices` (and an empty `coupon`). The server prices the order again. A code it rejects comes back as a field error `{ fields: { code } }`; `codeFieldError(err)` reads it and `Checkout` shows it under the code field. The response carries `offers { applications, code, totals }`.
+
+**Gift choice.** When a gift offer has several items (or an item with several options), `OfferGiftPicker` (in `CartView` and `Checkout`) lets the shopper pick one; the pick goes to the quote and the order as `gift_choices: { offerId: 'productId|variantId' }` and the server adds that gift.
+
+**Tracking.** `OrderTracking` shows one row per offer on orders priced by Offers (tiers with their level, e.g. "· 15%", on orders that carry it), any discount on top as "Discount", free units ("Free" / "1 free") and a waived delivery charge struck through. Older orders keep the single discount row. Helpers: `orderOfferSummary(order)`, `orderLineFree(line)`.
+
+**React.**
+
+| Component / hook | What |
+|---|---|
+| `useOffers()` | `{ enabled, offers, display, code, setCode, removedOffers, removeOffer, restoreOffer, giftChoices, chooseGift, clearChoices, clockOffset, ready, refresh }`. The code is kept in localStorage `promo_code` (also set by `?promo=`) |
+| `useCartQuote(opts?)` | `{ quote, request, fresh, loading, error, refresh }`; `opts`: `lines?` (default the selected cart lines), `place?`, `paymentMethod?`, `phone?`, `code?`, `debounceMs?`, `enabled?` |
+| `useProductOffers(productId)` | the offers that touch one product |
+| `<OfferBadges product>`, `<OfferCardHint product>` | card / gallery badges and the line under the price (`product`: `_id`, `price`, `categories`, variant ids) |
+| `<ProductOffers product>` | tier table, delivery / gift / code notes with countdowns, "Bundle & save" (`<OfferTierTable>`, `<OfferNotes>`, `<BundleOffer>` on their own) |
+| `<OfferGiftPicker quote>` | pick a gift when a gift offer has several |
+| `<OfferProgress quote>`, `<OfferMessages quote>`, `<OfferSummary quote>`, `<OfferCodeField request quote>` (`useOfferCode` for your own field) | cart / checkout pieces; `CartView` and `Checkout` use them automatically |
+| `<OffersList offers? offerHref?>`, `<OfferTopBar>`, `<OffersLink>`, `<OfferCodeChip code>` | the Offers page, the top bar and the nav link |
+
+Each component respects the store's display settings (`badges`, `badge_style`, `badge_corner`, `saving_as`, `colors`, `pdp_tiers`, `pdp_notes`, `pdp_bundle`, `pdp_delivery`, `cart_progress`, `cart_upsell`, `cart_savings`, `code_field`, `top_bar`, `offers_page`, `countdowns`) and renders nothing when the store isn't on Offers. Restyle with the `bx-offer-*` classes; badge colours come in as `--bx-offer-tone`.
+
+**Core helpers** (`/core`, no discount maths): `buildQuoteRequest`, `quoteKey`, `quotePayment`, `offerOrderFields`, `codeFieldError`, `createLatest` (newest-request-wins), `quoteSavings`, `summaryRows`, `quoteLineFor`, `lineOffers`, `addedLines`, `upsellMessages`, `upsellProgress`, `cartMilestones`, `milestoneBar`, `offersForProduct`, `productBadges`, `productHint`, `tierRows` (active tier from the quote), `offerHeadline`, `offerTagline`, `offerConditionsText`, `offersDisplay`, `offersPlugin`.
 
 ## Deviations from the storefront and the contract
 

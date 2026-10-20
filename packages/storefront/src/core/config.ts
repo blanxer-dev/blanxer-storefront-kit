@@ -17,6 +17,8 @@ export const STORAGE_KEYS = {
   cart: 'cart_items',
   cartSelection: 'cart_selection',
   promoCode: 'promo_code',
+  /** Offers: automatic offers the shopper removed and gift picks (`{ removed, gifts }`). */
+  offerChoices: 'bx_offer_choices',
   stockAlerts: 'stock_alerts',
   ping: 'ping',
   checkoutOrderId: 'checkout_order_id',

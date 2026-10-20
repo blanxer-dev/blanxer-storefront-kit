@@ -17,7 +17,7 @@ export const origin = cache(async (): Promise<string | undefined> => (await site
 export const price = (s: Store, amount: number) => `${currencyLabel(s)} ${formatCurrency(amount)}`;
 
 /** Paths this site serves. Links from Blanxer menus that point elsewhere (Blanxer page-builder pages, /p/…) are dropped. */
-const OWN_PATH = /^\/(?:$|products|product\/|collections\/|brand\/|brands|search|sale|cart|blogs|blog\/|forms\/|track\/)/;
+const OWN_PATH = /^\/(?:$|products|product\/|collections\/|brand\/|brands|search|sale|offers|cart|blogs|blog\/|forms\/|track\/)/;
 
 export const usableHref = (href: unknown): string | null => {
   const h = String(href || '').trim();

@@ -1,6 +1,7 @@
 // Shapes of the Blanxer public API that the package relies on. They are loose
 // on purpose (`[key: string]: any`): the API returns more than we type, and a
 // new backend field must never break a merchant's build.
+import type { OrderOffers } from './offers.js';
 
 export type Loose = { [key: string]: any };
 
@@ -211,6 +212,8 @@ export interface OrderResponse extends Loose {
   delivery_charge?: number;
   hold_seconds?: number;
   hold_expires_at?: string;
+  /** What the offers did (stores on Offers): applications, the code result, totals. */
+  offers?: OrderOffers;
   /** Present (and `_id` absent) when the backend accepted a test order
    * (phone `0000000000` / mailinator email) without creating it. */
   success?: boolean;

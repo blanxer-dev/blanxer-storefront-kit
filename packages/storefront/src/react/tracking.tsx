@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import Image from 'next/image';
 import Link from 'next/link';
 import { initials } from '../core/format.js';
+import { orderLineFree, orderOfferSummary } from '../core/offers.js';
 import { fieldError, errorMessage } from '../core/http.js';
 import { validation } from '../core/validation.js';
 import { blanxerImageLoader } from '../next/image-loader.js';
@@ -199,6 +200,8 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
     );
   }
 
+  // orders priced by Offers: one row per offer, free units, waived delivery (older orders: null)
+  const offerSummary = orderOfferSummary(order);
   const reviewEligible = order.status === 'Delivered';
   const cancelEligible = ['Pending', 'Processing'].includes(order.status) && !!store?.checkout?.extras?.allow_customer_cancellation;
   const reviewProducts = groupByProduct(order.ordered_products || []);
@@ -237,8 +240,11 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
       <section className="bx-track-card">
         <h2 className="bx-section-title">Order Summary</h2>
         <ul className="bx-cart-lines">
-          {(order.ordered_products || []).map((el: any) => (
-            <li key={el._id} className="bx-cart-line">
+          {(order.ordered_products || []).map((el: any, i: number) => {
+            const free = orderLineFree(el);
+            const gross = (el.price + (el.customization_charge || 0)) * el.quantity;
+            return (
+            <li key={el._id || `${el.product_id}_${i}`} className={cx('bx-cart-line', free.allFree && 'bx-offer-gift-line')}>
               <div className="bx-cart-thumb">
                 <Thumb src={el.image_url} name={el.product_name} />
               </div>
@@ -251,17 +257,43 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
                   {money(el.price)} × {el.quantity}
                 </p>
                 {el.customization_charge ? <p className="bx-cart-meta">+ {money(el.customization_charge)} extra charge</p> : null}
+                {free.free > 0 && !free.allFree ? <p className="bx-offer-line-tag">{free.free} free</p> : null}
               </div>
-              <p className="bx-cart-line-total">{money((el.price + (el.customization_charge || 0)) * el.quantity)}</p>
+              <p className="bx-cart-line-total">
+                {free.allFree ? (
+                  <>
+                    <s className="bx-cart-line-was">{money(gross)}</s>
+                    <span className="bx-free">Free</span>
+                  </>
+                ) : (
+                  money(gross)
+                )}
+              </p>
             </li>
-          ))}
+            );
+          })}
         </ul>
         <dl className="bx-totals">
           <div className="bx-total-row">
             <dt>Sub-total</dt>
             <dd>{money(order.product_total_price || 0)}</dd>
           </div>
-          {order.discount?.d_value ? (
+          {offerSummary ? (
+            <>
+              {offerSummary.rows.map((r) => (
+                <div key={r.promotion_id} className="bx-total-row bx-total-row--discount" data-offer-kind={r.kind}>
+                  <dt>{r.label}</dt>
+                  <dd>({money(r.amount)})</dd>
+                </div>
+              ))}
+              {offerSummary.other > 0 ? (
+                <div className="bx-total-row bx-total-row--discount">
+                  <dt>Discount</dt>
+                  <dd>({money(offerSummary.other)})</dd>
+                </div>
+              ) : null}
+            </>
+          ) : order.discount?.d_value ? (
             <div className="bx-total-row bx-total-row--discount">
               <dt>Discount {order.discount.code ? `[${order.discount.code}]` : ''}</dt>
               <dd>({money(order.discount.d_value)})</dd>
@@ -269,7 +301,14 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
           ) : null}
           <div className="bx-total-row">
             <dt>Delivery Charge</dt>
-            <dd>{order.delivery_charge ? money(order.delivery_charge) : <span className="bx-free">FREE</span>}</dd>
+            <dd>
+              {offerSummary?.delivery.waived ? (
+                <>
+                  <s className="bx-muted">{money(offerSummary.delivery.before || 0)}</s>{' '}
+                </>
+              ) : null}
+              {order.delivery_charge ? money(order.delivery_charge) : <span className="bx-free">FREE</span>}
+            </dd>
           </div>
           {order.customization_total ? (
             <div className="bx-total-row">

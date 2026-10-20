@@ -40,11 +40,12 @@ OpenNext copies `.env` into the Worker, so the deployed site reads the same valu
 |---|---|---|
 | `/` | `src/app/page.tsx` | hero, categories, new arrivals, sale |
 | `/products` | `src/app/products/page.tsx` | paged, sortable |
-| `/product/[slug]` | `src/app/product/[slug]/page.tsx` | gallery + `<AddToCart>` (variants, custom fields, flash sale, back-in-stock), JSON-LD |
+| `/product/[slug]` | `src/app/product/[slug]/page.tsx` | gallery + `<AddToCart>` (variants, custom fields, flash sale, back-in-stock), offer badges + `<ProductOffers>`, JSON-LD |
 | `/collections/[slug]` | `src/app/collections/[slug]/page.tsx` | includes `new-arrivals` |
 | `/brand/[slug]`, `/brands` | `src/app/brand/…`, `src/app/brands/…` | |
 | `/search?q=`, `/sale` | `src/app/search/…`, `src/app/sale/…` | |
-| `/cart` | `src/app/cart/page.tsx` | `<CartView>` |
+| `/cart` | `src/app/cart/page.tsx` | `<CartView>` (stores on Offers: progress, gift lines, code, totals from the server's quote) |
+| `/offers` | `src/app/offers/page.tsx` | stores on Offers with the Offers page on (404 otherwise) |
 | **`/checkout`** | `src/app/checkout/page.tsx` | `<Checkout>`: required, keep it |
 | **`/payment/success`**, **`/payment/failed`** | `src/app/payment/…` | required: gateways return here |
 | **`/track/[id]`** | `src/app/track/[id]/page.tsx` | required: order SMS/emails link here; cancel + review |
@@ -58,6 +59,7 @@ There is no `/account`, `/login` or `/p/[slug]`: custom sites use guest checkout
 
 - Colours and font come from the store (`customization.theme`, `customization.font`): `--brand` in `src/app/layout.tsx`, fonts in `src/lib/fonts.ts`. Change `src/app/globals.css` and the components in `src/components/` freely.
 - The checkout and other package components are themed, not rewritten: `--bx-*` CSS variables, `bx-*` classes, the `theme` prop of `<BlanxerProvider>`, and `labels`/`header`/`footer` on `<Checkout>`. The "Checkout Powered by Blanxer" line stays (restyle `.bx-powered-by`).
+- Offers (stores on Blanxer's Offers plugin): badges on cards (`src/components/product-card.tsx`), the top bar and nav link (`src/components/header.tsx`), the product-page blocks and `/offers` come from the package and follow the store's offer settings. Restyle `bx-offer-*`; prices always come from the server's quote, never from the site's code.
 - Images: `next/image` everywhere (the loader in `src/lib/image-loader.ts` resizes Blanxer product photos). Optimise your own images with `npm run images` first; `preload` only the first big image of a page.
 
 ## Caching on Cloudflare

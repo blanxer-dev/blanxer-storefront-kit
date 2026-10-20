@@ -1,7 +1,8 @@
 /**
  * @blanxer-dev/storefront/client — calls that must run in the shopper's browser:
- * orders, coupons, payment starts and checks, hold release, tracking, cancel,
- * review, back-in-stock, forms, flash-sale notify and Meta events.
+ * orders, coupons, offers and the cart quote, payment starts and checks, hold
+ * release, tracking, cancel, review, back-in-stock, forms, flash-sale notify and
+ * Meta events.
  *
  * Importing this from a Server Component, route handler or server action is a
  * build error on purpose (per-IP rate limits and gateway return URLs depend on
@@ -11,7 +12,8 @@ import 'client-only';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
-import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse } from '../core/types.js';
+import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
+import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
 
@@ -85,6 +87,76 @@ export const applyCoupon = (body: {
   code: string;
   products: { product: string; variant: string; quantity: number }[];
 }): Promise<Coupon> => call('POST', `/public/coupon`, body);
+
+// ---------------------------------------------------------------- offers
+
+let offersNoted = false;
+/** One console.debug line per page load when the offers endpoints aren't there (older backend). */
+const noteOffersOff = (why: unknown) => {
+  if (offersNoted) return;
+  offersNoted = true;
+  try {
+    console.debug('[@blanxer-dev/storefront] offers unavailable, using coupons:', (why as any)?.status || (why as any)?.message || String(why));
+  } catch {
+    /* no console */
+  }
+};
+
+const isAbort = (e: unknown) => (e as any)?.name === 'AbortError';
+
+/**
+ * Live (and starting within 30 days) public offers, the store's display settings and the
+ * server time. `enabled: false` → the store isn't on Offers: use the coupon calls above.
+ * Never throws: a 404 (older backend), a network error or a non-JSON answer is "offers off".
+ */
+export const getOffers = (storeId: string, init?: RequestInit): Promise<OffersResponse> =>
+  offersCall(`/public/promotions/${storeId}`, init);
+
+/** Same, only the offers that touch one product (badges, product-page blocks). Never throws. */
+export const getProductOffers = (storeId: string, productId: string, init?: RequestInit): Promise<OffersResponse> =>
+  offersCall(`/public/promotions/${storeId}/product/${enc(productId)}`, init);
+
+const offersCall = async (path: string, init?: RequestInit): Promise<OffersResponse> => {
+  try {
+    const res = offersResponseOf(await call<any>('GET', path, undefined, init));
+    if (!res) noteOffersOff('not an offers answer');
+    return res || OFFERS_OFF;
+  } catch (e) {
+    if (!isAbort(e)) noteOffersOff(e);
+    return OFFERS_OFF;
+  }
+};
+
+/** Thrown by `quoteCart` when the server is busy (rate limit, 5xx): keep the offers, try again later. */
+export class QuoteUnavailableError extends Error {
+  status: number;
+  constructor(status: number) {
+    super(`Quote unavailable (${status})`);
+    this.name = 'QuoteUnavailableError';
+    this.status = status;
+  }
+}
+
+/**
+ * The cart priced by the server: per-line offers, gift lines, the code result, delivery,
+ * totals and upsell messages. Build `body` with `buildQuoteRequest` (from
+ * `@blanxer-dev/storefront/core`). Resolves to null when the store isn't on Offers, and
+ * also for a 404, a network error or a non-JSON answer (offers off). Throws
+ * `QuoteUnavailableError` for a rate limit or a server error.
+ * Rate-limited per IP: debounce it (the react `useCartQuote` hook does).
+ */
+export const quoteCart = async (storeId: string, body: QuoteRequest, init?: RequestInit): Promise<Quote | null> => {
+  try {
+    const q = quoteOf(await call<any>('POST', `/public/promotions/${storeId}/quote`, body, init));
+    return q;
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    const status = (e as any)?.status;
+    if (status === 429 || status >= 500) throw new QuoteUnavailableError(status);
+    noteOffersOff(e);
+    return null;
+  }
+};
 
 // ---------------------------------------------------------------- payments
 
@@ -186,7 +258,11 @@ export async function checkPayment(kind: 'qr' | 'fonepay_checkout', transaction:
 export const getDeliveryCharges = (storeId: string): Promise<DeliveryTable> =>
   call('GET', `/public/delivery_charge/${storeId}`);
 
-export const getFlashSaleForProduct = (storeId: string, productId: string): Promise<FlashSaleForProduct> =>
+/** One active product by id or slug (bundle blocks, gift pickers). */
+export const getProductPublic = (storeId: string, idOrSlug: string): Promise<Product> =>
+  call('GET', `/product/public/${storeId}/${enc(idOrSlug)}`);
+
+export const getFlashSaleForProduct =(storeId: string, productId: string): Promise<FlashSaleForProduct> =>
   call('GET', `/public/flash-sale/${storeId}/product/${productId}`);
 
 export const notifyFlashSale = (
@@ -253,8 +329,6 @@ type MetaConfig = {
   /** the store has the Conversions API (`meta_capi` plugin) */
   enabled: boolean;
   store_id: string;
-  /** the store asks shoppers before tracking (`tracking_consent` plugin) */
-  consentRequired?: boolean;
 };
 
 export type MetaUser = {
@@ -296,31 +370,6 @@ const readCookie = (name: string): string => {
   if (typeof document === 'undefined') return '';
   const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
   return m ? decodeURIComponent(m[1]!) : '';
-};
-
-// consent ------------------------------------------------------------
-
-const CONSENT_KEY = 'bx_tracking_consent';
-
-export const getConsent = (): 'granted' | 'denied' | 'unknown' => {
-  try {
-    const v = localStorage.getItem(CONSENT_KEY);
-    return v === 'granted' || v === 'denied' ? v : 'unknown';
-  } catch {
-    return 'unknown';
-  }
-};
-
-/** True unless the store asks for consent and the shopper hasn't given it. */
-export const hasConsent = () => !(inBrowser() && window.__META_CAPI__?.consentRequired) || getConsent() === 'granted';
-
-export const setConsent = (v: 'granted' | 'denied') => {
-  try {
-    localStorage.setItem(CONSENT_KEY, v);
-  } catch {
-    /* private mode */
-  }
-  if (inBrowser() && window.fbq) window.fbq('consent', v === 'granted' ? 'grant' : 'revoke');
 };
 
 // ad click id ---------------------------------------------------------
@@ -439,13 +488,12 @@ export const pushMetaEvent = (eventName: string, cd: Record<string, any> = {}, e
 // tracking ---------------------------------------------------------------
 
 /** The `meta` block of the order body: lets the backend send the Purchase
- * matched to this browser. Nothing identifying without consent. The argument
- * is ignored (older versions shared an event id; the backend now returns it). */
-export const buildOrderMeta = (_legacyEventId?: string) => {
-  const event_source_url = inBrowser() ? window.location.href : '';
-  if (!hasConsent()) return { consent: false, event_source_url };
-  return { ...fbIds(), event_source_url, consent: true };
-};
+ * matched to this browser. The argument is ignored (older versions shared an
+ * event id; the backend now returns it). */
+export const buildOrderMeta = (_legacyEventId?: string) => ({
+  ...fbIds(),
+  event_source_url: inBrowser() ? window.location.href : '',
+});
 
 /** Browser pixel only (no-op when the pixel is not loaded). */
 export const pixelTrack = (event: MetaEventName, data?: Record<string, any>, options?: { eventID?: string }) => {
@@ -457,7 +505,7 @@ export const pixelTrack = (event: MetaEventName, data?: Record<string, any>, opt
 
 /**
  * Track a Meta event on the pixel and GTM's dataLayer and, when the store has
- * the `meta_capi` plugin (and the shopper hasn't declined tracking), relay it
+ * the `meta_capi` plugin, relay it
  * to Blanxer's CAPI endpoint with the same event id. Purchase is never
  * relayed: the backend sends it from the real order (use `firePurchase`).
  * Returns the event id.
@@ -471,7 +519,7 @@ export function trackEvent(
   pixelTrack(event, customData, { eventID: eventId });
   pushMetaEvent(event, customData, eventId);
   const cfg = inBrowser() ? window.__META_CAPI__ : undefined;
-  if (cfg?.enabled && cfg.store_id && event !== 'Purchase' && event !== 'PageView' && hasConsent()) {
+  if (cfg?.enabled && cfg.store_id && event !== 'Purchase' && event !== 'PageView') {
     try {
       fetch(`${base()}/public/meta-event/${cfg.store_id}`, {
         method: 'POST',

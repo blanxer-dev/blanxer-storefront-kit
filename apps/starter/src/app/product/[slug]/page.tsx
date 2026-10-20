@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getProduct } from '@blanxer-dev/storefront/server';
 import { breadcrumbJsonLd, productJsonLd, productMetadata } from '@blanxer-dev/storefront/seo';
-import { AddToCart } from '@blanxer-dev/storefront/react';
+import { AddToCart, OfferBadges, ProductOffers } from '@blanxer-dev/storefront/react';
 import { JsonLd } from '@/components/json-ld';
 import { origin, slugParam, store } from '@/lib/site';
 
@@ -45,6 +45,7 @@ export default async function ProductPage({ params }: Props) {
         <div>
           <div className="gallery-main">
             {images[0] ? <Image src={images[0]} alt={product.name} fill preload sizes="(max-width: 860px) 100vw, 55vw" /> : null}
+            <OfferBadges product={{ _id: product._id, price: product.price, categories: (product.categories || []).map(String), variants: (product.variants || []).map((v) => ({ _id: v._id })) }} />
           </div>
           {images.length > 1 ? (
             <div className="gallery-thumbs">
@@ -60,6 +61,8 @@ export default async function ProductPage({ params }: Props) {
           <h1>{product.name}</h1>
           {/* Price, flash sale, variants, custom fields, quantity, add to cart, back-in-stock: all from the package. */}
           <AddToCart product={product} />
+          {/* Stores on Offers: tier table, delivery/gift/code notes and "Bundle & save", by the store's settings. */}
+          <ProductOffers product={{ _id: product._id }} />
           {product.description ? (
             <div className="prose" dangerouslySetInnerHTML={{ __html: product.description }} />
           ) : null}
