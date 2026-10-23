@@ -137,6 +137,15 @@ describe('quoteAdvance (browser)', () => {
     expect(url).toBe('https://api.test/public/promotions/s1/quote');
     expect(JSON.parse(String(init.body))).toMatchObject({ payment: 'cod', place: 'Kathmandu' });
   });
+  it('release-hold names the attempt, or the order phone when there is none', async () => {
+    const fetch = vi.fn(async () => new Response('{"success":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    const c = await loadClient();
+    await c.releaseHold({ store_id: 's1', order_id: 'o1', phone_number: '9800000000' });
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('https://api.test/order/public/release-hold');
+    expect(JSON.parse(String(init.body))).toEqual({ store_id: 's1', order_id: 'o1', phone_number: '9800000000' });
+  });
   it('never throws: 404, 5xx, network error and HTML are plain COD', async () => {
     for (const f of [
       async () => new Response('<!doctype html>', { status: 404 }),

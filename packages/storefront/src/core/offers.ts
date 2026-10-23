@@ -250,6 +250,11 @@ export interface Quote {
    * null / absent = plain COD. Read it with `toAdvance` / `codOffer`.
    */
   advance?: Advance | null;
+  /**
+   * What the order will cost, as create-order prices it (newer backends): customization and a
+   * member discount included. Show it (`quotePayable`) instead of adding customization yourself.
+   */
+  payable?: { customization?: number; member_discount?: number; total: number };
 }
 
 export interface QuoteResponse {

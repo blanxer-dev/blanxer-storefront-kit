@@ -157,20 +157,11 @@ export interface PaymentDue {
 const SETTLED = ['paid', 'partial', 'waiting reconcile', 'refunded'];
 const lc = (v: unknown) => String(v ?? '').trim().toLowerCase();
 
-/** The order total from a public order read. */
-export const orderTotal = (o: any) =>
-  Math.max(
-    0,
-    (Number(o?.product_total_price) || 0) +
-      (Number(o?.customization_total) || 0) +
-      (Number(o?.delivery_charge) || 0) -
-      (Number(o?.discount?.d_value) || 0),
-  );
-
 /**
  * What is still to be paid online on this order (the public order read), or null. An advance
- * order that isn't paid yet → the advance; any other online order still Inactive and not
- * settled → the order total. Cancelled / returned / settled orders and plain COD → null.
+ * order that isn't paid yet → the advance (`amount_to_pay`, else the advance's amount); any other
+ * online order still Inactive and not settled → the server's `amount_to_pay` (null when it says
+ * 0 or nothing). Cancelled / returned / settled orders and plain COD → null.
  */
 export const paymentDue = (o: any): PaymentDue | null => {
   if (!o || !o._id) return null;
@@ -182,7 +173,7 @@ export const paymentDue = (o: any): PaymentDue | null => {
   const adv = o.advance;
   if (adv && typeof adv === 'object') {
     if (adv.status !== 'due') return null;
-    const amount = Number(adv.amount) || 0;
+    const amount = Number(o.amount_to_pay) > 0 ? Number(o.amount_to_pay) : Number(adv.amount) || 0;
     if (!(amount > 0)) return null;
     return {
       order_id: id,
@@ -195,18 +186,23 @@ export const paymentDue = (o: any): PaymentDue | null => {
   }
   const method = String(o.payment_method ?? '');
   if (!method || method === 'COD') return null;
-  const amount = orderTotal(o);
+  const amount = Number(o.amount_to_pay) || 0;
   if (!(amount > 0)) return null;
   return { order_id: id, order_number: number, amount, on_delivery: null, advance: false, via: isOnlineMethod(method) ? method : null };
 };
 
-/** The split on a placed order: "Paid online (advance)" / "To pay on delivery" (§F). */
+/**
+ * The split on a placed order: "Paid online (advance)" / "To pay on delivery" (§F). The cash part
+ * is the server's `cod_to_collect` when the read has it (it counts refunds), else the advance's
+ * `on_delivery`.
+ */
 export const advanceSplit = (o: any): { paid: number; on_delivery: number } | null => {
   const adv = o?.advance;
   if (!adv || adv.status !== 'paid') return null;
   const paid = Number(adv.amount) || 0;
   if (!(paid > 0)) return null;
-  return { paid, on_delivery: Number(adv.on_delivery) || 0 };
+  const onDelivery = typeof o.cod_to_collect === 'number' && Number.isFinite(o.cod_to_collect) ? o.cod_to_collect : Number(adv.on_delivery) || 0;
+  return { paid, on_delivery: onDelivery };
 };
 
 /** The line on a QR / payment screen: "Advance for order #1234 · Rs 2,350 on delivery" (§D). */
@@ -287,15 +283,33 @@ export const pendingDue = (p: PendingOrder): PaymentDue => ({
 });
 
 /**
- * What an order just placed asks to be paid online now, from create-order's answer: the advance
- * (`advance.amount`), else the order total (`total_price` is goods + customization − discounts,
- * without delivery). 0 when the answer doesn't say.
+ * What an order just placed asks to be paid online now, from create-order's answer: the server's
+ * `amount_to_pay`, else the advance's amount. 0 when the answer doesn't say.
  */
 export const placedAmount = (res: any): number => {
+  const toPay = Number(res?.amount_to_pay) || 0;
+  if (toPay > 0) return toPay;
   const adv = Number(res?.advance?.amount) || 0;
-  if (adv > 0) return adv;
-  const total = (Number(res?.total_price) || 0) + (Number(res?.delivery_charge) || 0);
-  return total > 0 ? total : 0;
+  return adv > 0 ? adv : 0;
+};
+
+/**
+ * What the order will cost, as create-order prices it: the quote's `payable.total` (customization
+ * and a member discount included), or null when the quote doesn't say (older backends: add
+ * customization to `totals.total` yourself, as before).
+ */
+export const quotePayable = (quote: any): number | null => {
+  const t = quote?.payable?.total;
+  return typeof t === 'number' && Number.isFinite(t) && t >= 0 ? t : null;
+};
+
+/**
+ * Seconds left on the checkout hold from a payment init (or create-order) answer, or null: the
+ * hold has ended (or the backend doesn't say). With null, show no countdown and never "expired".
+ */
+export const holdSecondsOf = (data: any): number | null => {
+  const h = Number(data?.hold_seconds);
+  return h > 0 ? h : null;
 };
 
 // ── kit only ─────────────────────────────────────────────────────────────────────────────────

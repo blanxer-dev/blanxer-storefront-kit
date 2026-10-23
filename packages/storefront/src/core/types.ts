@@ -224,6 +224,8 @@ export interface OrderResponse extends Loose {
   advance?: { amount: number; on_delivery: number; basis?: 'delivery' | 'fixed' | 'percent'; required?: boolean } | null;
   /** `Inactive` until an online payment or advance lands; `Pending` for plain COD. */
   status?: string;
+  /** what is paid online now: the advance, the whole order (with delivery) for an online method, 0 for COD */
+  amount_to_pay?: number;
   /** Present (and `_id` absent) when the backend accepted a test order
    * (phone `0000000000` / mailinator email) without creating it. */
   success?: boolean;
@@ -256,6 +258,13 @@ export interface PublicOrder extends Loose {
   partial_payment_amount?: number;
   /** null (or absent on older backends) for every order without a website advance */
   advance?: PublicOrderAdvance | null;
+  /** what "Pay now" charges: the advance due, an unpaid online order's total, else 0 */
+  amount_to_pay?: number;
+  /** what the courier collects (total − the advance paid, net of refunds) */
+  cod_to_collect?: number;
+  /** while an Inactive order's checkout hold is on */
+  hold_seconds?: number;
+  hold_expires_at?: string;
 }
 
 export interface FlashSale {

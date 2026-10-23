@@ -76,8 +76,14 @@ export const submitReview = (body: {
   phone_number: string;
 }): Promise<any> => call('POST', `/order/public/submit-review`, body);
 
-/** Give an unpaid order's held units back early (QR closed on purpose, or its timer ran out). */
-export const releaseHold = (body: { store_id: string; order_id: string; transaction_id: string }): Promise<any> =>
+/**
+ * Give an unpaid order's held units back early (QR closed on purpose, its timer ran out, or the
+ * shopper drops the order). Name the payment attempt (`transaction_id`) or, with none (after a
+ * failed redirect), the order's 10-digit `phone_number`.
+ */
+export const releaseHold = (
+  body: { store_id: string; order_id: string } & ({ transaction_id: string; phone_number?: string } | { phone_number: string; transaction_id?: string }),
+): Promise<any> =>
   call('POST', `/order/public/release-hold`, body);
 
 // ---------------------------------------------------------------- coupons
@@ -217,6 +223,10 @@ export type PaymentStart =
       qr_message: string;
       /** what to pay now: the advance on an advance order, else the order total */
       amount: number;
+      amount_to_pay?: number;
+      /** the checkout hold left (absent once it ended: then no timer) */
+      hold_seconds?: number;
+      hold_expires_at?: string;
       /** QR inits on newer backends: for "Advance for order #1234 · Rs 2,350 on delivery" */
       order_number?: number | string;
       advance?: { amount: number; on_delivery: number } | null;
@@ -229,6 +239,9 @@ export type PaymentStart =
       qr_message: string;
       socket_url: string;
       amount: number;
+      amount_to_pay?: number;
+      hold_seconds?: number;
+      hold_expires_at?: string;
       order_number?: number | string;
       advance?: { amount: number; on_delivery: number } | null;
       banks: Array<{ bankName: string; bankCode: string; bankIcon: string; packageName: string; intentScheme: string }>;

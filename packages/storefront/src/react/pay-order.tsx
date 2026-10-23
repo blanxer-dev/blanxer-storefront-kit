@@ -6,7 +6,7 @@
  * the amount is always the init answer's (the advance on an advance order).
  */
 import { useId, useRef, useState, type ReactNode } from 'react';
-import { retryRefused, type PaymentDue } from '../core/advance.js';
+import { holdSecondsOf, retryRefused, type PaymentDue } from '../core/advance.js';
 import { errorMessage } from '../core/http.js';
 import type { PaymentMethod } from '../core/types.js';
 import { followPayment, startPayment, type PaymentStart } from '../client/index.js';
@@ -57,7 +57,8 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
     try {
       const s = await startPayment(method, { store: storeId, order: orderId, url: window.location.origin });
       optsRef.current.onStarted?.(method, orderId, s);
-      const hold = holdSeconds ?? (Number((s as any).hold_seconds) || undefined);
+      // the init's hold wins (every attempt answers what is left); create-order's only for older backends
+      const hold = holdSecondsOf(s) ?? holdSecondsOf({ hold_seconds: holdSeconds }) ?? undefined;
       if (s.type === 'qr') {
         setQr({ ...(s as any), order_id: orderId, store_id: storeId, hold_seconds: hold });
         setBusy(false);

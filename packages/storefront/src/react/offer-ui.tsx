@@ -37,7 +37,7 @@ import {
   type QuoteRequest,
 } from '../core/offers.js';
 import { errorMessage } from '../core/http.js';
-import type { Advance } from '../core/advance.js';
+import { quotePayable, type Advance } from '../core/advance.js';
 import { AdvanceSummaryRows } from './advance-ui.js';
 import { isOutOfStock } from '../core/variants.js';
 import { ensureNumber } from '../core/format.js';
@@ -730,7 +730,7 @@ export function OfferCodeField({ request, quote, error, collapsed = false, class
 
 export interface OfferSummaryProps {
   quote: Quote | null;
-  /** Σ customization charge × qty of the lines (not in the quote) */
+  /** Σ customization charge × qty of the lines; used only when the quote has no `payable` (older backends) */
   customization?: number;
   /** show the delivery row (checkout) */
   showDelivery?: boolean;
@@ -767,7 +767,7 @@ export function OfferSummary({ quote, customization = 0, showDelivery = false, p
       <dl className="bx-totals">
         <div className="bx-total-row">
           <dt>{labels?.subtotal || 'Sub-total'}</dt>
-          <dd>{money(quote.totals.gross + customization)}</dd>
+          <dd>{money(quote.totals.gross + (typeof quote.payable?.customization === 'number' ? quote.payable.customization : customization))}</dd>
         </div>
         {rows.map((r) => (
           <div key={r.promotion_id} className="bx-total-row bx-total-row--discount" data-offer-kind={r.kind}>
@@ -795,7 +795,8 @@ export function OfferSummary({ quote, customization = 0, showDelivery = false, p
         ) : null}
         <div className="bx-total-row bx-total-row--grand">
           <dt>{labels?.total || 'Total'}</dt>
-          <dd>{money((showDelivery ? quote.totals.total : quote.totals.goods) + customization)}</dd>
+          {/* checkout: the server's payable (customization included) when it sends it */}
+          <dd>{money(showDelivery ? (quotePayable(quote) ?? quote.totals.total + customization) : quote.totals.goods + customization)}</dd>
         </div>
       </dl>
       {advance !== undefined ? <AdvanceSummaryRows advance={advance} labels={{ payNow: labels?.payNow, onDelivery: labels?.onDelivery }} /> : null}

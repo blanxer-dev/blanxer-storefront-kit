@@ -118,7 +118,7 @@ export function QrPaymentModal({ open, data, onClose, onSuccess, onUnpaid }: Pay
 
   const isPaid = () => checkPayment('qr', data?.transaction || '');
 
-  const { timeLeft, expired, release, settledRef } = usePaymentHold({
+  const { timeLeft, expired, timed, release, settledRef } = usePaymentHold({
     open,
     data,
     checkEverySeconds: 5,
@@ -176,7 +176,7 @@ export function QrPaymentModal({ open, data, onClose, onSuccess, onUnpaid }: Pay
           </div>
           <AdvanceLine data={data} />
           <p className="bx-qr-amount">{money(Number(data?.amount) || 0)}</p>
-          <Timer timeLeft={timeLeft} />
+          {timed ? <Timer timeLeft={timeLeft} /> : null}
           <p className="bx-qr-steps-title">Steps to complete payment:</p>
           <ol className="bx-qr-steps">
             <li>Scan / Screenshot this QR</li>
@@ -272,7 +272,7 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess, onUnpaid 
     setAppNotFound(null);
   }, [data?.transaction]);
 
-  const { timeLeft, expired, release } = usePaymentHold({
+  const { timeLeft, expired, timed, release } = usePaymentHold({
     open,
     data,
     checkEverySeconds: 10,
@@ -363,7 +363,7 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess, onUnpaid 
             ))}
             {!filtered.length ? <p className="bx-muted">No banks found</p> : null}
           </div>
-          <Timer timeLeft={timeLeft} />
+          {timed ? <Timer timeLeft={timeLeft} /> : null}
           <Button variant="secondary" onClick={() => setShowQr(true)}>
             Scan QR Code Instead
           </Button>
@@ -395,7 +395,7 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess, onUnpaid 
           </div>
           <AdvanceLine data={data} />
           <p className="bx-qr-amount">{money(Number(data?.amount) || 0)}</p>
-          <Timer timeLeft={timeLeft} />
+          {timed ? <Timer timeLeft={timeLeft} /> : null}
           <p className="bx-qr-steps-title">How to pay using this QR code:</p>
           <ol className="bx-qr-steps">
             <li>Open your mobile banking app or digital wallet</li>

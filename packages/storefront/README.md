@@ -152,7 +152,7 @@ Stores with Blanxer's **Offers** plugin (automatic discounts, codes, buy more sa
 
 **Is the store on Offers?** Only stores whose document carries the `offers` plugin are asked (`toClientStore` passes its public `{ enabled, display }`); for every other store the package makes no offers call and the checkout is the 0.1.3 coupon flow (`applyCoupon`, `couponId` on the order) from the first render. Stores with the plugin are asked `GET /public/promotions/:store_id` (`{ enabled, data, settings, server_time }`); `useOffers().enabled` is true only when that answer says so. A 404 (a backend without Offers), a network error or a non-JSON answer from `/public/promotions` or `/quote` means offers off: coupon flow, no error UI, one `console.debug` line per page load (the browser still logs its own line for a 404 response). `getOffers` / `getProductOffers` never throw; `quoteCart` resolves null in those cases and throws `QuoteUnavailableError` only for a rate limit or a 5xx (offers stay on; the order is priced by the server anyway). Until the answer arrives, `Checkout` shows neither the coupon field nor the code field.
 
-**The quote.** `POST /public/promotions/:store_id/quote` with `buildQuoteRequest({ lines, code, place, paymentMethod, phone, removedOffers, giftChoices })`: product ids, variants and quantities only. Lines the server added (`added_by`: gifts, free items) are shown and never sent back. The answer has `lines` (per-line `allocations`, `net`, `free_qty`), `applications` (one per offer used), `code` (`applied` / `rejected` with the server's `message`), `delivery` (`before`, `discount`, `after`, `pending` until the place is known), `totals` (`gross`, `promo_discount`, `goods`, `delivery`, `total`) and `messages` (upsells with `data.remaining_amount` / `threshold` for progress bars). Customization charges are not in the quote; add them to `totals` as the cart does. Rate-limited (300 / 10 min / IP): use `useCartQuote`, which debounces, re-quotes when the lines, code, place, payment or phone change, aborts the request it replaces and never shows a stale answer.
+**The quote.** `POST /public/promotions/:store_id/quote` with `buildQuoteRequest({ lines, code, place, paymentMethod, phone, removedOffers, giftChoices })`: product ids, variants, quantities and per-unit `customization_charge` only. Lines the server added (`added_by`: gifts, free items) are shown and never sent back. The answer has `lines` (per-line `allocations`, `net`, `free_qty`), `applications` (one per offer used), `code` (`applied` / `rejected` with the server's `message`), `delivery` (`before`, `discount`, `after`, `pending` until the place is known), `totals` (`gross`, `promo_discount`, `goods`, `delivery`, `total`) and `messages` (upsells with `data.remaining_amount` / `threshold` for progress bars). Newer backends also answer `payable` (`{ customization, member_discount, total }`): show `payable.total` (`quotePayable(quote)`) as the order total, customization included. Older backends: customization charges are not in the quote; add them to `totals` as the cart does. Rate-limited (300 / 10 min / IP): use `useCartQuote`, which debounces, re-quotes when the lines, code, place, payment or phone change, aborts the request it replaces and never shows a stale answer.
 
 **The order.** `buildOrderPayload({ ..., offers: { code, removedOffers, giftChoices } })` sends `code`, `removed_offers` and `gift_choices` (and an empty `coupon`). The server prices the order again. A code it rejects comes back as a field error `{ fields: { code } }`; `codeFieldError(err)` reads it and `Checkout` shows it under the code field. The response carries `offers { applications, code, totals }`.
 
@@ -188,7 +188,7 @@ Stores can ask for part of a cash-on-delivery order online first: the delivery c
 - **When COD is hidden:** where the advance is the whole order and required.
 - **The order** goes as `paymentMethod: 'COD'` + `advance_via`. When the answer has `advance`, the order is paid online with that method like any online order. When it is `null`, it is plain COD.
 - **Where the advance comes from:**
-  - Stores on Offers: the cart quote.
+  - Stores on Offers: the cart quote (always the COD advance, whatever method is picked). Its `payable.total` (customization included) is the Total and the "Place Order · Rs X" amount; older backends: `totals.total` + customization.
   - Other stores with the setting on: `quoteAdvance` (`POST /public/promotions/:store/quote`, answered `{ enabled: false, data: { advance, totals } }`).
   - Any failure is plain COD.
 
@@ -196,18 +196,20 @@ Stores can ask for part of a cash-on-delivery order online first: the delivery c
 - **The waiting order.** After placing an online or advance order, the order waits in sessionStorage `checkout_pending_order` (`PendingOrder`: order id and number, cart line ids, cart signature, method, advance). The cart keeps those lines until the payment is confirmed.
 - **"Payment not finished".** A QR closed unpaid or expired, or a return to `/checkout` with the same cart, shows this panel instead of Place order:
   - "Try again", or another online method, on the same order id;
-  - "Pay cash on delivery instead", only for a shopper's-choice advance: it releases the hold and places a new plain COD order;
-  - "Start over".
+  - "Pay all in cash on delivery instead", only for a shopper's-choice advance: it releases the hold and places a new plain COD order;
+  - "Change the order details": releases the hold and forgets the waiting order.
+  The hold is released by the payment attempt when known, else by the order's phone (`releaseHold({ store_id, order_id, phone_number })`).
 - **Refused retries.** The server refuses a retry with "already paid" (the checkout goes to the success page) or "was cancelled" (a new order can be placed).
 - **`/payment/failed`** offers "Try payment again" (the order's tracking page) when this tab placed the order.
-- **`/track/<id>`** shows "Advance due — Pay Rs X" or "Payment not received — Pay Rs X" with the online methods. It pays this order in the page, or through the gateway's redirect. After an advance is paid, it shows "Paid online (advance) Rs X" and "To pay on delivery Rs Y".
+- **Amounts and the hold.** Every "Pay Rs X" is the server's `amount_to_pay`. The QR countdown follows the hold each init answers; once the hold has ended there is no countdown (the QR stays payable and never shows "expired").
+- **`/track/<id>`** shows "Advance due — Pay Rs X" or "Payment not received — Pay Rs X" with the online methods. It pays this order in the page, or through the gateway's redirect. After an advance is paid, it shows "Paid online (advance) Rs X" and "To pay on delivery Rs Y" (the read's `cod_to_collect`).
 
 **Building your own.** Use `usePayOrder()` to start (or restart) a payment for an order id with the QR modals; render its `modals`. Use `<PaymentDueBox due={paymentDue(order)} methods={paymentMethodsFor(store, { codAllowed: false })} onPay={...} />` and `<AdvanceSummaryRows advance={activeAdvance(...)} />`.
 
 The pure rules are in `/core` (`advance.ts`, the same functions as the Blanxer storefront):
 - `toAdvance`, `codOffer` (`plain` / `advance` / `hidden`), `pickAdvanceVia`, `activeAdvance`;
 - `advanceOrderFields`, `advanceBlocks`, `advanceWords` (all shopper copy);
-- `paymentDue`, `pendingDue`, `placedAmount`, `advanceSplit`, `advanceInitLine`, `retryRefused`;
+- `paymentDue`, `pendingDue`, `placedAmount`, `advanceSplit`, `advanceInitLine`, `retryRefused`, `quotePayable`, `holdSecondsOf`;
 - `cartSignature`, `parsePending`, `pendingFor`;
 - kit-only: `advancePaymentOn`, `advanceFromAnswer`, `orderAdvance`.
 

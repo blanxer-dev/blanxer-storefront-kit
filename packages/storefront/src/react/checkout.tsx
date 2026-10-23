@@ -37,6 +37,7 @@ import {
   pendingFor,
   pickAdvanceVia,
   placedAmount,
+  quotePayable,
   toAdvance,
   type Advance,
   type PendingOrder,
@@ -223,20 +224,13 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   });
   const offerQuote = offersOn ? cq.quote : null;
   const customization = quote.customization;
-  const payable = offerQuote ? offerQuote.totals.total + customization : quote.payable;
+  // the server's payable (customization included); older backends: add customization here
+  const payable = offerQuote ? (quotePayable(offerQuote) ?? offerQuote.totals.total + customization) : quote.payable;
   useEffect(() => setCodeError(''), [offers.code]);
 
-  // Advance payment. Stores on Offers: the quote carries it; while an online method is picked a
-  // second quote priced as COD (cached, same request as picking COD) keeps the COD tile right.
-  // Other stores: asked only when the store has the advance switched on.
+  // Advance payment. Stores on Offers: the quote carries it (always the COD advance, whatever
+  // method is picked). Other stores: asked only when the store has the advance switched on.
   const advanceOn = advancePaymentOn(store);
-  const codQuote = useCartQuote({
-    lines,
-    place,
-    paymentMethod: 'COD',
-    phone: values.customer_phone_number,
-    enabled: offersOn && advanceOn && !orderPlaced && paymentMethod !== 'COD' && !!place,
-  });
   const plainAdvance = useAdvanceQuote({
     lines,
     place,
@@ -245,7 +239,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     enabled: advanceOn && offers.ready && !offersOn && !orderPlaced,
   });
   const advance: Advance | null = offersOn
-    ? toAdvance((paymentMethod === 'COD' || !advanceOn ? cq.quote : codQuote.quote || cq.quote)?.advance)
+    ? toAdvance(cq.quote?.advance)
     : advanceOn
       ? plainAdvance.advance
       : null;
@@ -454,19 +448,32 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     takePendingPurchase();
   };
 
+  // Give the waiting order's held units back: by its payment attempt when known, else by the
+  // order's phone (after a failed redirect there is no attempt id). Best effort: the hold also ends.
+  const releaseWaiting = async (p: PendingOrder) => {
+    const phone = String(values.customer_phone_number || '').trim();
+    try {
+      if (p.transaction) await releaseHold({ store_id: storeId, order_id: p.order_id, transaction_id: p.transaction });
+      else if (/^\d{10}$/.test(phone)) await releaseHold({ store_id: storeId, order_id: p.order_id, phone_number: phone });
+    } catch {
+      /* best effort */
+    }
+  };
+
+  // "Change the order details": drop the waiting order (its units go back) and edit the form again.
+  const changeDetails = async () => {
+    const p = waiting;
+    if (p) await releaseWaiting(p);
+    startOver();
+  };
+
   // Shopper's-choice advance: drop the unpaid advance order (give its units back) and place a
   // new plain cash-on-delivery order with the same details.
   const codInstead = async () => {
     const p = waiting;
     if (!p?.advance || p.advance.required) return;
     setSubmitting(true);
-    if (p.transaction) {
-      try {
-        await releaseHold({ store_id: storeId, order_id: p.order_id, transaction_id: p.transaction });
-      } catch {
-        /* best effort: the hold also ends on its own */
-      }
-    }
+    await releaseWaiting(p);
     forgetPending();
     takePendingPurchase();
     setPaymentMethod('COD');
@@ -854,11 +861,11 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
               <div className="bx-advance-retry-actions">
                 {waiting.advance && !waiting.advance.required ? (
                   <Button variant="secondary" disabled={pay.busy} onClick={codInstead}>
-                    Pay cash on delivery instead
+                    Pay all in cash on delivery instead
                   </Button>
                 ) : null}
-                <Button variant="ghost" className="bx-advance-start-over" onClick={startOver}>
-                  Start over
+                <Button variant="ghost" className="bx-advance-start-over" disabled={pay.busy} onClick={changeDetails}>
+                  Change the order details
                 </Button>
               </div>
             </PaymentDueBox>
