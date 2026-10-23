@@ -23,4 +23,6 @@ export const STORAGE_KEYS = {
   ping: 'ping',
   checkoutOrderId: 'checkout_order_id',
   pixelPurchasePending: 'pixel_purchase_pending',
+  /** The order placed from this tab whose online payment (or advance) isn't confirmed yet (`PendingOrder`). */
+  pendingOrder: 'checkout_pending_order',
 } as const;

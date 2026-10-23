@@ -4,12 +4,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { initials } from '../core/format.js';
 import { orderLineFree, orderOfferSummary } from '../core/offers.js';
+import { advanceSplit, paymentDue } from '../core/advance.js';
+import { STORAGE_KEYS } from '../core/config.js';
+import { paymentMethodsFor } from '../core/payments.js';
 import { fieldError, errorMessage } from '../core/http.js';
 import { validation } from '../core/validation.js';
 import { blanxerImageLoader } from '../next/image-loader.js';
 import { cancelOrder, getOrder, submitReview } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
+import { PaymentDueBox, usePayOrder } from './pay-order.js';
 import { Button, Modal, TextArea, TextInput, cx } from './ui.js';
 
 /** Group lines of the same product for the review list (variants joined). */
@@ -158,7 +162,14 @@ export interface OrderTrackingProps {
   className?: string;
 }
 
-/** `/track/[id]`: order status, lines, totals, cancel (by phone) and per-product reviews once delivered. */
+/** Badge words: a Partial payment is an advance paid (the rest is cash on delivery). */
+const paymentStatusLabel = (s: string) => (String(s || '').toLowerCase() === 'partial' ? 'Advance paid' : s);
+
+/**
+ * `/track/[id]`: order status, lines, totals, cancel (by phone) and per-product reviews once
+ * delivered. An online payment or advance still due is paid here, on this order ("Advance due —
+ * Pay Rs X"); a paid advance shows "Paid online (advance)" / "To pay on delivery".
+ */
 export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackingProps) {
   const { store, storeId } = useBlanxer();
   const money = useMoney();
@@ -181,6 +192,23 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
   useEffect(() => {
     load();
   }, [load]);
+
+  const pay = usePayOrder({
+    // already paid / cancelled meanwhile: show the order as it is now
+    onRefused: () => load(),
+    onUnpaid: () => load(),
+  });
+  const onlineMethods = useMemo(() => paymentMethodsFor(store, { codAllowed: false }), [store]);
+  const payDue = (method: string) => {
+    if (!order?._id) return;
+    try {
+      // /payment/success comes back to this order
+      sessionStorage.setItem(STORAGE_KEYS.checkoutOrderId, order._id);
+    } catch {
+      /* storage blocked */
+    }
+    void pay.start(method, order._id);
+  };
 
   const total = useMemo(
     () => (order ? (order.product_total_price || 0) + (order.delivery_charge || 0) + (order.customization_total || 0) - (order.discount?.d_value || 0) : 0),
@@ -206,10 +234,14 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
   const cancelEligible = ['Pending', 'Processing'].includes(order.status) && !!store?.checkout?.extras?.allow_customer_cancellation;
   const reviewProducts = groupByProduct(order.ordered_products || []);
   const statusClass = (s: string) => `bx-badge bx-badge--${String(s || '').toLowerCase().replace(/\s+/g, '-')}`;
+  const due = paymentDue(order);
+  const split = advanceSplit(order);
 
   return (
     <div className={cx('bx-track', className)} data-bx="track">
-      {fromCheckout ? (
+      {due ? (
+        <PaymentDueBox due={due} methods={onlineMethods} busy={pay.busy} onPay={payDue} />
+      ) : fromCheckout ? (
         <div className="bx-notice bx-notice--success">
           <p className="bx-strong">Congratulations! Your order has been placed successfully!</p>
           <p>Thank you for your purchase. You will receive a confirmation SMS or call soon.</p>
@@ -232,7 +264,7 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
         <div>
           <dt>Order Status</dt>
           <dd>
-            <span className={statusClass(order.status)}>{order.status}</span> &amp; <span className={statusClass(order.payment_status)}>{order.payment_status}</span>
+            <span className={statusClass(order.status)}>{order.status}</span> &amp; <span className={statusClass(order.payment_status)}>{paymentStatusLabel(order.payment_status)}</span>
           </dd>
         </div>
       </dl>
@@ -320,15 +352,26 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
             <dt>Total</dt>
             <dd>{money(total)}</dd>
           </div>
-          {order.partial_payment_amount > 0 ? (
+          {split ? (
+            <>
+              <div className="bx-total-row bx-advance-row bx-advance-row--now">
+                <dt>Paid online (advance)</dt>
+                <dd>{money(split.paid)}</dd>
+              </div>
+              <div className="bx-total-row bx-advance-row bx-advance-row--later">
+                <dt>To pay on delivery</dt>
+                <dd>{money(split.on_delivery)}</dd>
+              </div>
+            </>
+          ) : (order.partial_payment_amount || 0) > 0 ? (
             <>
               <div className="bx-total-row">
                 <dt>Partial Payment</dt>
-                <dd>({money(order.partial_payment_amount)})</dd>
+                <dd>({money(order.partial_payment_amount || 0)})</dd>
               </div>
               <div className="bx-total-row">
                 <dt>Cash on Delivery</dt>
-                <dd>{money(total - order.partial_payment_amount)}</dd>
+                <dd>{money(total - (order.partial_payment_amount || 0))}</dd>
               </div>
             </>
           ) : null}
@@ -375,6 +418,7 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
 
       <ReviewModal open={!!reviewing} product={reviewing} order={order} onClose={() => setReviewing(null)} onDone={load} />
       <CancelModal open={cancelling} order={order} onClose={() => setCancelling(false)} onDone={load} />
+      {pay.modals}
     </div>
   );
 }

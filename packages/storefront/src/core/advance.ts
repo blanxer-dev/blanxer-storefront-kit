@@ -1,0 +1,335 @@
+/**
+ * Website advance payment ("pay part online, rest on delivery") and paying an order again.
+ * Pure helpers only (tested in test/advance.test.ts). Ported from the Blanxer storefront
+ * (`src/features/checkout/advance.ts`): same names, same rules, same shopper words.
+ *
+ * The server works out every amount: the advance comes from the quote
+ * (`POST /public/promotions/:store/quote` → `advance`), create-order works it out again, and the
+ * order read says what is still due. Nothing here computes an advance; it only decides what to
+ * show and send from the server's numbers.
+ */
+
+export type AdvanceBasis = 'delivery' | 'fixed' | 'percent';
+
+/** The quote's `advance` (contract §B). */
+export interface Advance {
+  /** pay now, whole rupees */
+  amount: number;
+  /** order total − amount: what the courier collects */
+  on_delivery: number;
+  /** the order total it was worked from */
+  total: number;
+  basis: AdvanceBasis;
+  /** true: plain cash on delivery isn't offered here */
+  required: boolean;
+  /** the advance is the whole order: pay online in full, no cash part */
+  full: boolean;
+}
+
+/**
+ * The storefront names of the methods that can pay online (never COD). Same list as the
+ * storefront; the kit never offers `Card` (`paymentMethodsFor` leaves it out).
+ */
+export const ONLINE_METHODS = [
+  'QR_Dynamic',
+  'FonepayCheckout',
+  'QR',
+  'Esewa',
+  'FonePay',
+  'Khalti',
+  'Card',
+  'NPX',
+  'nbank_card',
+  'QR_Static',
+] as const;
+
+export const isOnlineMethod = (name: unknown) => typeof name === 'string' && (ONLINE_METHODS as readonly string[]).includes(name);
+
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number.NaN);
+
+/** The quote's advance as the page uses it; anything unexpected (or none) is null = plain COD. */
+export const toAdvance = (raw: any): Advance | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const amount = num(raw.amount);
+  const onDelivery = num(raw.on_delivery);
+  const total = num(raw.total);
+  if (!(amount > 0) || !(onDelivery >= 0)) return null;
+  return {
+    amount,
+    on_delivery: onDelivery,
+    total: total >= 0 ? total : amount + onDelivery,
+    basis: raw.basis === 'fixed' || raw.basis === 'percent' ? raw.basis : 'delivery',
+    required: raw.required !== false,
+    full: raw.full === true,
+  };
+};
+
+/**
+ * How cash on delivery is offered with this advance (contract §A–C):
+ * - `plain`: as today (no advance here, or the advance is optional and would be the whole order);
+ * - `advance`: COD with the advance paid online first; `optional` = shopper's choice, where
+ *   plain COD stays as a choice too;
+ * - `hidden`: the advance is the whole order and required: pay online in full, no COD.
+ */
+export type CodOffer = { mode: 'plain' } | { mode: 'advance'; advance: Advance; optional: boolean } | { mode: 'hidden'; advance: Advance };
+
+export const codOffer = (advance: Advance | null): CodOffer => {
+  if (!advance) return { mode: 'plain' };
+  if (advance.full) return advance.required ? { mode: 'hidden', advance } : { mode: 'plain' };
+  return { mode: 'advance', advance, optional: !advance.required };
+};
+
+/** The cash-on-delivery choice under the COD tile: an online method name, or '' = no advance. */
+export type AdvanceChoice = string;
+
+/**
+ * The advance method picked: kept while still offered, else the shopper's remembered method when
+ * online, else the first online method. Shopper's choice starts at '' (plain COD, as today).
+ */
+export const pickAdvanceVia = (
+  prev: AdvanceChoice,
+  online: string[],
+  opts: { optional: boolean; preferred?: string | null },
+): AdvanceChoice => {
+  if (prev === '' && opts.optional) return '';
+  if (prev && online.includes(prev)) return prev;
+  if (opts.optional) return '';
+  if (opts.preferred && online.includes(opts.preferred)) return opts.preferred;
+  return online[0] || '';
+};
+
+/**
+ * The advance this order is placed with, or null (plain COD or an online method): COD picked,
+ * the advance applies (not full), and an online method is picked for it.
+ */
+export const activeAdvance = (
+  paymentMethod: string,
+  offer: CodOffer,
+  via: AdvanceChoice,
+  online: string[],
+): Advance | null => {
+  if (paymentMethod !== 'COD' || offer.mode !== 'advance') return null;
+  if (!via || !online.includes(via)) return null;
+  return offer.advance;
+};
+
+/** What the order call adds: `advance_via` only with COD and an advance that applies (§C). */
+export const advanceOrderFields = (advance: Advance | null, via: AdvanceChoice): { advance_via?: string } =>
+  advance && via && isOnlineMethod(via) ? { advance_via: via } : {};
+
+/** Place order is blocked: a required advance with no online method to pay it. */
+export const advanceBlocks = (paymentMethod: string, offer: CodOffer, via: AdvanceChoice, online: string[]) =>
+  paymentMethod === 'COD' && offer.mode === 'advance' && !offer.optional && !(via && online.includes(via));
+
+export type Money = (n: number) => string;
+
+/** The shopper-facing words for an advance (shown amounts are always the server's). */
+export const advanceWords = (advance: Advance, money: Money) => ({
+  /** second line of the COD tile (shopper's choice: the advance is an option) */
+  codLine: `${advance.required ? '' : 'or '}${money(advance.amount)} now · rest on delivery`,
+  /** above the online methods under COD */
+  pickerLabel: `Pay the ${money(advance.amount)} advance with`,
+  /** shopper's choice: the plain COD radio */
+  noAdvance: `No advance: pay ${money(advance.total)} on delivery`,
+  payNowLabel: 'Pay now (advance)',
+  onDeliveryLabel: 'Pay on delivery',
+  button: `Pay ${money(advance.amount)} & place order`,
+  underButton: `${money(advance.on_delivery)} cash on delivery`,
+  /** read out when the split changes (aria-live) */
+  live: `Pay ${money(advance.amount)} now and ${money(advance.on_delivery)} on delivery.`,
+});
+
+// ── paying an order (again) ──────────────────────────────────────────────────────────────────
+
+/** An online payment still owed on an order (contract §D, §F). */
+export interface PaymentDue {
+  order_id: string;
+  order_number: string;
+  /** what the gateway is asked for now (the server charges it again on init) */
+  amount: number;
+  /** an advance: the cash part on delivery; null for a fully online order */
+  on_delivery: number | null;
+  advance: boolean;
+  /** the method picked at checkout (to preselect) */
+  via: string | null;
+}
+
+const SETTLED = ['paid', 'partial', 'waiting reconcile', 'refunded'];
+const lc = (v: unknown) => String(v ?? '').trim().toLowerCase();
+
+/** The order total from a public order read. */
+export const orderTotal = (o: any) =>
+  Math.max(
+    0,
+    (Number(o?.product_total_price) || 0) +
+      (Number(o?.customization_total) || 0) +
+      (Number(o?.delivery_charge) || 0) -
+      (Number(o?.discount?.d_value) || 0),
+  );
+
+/**
+ * What is still to be paid online on this order (the public order read), or null. An advance
+ * order that isn't paid yet → the advance; any other online order still Inactive and not
+ * settled → the order total. Cancelled / returned / settled orders and plain COD → null.
+ */
+export const paymentDue = (o: any): PaymentDue | null => {
+  if (!o || !o._id) return null;
+  const status = lc(o.status);
+  if (status !== 'inactive') return null;
+  if (SETTLED.includes(lc(o.payment_status))) return null;
+  const id = String(o._id);
+  const number = String(o.order_number ?? '');
+  const adv = o.advance;
+  if (adv && typeof adv === 'object') {
+    if (adv.status !== 'due') return null;
+    const amount = Number(adv.amount) || 0;
+    if (!(amount > 0)) return null;
+    return {
+      order_id: id,
+      order_number: number,
+      amount,
+      on_delivery: Number(adv.on_delivery) || 0,
+      advance: true,
+      via: isOnlineMethod(adv.via) ? adv.via : null,
+    };
+  }
+  const method = String(o.payment_method ?? '');
+  if (!method || method === 'COD') return null;
+  const amount = orderTotal(o);
+  if (!(amount > 0)) return null;
+  return { order_id: id, order_number: number, amount, on_delivery: null, advance: false, via: isOnlineMethod(method) ? method : null };
+};
+
+/** The split on a placed order: "Paid online (advance)" / "To pay on delivery" (§F). */
+export const advanceSplit = (o: any): { paid: number; on_delivery: number } | null => {
+  const adv = o?.advance;
+  if (!adv || adv.status !== 'paid') return null;
+  const paid = Number(adv.amount) || 0;
+  if (!(paid > 0)) return null;
+  return { paid, on_delivery: Number(adv.on_delivery) || 0 };
+};
+
+/** The line on a QR / payment screen: "Advance for order #1234 · Rs 2,350 on delivery" (§D). */
+export const advanceInitLine = (init: any, money: Money): string | null => {
+  const adv = init?.advance;
+  if (!adv || !(Number(adv.amount) > 0)) return null;
+  const n = init?.order_number != null && init.order_number !== '' ? ` for order #${init.order_number}` : '';
+  return `Advance${n} · ${money(Number(adv.on_delivery) || 0)} on delivery`;
+};
+
+/** The words of a refused retry (§D): already paid / cancelled → stop offering to pay. */
+export const retryRefused = (message: unknown): 'paid' | 'cancelled' | null => {
+  const m = lc(message);
+  if (m.includes('already paid')) return 'paid';
+  if (m.includes('was cancelled')) return 'cancelled';
+  return null;
+};
+
+// ── the order waiting for payment, kept with the cart ────────────────────────────────────────
+
+/** The cart lines an order was placed with, as one comparable string. */
+export const cartSignature = (lines: { id?: string; product?: string; variant?: string; quantity?: number }[]) =>
+  lines
+    .map((l) => `${l.id || `${l.product}_${l.variant || ''}`}x${Number(l.quantity) || 0}`)
+    .sort()
+    .join('|');
+
+/** An order placed from this tab whose online payment isn't confirmed yet. */
+export interface PendingOrder {
+  order_id: string;
+  order_number: string;
+  /** cart line ids it was placed with (removed from the cart once paid) */
+  lines: string[];
+  signature: string;
+  method: string;
+  /** what the server said is to pay now (the advance, else the order total), for the button */
+  amount: number;
+  /** an advance order: plain COD may replace it only when the advance is optional */
+  advance: null | { amount: number; on_delivery: number; required: boolean };
+  /** the last payment attempt (releasing the hold needs it) */
+  transaction?: string;
+}
+
+export const PENDING_KEY = 'checkout_pending_order';
+
+export const parsePending = (raw: string | null): PendingOrder | null => {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw);
+    if (!p || typeof p.order_id !== 'string' || !p.order_id || !Array.isArray(p.lines)) return null;
+    return {
+      order_id: p.order_id,
+      order_number: String(p.order_number ?? ''),
+      lines: p.lines.map(String),
+      signature: String(p.signature ?? ''),
+      method: String(p.method ?? ''),
+      amount: Number(p.amount) > 0 ? Number(p.amount) : 0,
+      advance: p.advance && Number(p.advance.amount) > 0 ? { amount: Number(p.advance.amount), on_delivery: Number(p.advance.on_delivery) || 0, required: p.advance.required !== false } : null,
+      ...(p.transaction ? { transaction: String(p.transaction) } : {}),
+    };
+  } catch {
+    return null;
+  }
+};
+
+/** The waiting order still belongs to this cart (same lines, same quantities). */
+export const pendingFor = (pending: PendingOrder | null, signature: string): PendingOrder | null =>
+  pending && pending.signature && pending.signature === signature ? pending : null;
+
+/** The waiting order as something to pay (the checkout's "Payment not finished" panel). */
+export const pendingDue = (p: PendingOrder): PaymentDue => ({
+  order_id: p.order_id,
+  order_number: p.order_number,
+  amount: p.advance ? p.advance.amount : p.amount,
+  on_delivery: p.advance ? p.advance.on_delivery : null,
+  advance: !!p.advance,
+  via: isOnlineMethod(p.method) ? p.method : null,
+});
+
+/**
+ * What an order just placed asks to be paid online now, from create-order's answer: the advance
+ * (`advance.amount`), else the order total (`total_price` is goods + customization − discounts,
+ * without delivery). 0 when the answer doesn't say.
+ */
+export const placedAmount = (res: any): number => {
+  const adv = Number(res?.advance?.amount) || 0;
+  if (adv > 0) return adv;
+  const total = (Number(res?.total_price) || 0) + (Number(res?.delivery_charge) || 0);
+  return total > 0 ? total : 0;
+};
+
+// ── kit only ─────────────────────────────────────────────────────────────────────────────────
+
+/** `store.checkout.advance_payment` as `check_domain` sends it (display only: the quote decides). */
+export interface AdvancePaymentSetting {
+  enabled?: boolean;
+  basis?: AdvanceBasis;
+  amount?: number;
+  percent?: number;
+  required?: boolean;
+  min_order?: number;
+  places?: { mode?: 'all' | 'only' | 'except'; names?: string[] };
+  [key: string]: any;
+}
+
+/** The store switched the advance on (absent on older stores = off). Only then is it quoted. */
+export const advancePaymentOn = (store?: { checkout?: { advance_payment?: AdvancePaymentSetting | null } | null } | null): boolean =>
+  store?.checkout?.advance_payment?.enabled === true;
+
+/**
+ * The advance from a quote answer, on a store on Offers (`{ enabled: true, data: { …, advance } }`)
+ * or not (`{ enabled: false, data: { advance, totals } }`). Anything else (an older backend, an
+ * HTML page, an error body) is null: plain cash on delivery, as today.
+ */
+export const advanceFromAnswer = (raw: unknown): Advance | null => {
+  const r = raw as any;
+  if (!r || typeof r !== 'object' || !r.data || typeof r.data !== 'object') return null;
+  return toAdvance(r.data.advance);
+};
+
+/** The advance on a create-order answer (`advance: { amount, on_delivery, basis, required }`), or null = plain COD. */
+export const orderAdvance = (res: unknown): { amount: number; on_delivery: number; required: boolean } | null => {
+  const a = (res as any)?.advance;
+  if (!a || typeof a !== 'object' || !(Number(a.amount) > 0)) return null;
+  return { amount: Number(a.amount), on_delivery: Number(a.on_delivery) || 0, required: a.required !== false };
+};

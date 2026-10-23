@@ -1,3 +1,4 @@
+import { advanceOrderFields, type Advance } from './advance.js';
 import { isAddedLine, offerOrderFields } from './offers.js';
 import type { CartItem, Store } from './types.js';
 
@@ -66,13 +67,20 @@ export interface BuildOrderInput {
    */
   offers?: { code?: string | null; removedOffers?: string[]; giftChoices?: Record<string, string> };
   meta?: OrderMeta;
+  /**
+   * Cash on delivery with an advance: the advance that applies (`activeAdvance(...)`, from the
+   * server's quote) and the online method that pays it. Only sent with `paymentMethod: 'COD'`
+   * (as `advance_via`); the server works the amount out again.
+   */
+  advance?: Advance | null;
+  advanceVia?: string;
 }
 
 /**
  * `POST /order/:store_id` body, field for field as the Blanxer storefront
  * (`src/features/checkout/index.tsx` on main cabd695) sends it.
  */
-export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, couponId, offers, meta }: BuildOrderInput) => {
+export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, couponId, offers, meta, advance, advanceVia }: BuildOrderInput) => {
   const payload: Record<string, any> = {
     products: lines.filter((el) => !isAddedLine(el)).map((el) => ({
       product: el.product,
@@ -103,6 +111,7 @@ export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, co
     url,
     coupon: offers ? '' : couponId || '',
     ...(offers ? offerOrderFields(offers) : {}),
+    ...advanceOrderFields(paymentMethod === 'COD' ? advance ?? null : null, advanceVia || ''),
   };
   // JSON.stringify drops undefined; do it here too so the object equals what goes on the wire.
   for (const k of Object.keys(payload)) if (payload[k] === undefined) delete payload[k];

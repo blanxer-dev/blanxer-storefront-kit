@@ -60,6 +60,8 @@ export interface CartContextValue {
   deselectAll: () => void;
   /** Remove the selected (just-ordered) lines; resets the cart if nothing else is left. */
   removeSelectedFromCart: () => void;
+  /** Remove these lines (an order's lines once its payment is confirmed); resets the cart if nothing else is left. */
+  removeLines: (ids: string[]) => void;
   resetCart: () => void;
 }
 
@@ -69,6 +71,11 @@ export function useCart(): CartContextValue {
   const v = useContext(CartContext);
   if (!v) throw new Error('[@blanxer-dev/storefront] useCart() needs <BlanxerProvider> (or <CartProvider>) above it.');
   return v;
+}
+
+/** The cart, or null outside `<BlanxerProvider>` / `<CartProvider>`. */
+export function useOptionalCart(): CartContextValue | null {
+  return useContext(CartContext);
 }
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -133,6 +140,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const removeSelectedFromCart = () => {
     const remaining = items.filter((el) => !selectedIds.has(el.id));
     if (selectedIds.size === 0 || remaining.length === 0) {
+      resetCart();
+      return;
+    }
+    setItems(remaining);
+    save(remaining);
+    const remainingIds = new Set(remaining.map((el) => el.id));
+    seenIds.current = remainingIds;
+    setSelectedIds((prev) => new Set([...prev].filter((id) => remainingIds.has(id))));
+  };
+
+  const removeLines = (ids: string[]) => {
+    const drop = new Set(ids);
+    const remaining = items.filter((el) => !drop.has(el.id));
+    if (remaining.length === items.length) return;
+    if (remaining.length === 0) {
       resetCart();
       return;
     }
@@ -278,6 +300,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     selectAll,
     deselectAll,
     removeSelectedFromCart,
+    removeLines,
     resetCart,
   };
 

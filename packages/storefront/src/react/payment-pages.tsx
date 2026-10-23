@@ -1,27 +1,50 @@
 'use client';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { STORAGE_KEYS } from '../core/config.js';
-import { firePurchase, takePendingPurchase } from '../client/index.js';
+import { clearPendingOrder, firePurchase, readPendingOrder, takePendingPurchase } from '../client/index.js';
+import { useOptionalCart } from './cart.js';
 import { cx } from './ui.js';
+
+/** Remove lines from the stored cart when the page has no cart provider. */
+const removeStoredLines = (ids: string[]) => {
+  try {
+    const items = JSON.parse(localStorage.getItem(STORAGE_KEYS.cart) || '[]');
+    if (!Array.isArray(items)) return;
+    const drop = new Set(ids);
+    localStorage.setItem(STORAGE_KEYS.cart, JSON.stringify(items.filter((el: any) => !drop.has(el?.id))));
+  } catch {
+    /* storage blocked */
+  }
+};
 
 /**
  * `/payment/success`. Gateways (and the QR modals) land here after a paid
  * order. Fires the Meta Purchase saved at checkout (same event id as the
- * server event), then sends the shopper to `/track/<order>?from=checkout`
- * (or home when there is no pending order).
+ * server event), removes the paid order's lines from the cart (kept until now), then sends the
+ * shopper to `/track/<order>?from=checkout` (or home when there is no pending order).
  */
 export function PaymentSuccess({ className, children }: { className?: string; children?: ReactNode }) {
   const router = useRouter();
+  const cart = useOptionalCart();
+  const ready = !cart || cart.hydrated;
   const done = useRef(false);
   useEffect(() => {
-    if (done.current) return;
+    if (done.current || !ready) return;
     done.current = true;
     let orderId: string | null = null;
     try {
       orderId = sessionStorage.getItem(STORAGE_KEYS.checkoutOrderId);
       sessionStorage.removeItem(STORAGE_KEYS.checkoutOrderId);
+      // the order waiting for this payment: its lines leave the cart now
+      const waiting = readPendingOrder();
+      if (waiting && (!orderId || waiting.order_id === orderId)) {
+        if (cart) cart.removeLines(waiting.lines);
+        else removeStoredLines(waiting.lines);
+        clearPendingOrder();
+        orderId = orderId || waiting.order_id;
+      }
       // read once, so a refresh doesn't fire it again; the server already
       // sent its Purchase (same id) when the payment was verified
       const pending = takePendingPurchase();
@@ -30,7 +53,8 @@ export function PaymentSuccess({ className, children }: { className?: string; ch
       /* storage blocked */
     }
     router.replace(orderId ? `/track/${orderId}?from=checkout` : '/');
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, ready]);
 
   return (
     <div className={cx('bx-result bx-result--success', className)} aria-busy="true">
@@ -44,11 +68,35 @@ export function PaymentSuccess({ className, children }: { className?: string; ch
   );
 }
 
-/** `/payment/failed`. Pass `method` (from `?method=`) to show the card-specific reasons. */
-export function PaymentFailed({ method, homeHref = '/', className }: { method?: string; homeHref?: string; className?: string }) {
-  // the payment didn't go through: no Purchase for it later
+/**
+ * `/payment/failed`. Pass `method` (from `?method=`) to show the card-specific reasons. When this
+ * tab placed the order, the main action is "Try payment again" (the order's tracking page, which
+ * pays the same order); "Shop More" stays as the second one.
+ */
+export function PaymentFailed({
+  method,
+  homeHref = '/',
+  trackHref = (id: string) => `/track/${encodeURIComponent(id)}`,
+  className,
+}: {
+  method?: string;
+  homeHref?: string;
+  /** the tracking page of an order (default `/track/<id>`) */
+  trackHref?: (orderId: string) => string;
+  className?: string;
+}) {
+  const [orderId, setOrderId] = useState<string | null>(null);
   useEffect(() => {
-    takePendingPurchase();
+    let id: string | null = null;
+    try {
+      id = readPendingOrder()?.order_id || sessionStorage.getItem(STORAGE_KEYS.checkoutOrderId);
+    } catch {
+      id = null;
+    }
+    setOrderId(id);
+    // no order to pay again: the payment didn't go through, no Purchase for it later
+    // (with one, the Purchase waits for the retry's /payment/success)
+    if (!id) takePendingPurchase();
   }, []);
   const isCard = method === 'card';
   return (
@@ -67,9 +115,20 @@ export function PaymentFailed({ method, homeHref = '/', className }: { method?: 
       ) : (
         <p className="bx-result-body">However, you might receive call/sms soon for confirmation</p>
       )}
-      <Link className="bx-button bx-button--primary" href={homeHref}>
-        Shop More
-      </Link>
+      {orderId ? (
+        <div className="bx-result-actions">
+          <Link className="bx-button bx-button--primary" href={trackHref(orderId)}>
+            Try payment again
+          </Link>
+          <Link className="bx-button bx-button--secondary" href={homeHref}>
+            Shop More
+          </Link>
+        </div>
+      ) : (
+        <Link className="bx-button bx-button--primary" href={homeHref}>
+          Shop More
+        </Link>
+      )}
     </div>
   );
 }

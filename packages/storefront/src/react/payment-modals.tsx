@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'react-qr-code';
 import { checkPayment } from '../client/index.js';
+import { advanceInitLine } from '../core/advance.js';
 import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
 import { formatTimeLeft, usePaymentHold, type HoldData } from './payment-hold.js';
@@ -30,18 +31,32 @@ export function PaymentCloseConfirm({ loading, onCheck, onConfirm, onBack }: { l
   );
 }
 
-function Expired({ onClose }: { onClose: () => void }) {
+/**
+ * How a payment screen was left without a confirmed payment: `cancelled` (close confirmed),
+ * `expired` (✕ on the expired QR) or `retry` ("Try again" on the expired QR: start the same
+ * order again).
+ */
+export type PaymentUnpaidReason = 'cancelled' | 'expired' | 'retry';
+
+function Expired({ onClose, onRetry }: { onClose: () => void; onRetry?: () => void }) {
   const router = useRouter();
   return (
     <div className="bx-qr-expired">
       <p className="bx-qr-expired-title">QR is expired</p>
       <p className="bx-muted">Your items were released so other shoppers can buy them. If you already paid, your order is still confirmed.</p>
-      <Button onClick={onClose}>Back to checkout</Button>
+      {onRetry ? <Button onClick={onRetry}>Try again</Button> : <Button onClick={onClose}>Back to checkout</Button>}
       <Button variant="ghost" onClick={() => router.push('/')}>
         Go to home
       </Button>
     </div>
   );
+}
+
+/** "Advance for order #1234 · Rs 2,350 on delivery" when the init answer is for an advance. */
+function AdvanceLine({ data }: { data: { order_number?: number | string; advance?: { amount: number; on_delivery: number } | null } | null }) {
+  const money = useMoney();
+  const line = advanceInitLine(data, money);
+  return line ? <p className="bx-advance-init-line">{line}</p> : null;
 }
 
 function Timer({ timeLeft }: { timeLeft: number }) {
@@ -54,7 +69,24 @@ function Timer({ timeLeft }: { timeLeft: number }) {
 
 export interface QrPaymentData extends HoldData {
   qr_message: string;
+  /** what to pay now, from the init answer (the advance on an advance order) */
   amount: number;
+  order_number?: number | string;
+  /** newer backends: the order is an advance order (cash part on delivery) */
+  advance?: { amount: number; on_delivery: number } | null;
+}
+
+export interface PaymentModalProps<T> {
+  open: boolean;
+  data: T | null;
+  onClose: () => void;
+  onSuccess?: () => void;
+  /**
+   * The screen was left without a confirmed payment (close confirmed, QR expired, or "Try
+   * again" on the expired QR). The order still exists: offer to pay it again (same order id).
+   * With it, the expired screen's main button is "Try again" instead of "Back to checkout".
+   */
+  onUnpaid?: (reason: PaymentUnpaidReason) => void;
 }
 
 /**
@@ -62,7 +94,7 @@ export interface QrPaymentData extends HoldData {
  * automatic check every 5 s and on tab return, confirm-before-close, hold
  * release on cancel or expiry. On payment: `onSuccess()` then `/payment/success`.
  */
-export function QrPaymentModal({ open, data, onClose, onSuccess }: { open: boolean; data: QrPaymentData | null; onClose: () => void; onSuccess?: () => void }) {
+export function QrPaymentModal({ open, data, onClose, onSuccess, onUnpaid }: PaymentModalProps<QrPaymentData>) {
   const { notify } = useBlanxer();
   const money = useMoney();
   const router = useRouter();
@@ -112,6 +144,7 @@ export function QrPaymentModal({ open, data, onClose, onSuccess }: { open: boole
   const requestClose = () => {
     if (expired || settledRef.current) {
       setConfirmClose(false);
+      if (expired && !settledRef.current) onUnpaid?.('expired');
       onClose();
     } else setConfirmClose(true);
   };
@@ -119,20 +152,29 @@ export function QrPaymentModal({ open, data, onClose, onSuccess }: { open: boole
   const cancelPayment = async () => {
     setConfirmClose(false);
     await release();
+    onUnpaid?.('cancelled');
     onClose();
   };
+
+  const retry = onUnpaid
+    ? () => {
+        onUnpaid('retry');
+        onClose();
+      }
+    : undefined;
 
   return (
     <Modal open={open} onClose={requestClose} title="Scan to pay" className="bx-qr-modal">
       {confirmClose && !expired ? (
         <PaymentCloseConfirm loading={loading} onCheck={manualCheck} onConfirm={cancelPayment} onBack={() => setConfirmClose(false)} />
       ) : expired ? (
-        <Expired onClose={onClose} />
+        <Expired onClose={onClose} onRetry={retry} />
       ) : (
         <div className="bx-qr">
           <div className="bx-qr-code">
             <QRCode value={data?.qr_message || ''} size={220} />
           </div>
+          <AdvanceLine data={data} />
           <p className="bx-qr-amount">{money(Number(data?.amount) || 0)}</p>
           <Timer timeLeft={timeLeft} />
           <p className="bx-qr-steps-title">Steps to complete payment:</p>
@@ -163,8 +205,11 @@ export interface FonepayCheckoutData extends HoldData {
   prn: string;
   qr_message: string;
   socket_url: string;
+  /** what to pay now, from the init answer (the advance on an advance order) */
   amount: number;
   banks?: FonepayBank[];
+  order_number?: number | string;
+  advance?: { amount: number; on_delivery: number } | null;
 }
 
 const useIsMobile = () => {
@@ -185,7 +230,7 @@ const useIsMobile = () => {
  * in real time; the payment is always re-confirmed against Blanxer (also every
  * 10 s and on tab return). Same hold timer / release rules as the QR modal.
  */
-export function FonepayCheckoutModal({ open, data, onClose, onSuccess }: { open: boolean; data: FonepayCheckoutData | null; onClose: () => void; onSuccess?: () => void }) {
+export function FonepayCheckoutModal({ open, data, onClose, onSuccess, onUnpaid }: PaymentModalProps<FonepayCheckoutData>) {
   const { notify } = useBlanxer();
   const money = useMoney();
   const router = useRouter();
@@ -240,6 +285,7 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess }: { open:
   const requestClose = () => {
     if (expired || settledRef.current) {
       setConfirmClose(false);
+      if (expired && !settledRef.current) onUnpaid?.('expired');
       onClose();
     } else setConfirmClose(true);
   };
@@ -247,8 +293,16 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess }: { open:
   const cancelPayment = async () => {
     setConfirmClose(false);
     await release();
+    onUnpaid?.('cancelled');
     onClose();
   };
+
+  const retry = onUnpaid
+    ? () => {
+        onUnpaid('retry');
+        onClose();
+      }
+    : undefined;
 
   // Real-time success from Fonepay's websocket.
   useEffect(() => {
@@ -293,9 +347,10 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess }: { open:
       {confirmClose && !expired ? (
         <PaymentCloseConfirm loading={loading} onCheck={() => confirmPayment(true)} onConfirm={cancelPayment} onBack={() => setConfirmClose(false)} />
       ) : expired ? (
-        <Expired onClose={onClose} />
+        <Expired onClose={onClose} onRetry={retry} />
       ) : showBankList && !showQr ? (
         <div className="bx-banks">
+          <AdvanceLine data={data} />
           <p className="bx-banks-title">Select your bank or wallet</p>
           <input className="bx-input" placeholder="Search..." aria-label="Search banks" value={search} onChange={(e) => setSearch(e.target.value)} />
           <div className="bx-bank-list">
@@ -338,6 +393,7 @@ export function FonepayCheckoutModal({ open, data, onClose, onSuccess }: { open:
           <div className="bx-qr-code">
             <QRCode value={data?.qr_message || ''} size={220} />
           </div>
+          <AdvanceLine data={data} />
           <p className="bx-qr-amount">{money(Number(data?.amount) || 0)}</p>
           <Timer timeLeft={timeLeft} />
           <p className="bx-qr-steps-title">How to pay using this QR code:</p>

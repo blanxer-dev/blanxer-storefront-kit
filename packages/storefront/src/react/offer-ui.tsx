@@ -37,6 +37,8 @@ import {
   type QuoteRequest,
 } from '../core/offers.js';
 import { errorMessage } from '../core/http.js';
+import type { Advance } from '../core/advance.js';
+import { AdvanceSummaryRows } from './advance-ui.js';
 import { isOutOfStock } from '../core/variants.js';
 import { ensureNumber } from '../core/format.js';
 import type { CartItem, Product, ProductVariant } from '../core/types.js';
@@ -735,11 +737,25 @@ export interface OfferSummaryProps {
   /** delivery place, for the row label */
   place?: string;
   className?: string;
-  labels?: { subtotal?: string; delivery?: string; total?: string; free?: string; saving?: (amount: string) => string; deliveryLater?: string };
+  labels?: {
+    subtotal?: string;
+    delivery?: string;
+    total?: string;
+    free?: string;
+    saving?: (amount: string) => string;
+    deliveryLater?: string;
+    payNow?: string;
+    onDelivery?: string;
+  };
+  /**
+   * Checkout, cash on delivery with an advance (`activeAdvance(...)`): "Pay now (advance)" and
+   * "Pay on delivery" under the Total (server amounts, read out on change). Omit elsewhere.
+   */
+  advance?: Advance | null;
 }
 
 /** Sub-total, one row per offer, delivery, total and "You're saving" — all from the quote. */
-export function OfferSummary({ quote, customization = 0, showDelivery = false, place, className, labels }: OfferSummaryProps) {
+export function OfferSummary({ quote, customization = 0, showDelivery = false, place, className, labels, advance }: OfferSummaryProps) {
   const { display } = useOffers();
   const money = useMoney();
   if (!quote) return null;
@@ -782,6 +798,7 @@ export function OfferSummary({ quote, customization = 0, showDelivery = false, p
           <dd>{money((showDelivery ? quote.totals.total : quote.totals.goods) + customization)}</dd>
         </div>
       </dl>
+      {advance !== undefined ? <AdvanceSummaryRows advance={advance} labels={{ payNow: labels?.payNow, onDelivery: labels?.onDelivery }} /> : null}
       {!showDelivery ? <p className="bx-muted bx-offer-summary-note">{labels?.deliveryLater || 'Delivery is added at checkout.'}</p> : null}
       {display.cart_savings && saving > 0 ? (
         <p className="bx-offer-savings">{labels?.saving ? labels.saving(money(saving)) : `You're saving ${money(saving)} on this order`}</p>
