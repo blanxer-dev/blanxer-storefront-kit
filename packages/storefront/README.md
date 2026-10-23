@@ -197,7 +197,7 @@ Stores can ask for part of a cash-on-delivery order online first: the delivery c
 - **"Payment not finished".** A QR closed unpaid or expired, or a return to `/checkout` with the same cart, shows this panel instead of Place order:
   - "Try again", or another online method, on the same order id;
   - "Pay all in cash on delivery instead", only for a shopper's-choice advance: it releases the hold and places a new plain COD order;
-  - "Change the order details": releases the hold and forgets the waiting order.
+  - "Change the order details instead": releases the hold and forgets the waiting order.
   The hold is released by the payment attempt when known, else by the order's phone (`releaseHold({ store_id, order_id, phone_number })`).
 - **Refused retries.** The server refuses a retry with "already paid" (the checkout goes to the success page) or "was cancelled" (a new order can be placed).
 - **`/payment/failed`** offers "Try payment again" (the order's tracking page) when this tab placed the order.

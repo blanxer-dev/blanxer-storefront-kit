@@ -460,7 +460,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     }
   };
 
-  // "Change the order details": drop the waiting order (its units go back) and edit the form again.
+  // "Change the order details instead": drop the waiting order (its units go back) and edit the form again.
   const changeDetails = async () => {
     const p = waiting;
     if (p) await releaseWaiting(p);
@@ -865,7 +865,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
                   </Button>
                 ) : null}
                 <Button variant="ghost" className="bx-advance-start-over" disabled={pay.busy} onClick={changeDetails}>
-                  Change the order details
+                  Change the order details instead
                 </Button>
               </div>
             </PaymentDueBox>

@@ -23,7 +23,7 @@ Needs the Blanxer backend from the advance-payment release. Older backends send 
 - **All stores: retry on the same order.**
   - When a QR is closed unpaid or expires, or the shopper comes back to checkout with the same cart, a "Payment not finished" panel replaces Place order. It offers "Try again" or another online method, both on the same order id.
   - A shopper's-choice advance order can switch to "Pay all in cash on delivery instead": the hold is released and a new plain COD order is placed.
-  - "Change the order details" releases the hold and forgets the waiting order, so the form can be edited and placed again.
+  - "Change the order details instead" releases the hold and forgets the waiting order, so the form can be edited and placed again.
   - The hold is released by the payment attempt when known, else by the order's 10-digit phone (`releaseHold({ store_id, order_id, phone_number })`, e.g. after a failed redirect).
   - "Pay Rs X" amounts come from the server's `amount_to_pay` (create-order, the order read).
   - A retry refused as "already paid" goes to the success page. One refused as "cancelled" lets the shopper place a new order.
