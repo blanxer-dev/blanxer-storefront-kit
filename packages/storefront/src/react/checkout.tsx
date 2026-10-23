@@ -15,7 +15,7 @@
  * keeps the cart until its payment is confirmed; a try that didn't finish is paid again on the
  * same order ("Payment not finished"), never placed twice.
  */
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { STORAGE_KEYS } from '../core/config.js';
@@ -28,6 +28,7 @@ import { paymentFlow, paymentMethodsFor } from '../core/payments.js';
 import {
   activeAdvance,
   advanceBlocks,
+  advanceFlow,
   advancePaymentOn,
   advanceWords,
   cartSignature,
@@ -69,7 +70,7 @@ import { useCartQuote, useOffers } from './offers.js';
 import { OfferCodeField, OfferGiftPicker, OfferSummary } from './offer-ui.js';
 import { useMoney } from './money.js';
 import { AdvanceSummaryRows, useAdvanceQuote } from './advance-ui.js';
-import { PaymentDueBox, usePayOrder } from './pay-order.js';
+import { AdvanceMethodModal, PaymentDueBox, usePayOrder } from './pay-order.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
 
 export interface CheckoutLabels {
@@ -163,11 +164,11 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const [submitting, setSubmitting] = useState(false);
   const placingRef = useRef(false);
   const [testOrder, setTestOrder] = useState(false);
-  // advance payment: the online method paying the advance ('' = none / no advance)
-  const [advanceVia, setAdvanceVia] = useState('');
+  // advance payment: the "Pay the Rs X advance with" modal, and the method last picked there
+  const [choosingAdvance, setChoosingAdvance] = useState(false);
+  const lastVia = useRef('');
   // the order placed from this tab whose payment isn't confirmed yet (sessionStorage)
   const [pending, setPending] = useState<PendingOrder | null>(null);
-  const advanceLabelId = useId();
   const offers = useOffers();
   const offersOn = offers.enabled;
   const [codeError, setCodeError] = useState('');
@@ -249,16 +250,11 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   // An advance that is the whole order and required: no cash on delivery here.
   const methods = offer.mode === 'hidden' ? quote.paymentMethods.filter((m) => m.name !== 'COD') : quote.paymentMethods;
   const online = methods.filter((m) => m.name !== 'COD').map((m) => m.name as string);
-  const onlineKey = online.join(',');
-  const optional = offer.mode === 'advance' && offer.optional;
-  useEffect(() => {
-    if (offer.mode !== 'advance') return;
-    setAdvanceVia((prev) => pickAdvanceVia(prev, online, { optional }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [offer.mode, optional, onlineKey]);
-  const active = activeAdvance(paymentMethod, offer, advanceVia, online);
+  // COD where the advance applies: the summary splits and the button asks for the advance;
+  // the method that pays it is picked only when the order is placed (`advanceFlow`)
+  const active = activeAdvance(paymentMethod, offer);
   const words = offer.mode === 'advance' ? advanceWords(offer.advance, money) : null;
-  const blocked = advanceBlocks(paymentMethod, offer, advanceVia, online) || (paymentMethod === 'COD' && !advanceFresh);
+  const blocked = advanceBlocks(paymentMethod, offer, online) || (paymentMethod === 'COD' && !advanceFresh);
 
   // A payment that didn't finish, for the cart as it is now: pay it again on the same order.
   useEffect(() => {
@@ -477,25 +473,45 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     forgetPending();
     takePendingPurchase();
     setPaymentMethod('COD');
-    setAdvanceVia('');
     await placeNew('COD', '', null);
+  };
+
+  /** Form errors shown and the first one focused; true when the form is fine. */
+  const formOk = (): boolean => {
+    const v = validate();
+    setErrors(v);
+    if (!Object.keys(v).length) return true;
+    const first = document.querySelector('.bx-checkout [aria-invalid="true"]') as HTMLElement | null;
+    first?.focus();
+    return false;
   };
 
   const onSubmit = (ev: FormEvent) => {
     ev.preventDefault();
-    if (waiting) return; // never a second order for this cart: pay the waiting one
-    void placeNew(paymentMethod, advanceVia, active);
+    if (waiting || placingRef.current) return; // never a second order for this cart: pay the waiting one
+    if (!active) {
+      void placeNew(paymentMethod, '', null);
+      return;
+    }
+    // COD with an advance: ask which online method pays it (the order is created on confirm),
+    // or go straight to the store's only one when the advance is required
+    if (!formOk()) return;
+    const flow = advanceFlow(offer, online);
+    if (flow.kind === 'direct') void placeNew('COD', flow.via, active);
+    else if (flow.kind === 'choose') setChoosingAdvance(true);
+    else void placeNew(paymentMethod, '', null);
+  };
+
+  /** From the advance modal: an online method → the advance order; '' (shopper's choice) → plain COD. */
+  const confirmAdvance = (via: string) => {
+    setChoosingAdvance(false);
+    if (via) lastVia.current = via;
+    void placeNew('COD', via, via ? active : null);
   };
 
   const placeNew = async (method: string, via: string, adv: Advance | null) => {
     if (placingRef.current) return;
-    const v = validate();
-    setErrors(v);
-    if (Object.keys(v).length) {
-      const first = document.querySelector('.bx-checkout [aria-invalid="true"]') as HTMLElement | null;
-      first?.focus();
-      return;
-    }
+    if (!formOk()) return;
     if (!lines.length || !method) return;
 
     placingRef.current = true;
@@ -733,30 +749,6 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
                   </label>
                 ))}
               </div>
-              {paymentMethod === 'COD' && offer.mode === 'advance' && words ? (
-                <div className="bx-advance-picker" data-bx="advance-picker">
-                  <p className="bx-advance-label" id={advanceLabelId}>
-                    {words.pickerLabel}
-                  </p>
-                  <div className="bx-payment-methods bx-advance-methods" role="radiogroup" aria-labelledby={advanceLabelId}>
-                    {methods
-                      .filter((m) => m.name !== 'COD')
-                      .map((m) => (
-                        <label key={m.name} className={cx('bx-payment-method', 'bx-advance-method', advanceVia === m.name && 'bx-payment-method--active')} data-method={m.name}>
-                          <input type="radio" name="bx-advance-via" value={m.name} checked={advanceVia === m.name} onChange={() => setAdvanceVia(m.name)} />
-                          {paymentMethodIcons?.[m.name] ? <span className="bx-payment-icon">{paymentMethodIcons[m.name]}</span> : null}
-                          <span className="bx-payment-name">{m.display_name}</span>
-                        </label>
-                      ))}
-                    {offer.optional ? (
-                      <label className={cx('bx-payment-method', 'bx-advance-method', 'bx-advance-none', advanceVia === '' && 'bx-payment-method--active')} data-method="">
-                        <input type="radio" name="bx-advance-via" value="" checked={advanceVia === ''} onChange={() => setAdvanceVia('')} />
-                        <span className="bx-payment-name">{words.noAdvance}</span>
-                      </label>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
             </section>
           ) : delivery ? (
             <p className="bx-muted">No payment method is available for this place.</p>
@@ -854,7 +846,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
               title="Payment not finished"
               due={pendingDue(waiting)}
               methods={allOnline}
-              retryMethod={waiting.method}
+              lastMethod={waiting.method}
+              primaryLabel="Try again"
               busy={pay.busy}
               onPay={payAgain}
             >
@@ -894,6 +887,19 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         </aside>
       </form>
 
+      {offer.mode === 'advance' && words ? (
+        <AdvanceMethodModal
+          open={choosingAdvance}
+          onClose={() => setChoosingAdvance(false)}
+          title={words.pickerLabel}
+          methods={methods.filter((m) => m.name !== 'COD')}
+          initial={pickAdvanceVia(lastVia.current, online)}
+          payLabel={words.payButton}
+          noAdvanceLabel={offer.optional ? words.noAdvance : undefined}
+          busy={submitting}
+          onConfirm={confirmAdvance}
+        />
+      ) : null}
       {pay.modals}
     </div>
   );

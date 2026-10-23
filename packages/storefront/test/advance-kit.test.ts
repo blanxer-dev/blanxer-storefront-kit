@@ -20,7 +20,6 @@ import {
 // the order send, and the browser call (fetch replaced). Shared rules: advance.test.ts.
 
 const adv = { amount: 150, on_delivery: 2350, total: 2500, basis: 'delivery', required: true, full: false };
-const online = ['QR_Dynamic', 'Esewa'];
 
 const line = (over: Partial<CartItem> = {}): CartItem => ({
   id: 'p1_v1',
@@ -104,7 +103,7 @@ describe('what the order sends', () => {
   const offer = codOffer(toAdvance(adv));
 
   it('advance_via only with COD and an advance that applies', () => {
-    const a = activeAdvance('COD', offer, 'Esewa', online);
+    const a = activeAdvance('COD', offer);
     expect(buildOrderPayload({ ...base, paymentMethod: 'COD', advance: a, advanceVia: 'Esewa' })).toMatchObject({ paymentMethod: 'COD', advance_via: 'Esewa' });
   });
   it('plain COD, online methods and older callers send no advance_via', () => {

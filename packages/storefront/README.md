@@ -182,9 +182,9 @@ Each component respects the store's display settings (`badges`, `badge_style`, `
 Stores can ask for part of a cash-on-delivery order online first: the delivery charge, a fixed amount, or a percent. The setting is `store.checkout.advance_payment` (from `check_domain`; display only). It can be required, or the shopper's choice with plain COD kept. **The server works out every amount**: the quote returns `advance: { amount, on_delivery, total, basis, required, full } | null`, create-order works it out again, and the gateway charges only the advance. Needs the backend from the advance-payment release; older backends send no `advance` and everything works as before.
 
 **Checkout (automatic).**
-- **The COD tile** reads "Cash on delivery — Rs 150 now · rest on delivery".
-- **Picking COD** shows "Pay the Rs 150 advance with" and the store's online methods as radios. With shopper's choice, the last radio is "No advance: pay Rs 2,500 on delivery", picked by default.
+- **The payment methods are unchanged.** The COD tile adds one line: "Rs 150 online now · rest on delivery" ("or …" when the advance is the shopper's choice).
 - **The summary** adds "Pay now (advance)" and "Pay on delivery" (`aria-live`). The button reads "Pay Rs 150 & place order", with "Rs 2,350 cash on delivery" under it.
+- **The advance modal.** Pressing that button (after the form checks) opens "Pay the Rs 150 advance with": the store's online methods as radios and "Pay Rs 150". The order is created only on confirm; Back places nothing. With shopper's choice the last option is "Pay all Rs 2,500 on delivery instead" (button "Place order", a plain COD order). A required advance with one online method goes straight to it (`advanceFlow`).
 - **When COD is hidden:** where the advance is the whole order and required.
 - **The order** goes as `paymentMethod: 'COD'` + `advance_via`. When the answer has `advance`, the order is paid online with that method like any online order. When it is `null`, it is plain COD.
 - **Where the advance comes from:**
@@ -195,7 +195,7 @@ Stores can ask for part of a cash-on-delivery order online first: the delivery c
 **Paying again on the same order (every online order, not only advances).**
 - **The waiting order.** After placing an online or advance order, the order waits in sessionStorage `checkout_pending_order` (`PendingOrder`: order id and number, cart line ids, cart signature, method, advance). The cart keeps those lines until the payment is confirmed.
 - **"Payment not finished".** A QR closed unpaid or expired, or a return to `/checkout` with the same cart, shows this panel instead of Place order:
-  - "Try again", or another online method, on the same order id;
+  - "Try again" (the last method, same order id) and "Pay another way" (the method modal, online methods only);
   - "Pay all in cash on delivery instead", only for a shopper's-choice advance: it releases the hold and places a new plain COD order;
   - "Change the order details instead": releases the hold and forgets the waiting order.
   The hold is released by the payment attempt when known, else by the order's phone (`releaseHold({ store_id, order_id, phone_number })`).
@@ -204,10 +204,10 @@ Stores can ask for part of a cash-on-delivery order online first: the delivery c
 - **Amounts and the hold.** Every "Pay Rs X" is the server's `amount_to_pay`. The QR countdown follows the hold each init answers; once the hold has ended there is no countdown (the QR stays payable and never shows "expired").
 - **`/track/<id>`** shows "Advance due — Pay Rs X" or "Payment not received — Pay Rs X" with the online methods. It pays this order in the page, or through the gateway's redirect. After an advance is paid, it shows "Paid online (advance) Rs X" and "To pay on delivery Rs Y" (the read's `cod_to_collect`).
 
-**Building your own.** Use `usePayOrder()` to start (or restart) a payment for an order id with the QR modals; render its `modals`. Use `<PaymentDueBox due={paymentDue(order)} methods={paymentMethodsFor(store, { codAllowed: false })} onPay={...} />` and `<AdvanceSummaryRows advance={activeAdvance(...)} />`.
+**Building your own.** Use `usePayOrder()` to start (or restart) a payment for an order id with the QR modals; render its `modals`. Use `<PaymentDueBox due={paymentDue(order)} methods={paymentMethodsFor(store, { codAllowed: false })} onPay={...} />` (main "Pay Rs X" + "Pay another way"), `<AdvanceMethodModal>` and `<AdvanceSummaryRows advance={activeAdvance(...)} />`.
 
 The pure rules are in `/core` (`advance.ts`, the same functions as the Blanxer storefront):
-- `toAdvance`, `codOffer` (`plain` / `advance` / `hidden`), `pickAdvanceVia`, `activeAdvance`;
+- `toAdvance`, `codOffer` (`plain` / `advance` / `hidden`), `pickAdvanceVia`, `activeAdvance`, `advanceFlow` (`plain` / `direct` / `choose`);
 - `advanceOrderFields`, `advanceBlocks`, `advanceWords` (all shopper copy);
 - `paymentDue`, `pendingDue`, `placedAmount`, `advanceSplit`, `advanceInitLine`, `retryRefused`, `quotePayable`, `holdSecondsOf`;
 - `cartSignature`, `parsePending`, `pendingFor`;

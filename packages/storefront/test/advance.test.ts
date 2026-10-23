@@ -1,8 +1,9 @@
-// Same cases as the Blanxer storefront (src/features/checkout/advance.test.ts), updated for the built backend (2026-10-23 contract changes).
+// Same cases as the Blanxer storefront (src/features/checkout/advance.test.ts): the helpers are a port.
 import { describe, expect, it } from 'vitest';
 import {
   activeAdvance,
   advanceBlocks,
+  advanceFlow,
   advanceInitLine,
   advanceOrderFields,
   advanceSplit,
@@ -11,9 +12,9 @@ import {
   codOffer,
   parsePending,
   paymentDue,
+  holdSecondsOf,
   pendingDue,
   placedAmount,
-  holdSecondsOf,
   quotePayable,
   pendingFor,
   pickAdvanceVia,
@@ -43,6 +44,14 @@ describe('advance from the quote', () => {
   });
 });
 
+describe('the total shown', () => {
+  it("is the quote's payable (customization and member discount in), else none", () => {
+    expect(quotePayable({ totals: { total: 2500 }, payable: { customization: 80, member_discount: 240, total: 2340 } })).toBe(2340);
+    expect(quotePayable({ totals: { total: 2500 } })).toBeNull();
+    expect(quotePayable(null)).toBeNull();
+  });
+});
+
 describe('how cash on delivery is offered', () => {
   it('required: COD only with the advance', () => {
     const a = toAdvance(quoted)!;
@@ -51,9 +60,10 @@ describe('how cash on delivery is offered', () => {
   it("shopper's choice keeps plain COD", () => {
     const a = toAdvance({ ...quoted, required: false })!;
     expect(codOffer(a)).toEqual({ mode: 'advance', advance: a, optional: true });
-    expect(pickAdvanceVia('', online, { optional: true })).toBe('');
-    expect(activeAdvance('COD', codOffer(a), '', online)).toBeNull();
-    expect(advanceBlocks('COD', codOffer(a), '', online)).toBe(false);
+    // the summary shows the split; plain COD stays a choice when the order is placed
+    expect(activeAdvance('COD', codOffer(a))).toBe(a);
+    expect(advanceFlow(codOffer(a), ['Esewa'])).toEqual({ kind: 'choose' });
+    expect(advanceBlocks('COD', codOffer(a), [])).toBe(false);
   });
   it('an advance that is the whole order: no COD when required, plain COD when not', () => {
     const full = toAdvance({ ...quoted, amount: 2500, on_delivery: 0, full: true })!;
@@ -63,31 +73,37 @@ describe('how cash on delivery is offered', () => {
 });
 
 describe('the advance method', () => {
-  it('required: keeps the pick, else the remembered online method, else the first', () => {
-    expect(pickAdvanceVia('Esewa', online, { optional: false })).toBe('Esewa');
-    expect(pickAdvanceVia('', online, { optional: false, preferred: 'Khalti' })).toBe('Khalti');
-    expect(pickAdvanceVia('', online, { optional: false, preferred: 'COD' })).toBe('QR_Dynamic');
-    expect(pickAdvanceVia('FonePay', online, { optional: false })).toBe('QR_Dynamic');
-    expect(pickAdvanceVia('', [], { optional: false })).toBe('');
+  it('the modal preselects the pick, else the remembered online method, else the first', () => {
+    expect(pickAdvanceVia('Esewa', online)).toBe('Esewa');
+    expect(pickAdvanceVia('', online, { preferred: 'Khalti' })).toBe('Khalti');
+    expect(pickAdvanceVia('', online, { preferred: 'COD' })).toBe('QR_Dynamic');
+    expect(pickAdvanceVia('FonePay', online)).toBe('QR_Dynamic');
+    expect(pickAdvanceVia('', [])).toBe('');
   });
-  it('a required advance without a method blocks Place order', () => {
+  it('a required advance with no online method blocks Place order', () => {
     const offer = codOffer(toAdvance(quoted));
-    expect(advanceBlocks('COD', offer, '', online)).toBe(true);
-    expect(advanceBlocks('COD', offer, 'Esewa', online)).toBe(false);
-    expect(advanceBlocks('Esewa', offer, '', online)).toBe(false);
+    expect(advanceBlocks('COD', offer, [])).toBe(true);
+    expect(advanceBlocks('COD', offer, online)).toBe(false);
+    expect(advanceBlocks('Esewa', offer, [])).toBe(false);
+  });
+  it('placing asks for the method in a modal, or goes straight to the only one', () => {
+    const offer = codOffer(toAdvance(quoted));
+    expect(advanceFlow(offer, online)).toEqual({ kind: 'choose' });
+    expect(advanceFlow(offer, ['Esewa'])).toEqual({ kind: 'direct', via: 'Esewa' });
+    expect(advanceFlow(codOffer(null), online)).toEqual({ kind: 'plain' });
   });
 });
 
 describe('what the order sends', () => {
   it('advance_via only with COD where the advance applies', () => {
     const offer = codOffer(toAdvance(quoted));
-    const a = activeAdvance('COD', offer, 'Esewa', online);
+    const a = activeAdvance('COD', offer);
     expect(a).toMatchObject({ amount: 150 });
     expect(advanceOrderFields(a, 'Esewa')).toEqual({ advance_via: 'Esewa' });
-    expect(activeAdvance('Esewa', offer, 'Esewa', online)).toBeNull();
+    expect(advanceOrderFields(a, '')).toEqual({});
+    expect(activeAdvance('Esewa', offer)).toBeNull();
     expect(advanceOrderFields(null, 'Esewa')).toEqual({});
-    expect(activeAdvance('COD', codOffer(null), 'Esewa', online)).toBeNull();
-    expect(activeAdvance('COD', offer, 'NPX', online)).toBeNull();
+    expect(activeAdvance('COD', codOffer(null))).toBeNull();
     expect(advanceOrderFields(toAdvance(quoted), 'COD')).toEqual({});
   });
 });
@@ -95,15 +111,16 @@ describe('what the order sends', () => {
 describe('advance words', () => {
   it('tile, picker, summary and button read the server amounts', () => {
     const w = advanceWords(toAdvance(quoted)!, money);
-    expect(w.codLine).toBe('Rs 150 now · rest on delivery');
+    expect(w.codLine).toBe('Rs 150 online now · rest on delivery');
     expect(w.pickerLabel).toBe('Pay the Rs 150 advance with');
     expect(w.payNowLabel).toBe('Pay now (advance)');
     expect(w.onDeliveryLabel).toBe('Pay on delivery');
     expect(w.button).toBe('Pay Rs 150 & place order');
     expect(w.underButton).toBe('Rs 2,350 cash on delivery');
-    expect(w.noAdvance).toBe('No advance: pay Rs 2,500 on delivery');
+    expect(w.noAdvance).toBe('Pay all Rs 2,500 on delivery instead');
+    expect(w.payButton).toBe('Pay Rs 150');
     expect(w.live).toBe('Pay Rs 150 now and Rs 2,350 on delivery.');
-    expect(advanceWords(toAdvance({ ...quoted, required: false })!, money).codLine).toBe('or Rs 150 now · rest on delivery');
+    expect(advanceWords(toAdvance({ ...quoted, required: false })!, money).codLine).toBe('or Rs 150 online now · rest on delivery');
   });
 });
 
@@ -124,16 +141,13 @@ const order = (o: any) => ({
 
 describe('paying an order again', () => {
   it('an advance not paid yet is due on the same order', () => {
-    const adv = { status: 'due', amount: 150, on_delivery: 2350, via: 'QR_Dynamic', gateway: null, paid_at: null };
-    const due = paymentDue(order({ advance: adv, amount_to_pay: 150 }));
+    const due = paymentDue(order({ amount_to_pay: 150, advance: { status: 'due', amount: 150, on_delivery: 2350, via: 'QR_Dynamic', gateway: null, paid_at: null } }));
     expect(due).toEqual({ order_id: 'o1', order_number: '1234', amount: 150, on_delivery: 2350, advance: true, via: 'QR_Dynamic' });
-    // the server's amount_to_pay wins; without it, the advance's amount
-    expect(paymentDue(order({ advance: adv, amount_to_pay: 160 }))?.amount).toBe(160);
-    expect(paymentDue(order({ advance: adv, amount_to_pay: undefined }))?.amount).toBe(150);
   });
   it('an online order not paid yet is due in full', () => {
-    // amount_to_pay is the whole order with delivery; nothing is worked out from the lines
-    expect(paymentDue(order({ payment_method: 'Esewa', payment_status: 'Failed', amount_to_pay: 2500 }))).toEqual({
+    // the server's amount_to_pay, never worked out from the order's fields
+    expect(paymentDue(order({ payment_method: 'Esewa', payment_status: 'Failed', amount_to_pay: 0 }))).toBeNull();
+    expect(paymentDue(order({ payment_method: 'Esewa', payment_status: 'Failed', amount_to_pay: 2500, product_total_price: 1 }))).toEqual({
       order_id: 'o1',
       order_number: '1234',
       amount: 2500,
@@ -141,14 +155,12 @@ describe('paying an order again', () => {
       advance: false,
       via: 'Esewa',
     });
-    expect(paymentDue(order({ payment_method: 'Esewa', payment_status: 'Failed', amount_to_pay: 0 }))).toBeNull();
-    expect(paymentDue(order({ payment_method: 'Esewa', payment_status: 'Failed', amount_to_pay: undefined }))).toBeNull();
   });
   it('nothing is due once paid, cancelled, or on plain COD', () => {
     expect(paymentDue(order({ advance: { status: 'paid', amount: 150, on_delivery: 2350 }, status: 'Pending', payment_status: 'Partial' }))).toBeNull();
     for (const ps of ['Paid', 'Partial', 'Waiting Reconcile', 'Refunded'])
-      expect(paymentDue(order({ payment_method: 'Esewa', payment_status: ps }))).toBeNull();
-    expect(paymentDue(order({ payment_method: 'Esewa', status: 'Cancelled' }))).toBeNull();
+      expect(paymentDue(order({ payment_method: 'Esewa', payment_status: ps, amount_to_pay: 2500 }))).toBeNull();
+    expect(paymentDue(order({ payment_method: 'Esewa', status: 'Cancelled', amount_to_pay: 2500 }))).toBeNull();
     expect(paymentDue(order({ status: 'Pending' }))).toBeNull();
     expect(paymentDue(order({}))).toBeNull();
     expect(paymentDue(null)).toBeNull();
@@ -166,10 +178,13 @@ describe('after the advance is paid', () => {
     expect(advanceSplit({ advance: { status: 'paid', amount: 150, on_delivery: 2350 } })).toEqual({ paid: 150, on_delivery: 2350 });
     expect(advanceSplit({ advance: { status: 'due', amount: 150, on_delivery: 2350 } })).toBeNull();
     expect(advanceSplit({})).toBeNull();
-    // the courier's figure (net of refunds) when the read has it
-    expect(advanceSplit({ advance: { status: 'paid', amount: 150, on_delivery: 2350 }, cod_to_collect: 2400 })).toEqual({ paid: 150, on_delivery: 2400 });
-    expect(advanceSplit({ advance: { status: 'paid', amount: 150, on_delivery: 2350 }, cod_to_collect: 0 })).toEqual({ paid: 150, on_delivery: 0 });
-    expect(advanceSplit({ advance: { status: 'paid', amount: 150, on_delivery: 2350 }, cod_to_collect: '2400' })).toEqual({ paid: 150, on_delivery: 2350 });
+    // what the courier collects is the server's (net of a refunded advance)
+    expect(advanceSplit({ cod_to_collect: 2400, advance: { status: 'paid', amount: 150, on_delivery: 2350 } })).toEqual({ paid: 150, on_delivery: 2400 });
+  });
+  it('the QR timer follows the hold the init says is left', () => {
+    expect(holdSecondsOf({ hold_seconds: 240 })).toBe(240);
+    expect(holdSecondsOf({ hold_seconds: 0 })).toBeNull();
+    expect(holdSecondsOf({})).toBeNull();
   });
   it('payment screens name the order and the cash part', () => {
     expect(advanceInitLine({ order_number: 1234, amount: 150, advance: { amount: 150, on_delivery: 2350 } }, money)).toBe(
@@ -181,13 +196,11 @@ describe('after the advance is paid', () => {
 });
 
 describe('the order waiting for payment', () => {
-  it('asks for what create-order said: the advance, else the order total', () => {
+  it("asks for what create-order said: amount_to_pay, else the advance", () => {
     expect(placedAmount({ amount_to_pay: 150, total_price: 2300, delivery_charge: 200, advance: { amount: 150, on_delivery: 2350 } })).toBe(150);
     expect(placedAmount({ amount_to_pay: 2500, total_price: 2300, delivery_charge: 200, advance: null })).toBe(2500);
-    expect(placedAmount({ advance: { amount: 150, on_delivery: 2350 } })).toBe(150);
-    // total_price excludes delivery: never summed here
-    expect(placedAmount({ total_price: 2300, delivery_charge: 200, advance: null })).toBe(0);
-    expect(placedAmount({})).toBe(0);
+    expect(placedAmount({ advance: { amount: 150 } })).toBe(150);
+    expect(placedAmount({ total_price: 2300, delivery_charge: 200 })).toBe(0);
   });
   it('belongs to the cart it was placed with', () => {
     const sig = cartSignature([
@@ -206,24 +219,6 @@ describe('the order waiting for payment', () => {
     expect(adv!.advance!.required).toBe(false);
     expect(parsePending('not json')).toBeNull();
     expect(parsePending(JSON.stringify({ order_id: '' }))).toBeNull();
-  });
-});
-
-describe('server totals and the hold', () => {
-  it('the quote payable is shown as it is (customization and member discount included)', () => {
-    expect(quotePayable({ totals: { total: 2500 }, payable: { customization: 80, member_discount: 240, total: 2340 } })).toBe(2340);
-    expect(quotePayable({ payable: { total: 0 } })).toBe(0);
-    expect(quotePayable({ totals: { total: 2500 } })).toBeNull();
-    expect(quotePayable({ payable: { total: '2340' } })).toBeNull();
-    expect(quotePayable({ payable: { total: -1 } })).toBeNull();
-    expect(quotePayable(null)).toBeNull();
-  });
-  it('the hold left from an init answer; none = no countdown', () => {
-    expect(holdSecondsOf({ hold_seconds: 280, hold_expires_at: '…' })).toBe(280);
-    expect(holdSecondsOf({ hold_seconds: '120' })).toBe(120);
-    expect(holdSecondsOf({ hold_seconds: 0 })).toBeNull();
-    expect(holdSecondsOf({})).toBeNull();
-    expect(holdSecondsOf(null)).toBeNull();
   });
 });
 

@@ -5,15 +5,15 @@
  * Every try starts the gateway for the SAME order id (the server never places a second order);
  * the amount is always the init answer's (the advance on an advance order).
  */
-import { useId, useRef, useState, type ReactNode } from 'react';
-import { holdSecondsOf, retryRefused, type PaymentDue } from '../core/advance.js';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { holdSecondsOf, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
 import { errorMessage } from '../core/http.js';
 import type { PaymentMethod } from '../core/types.js';
 import { followPayment, startPayment, type PaymentStart } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
 import { FonepayCheckoutModal, QrPaymentModal, type FonepayCheckoutData, type PaymentUnpaidReason, type QrPaymentData } from './payment-modals.js';
-import { Button, cx } from './ui.js';
+import { Button, Modal, cx } from './ui.js';
 
 export const PAYMENT_ERRORS: Record<string, string> = {
   FonePay: 'Fonepay is not available at the moment, please try again later.',
@@ -109,6 +109,74 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
   return { start, busy, open: !!qr || !!fonepay, modals };
 }
 
+export interface AdvanceMethodModalProps {
+  open: boolean;
+  /** close / back: nothing is placed or paid */
+  onClose: () => void;
+  /** e.g. "Pay the Rs 150 advance with" */
+  title: string;
+  /** the store's online methods */
+  methods: PaymentMethod[];
+  /** the method to start on (`pickAdvanceVia(...)`) */
+  initial: string;
+  /** the confirm button while an online method is picked, e.g. "Pay Rs 150" */
+  payLabel: string;
+  /** shopper's choice at checkout: a last option for plain COD (value ''), e.g. "Pay all Rs 2,500 on delivery instead" */
+  noAdvanceLabel?: string;
+  /** the confirm button while the plain COD option is picked (default "Place order") */
+  placeLabel?: string;
+  busy?: boolean;
+  /** an online method name, or '' for the plain COD option */
+  onConfirm: (via: string) => void;
+}
+
+/**
+ * "Pay the Rs 150 advance with": the store's online methods as compact radios, one confirm
+ * button. Used when placing a COD order with an advance, and for "Pay another way".
+ */
+export function AdvanceMethodModal({ open, onClose, title, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', busy, onConfirm }: AdvanceMethodModalProps) {
+  const id = useId();
+  const [picked, setPicked] = useState(initial);
+  // every opening starts on the given method
+  useEffect(() => {
+    if (open) setPicked(initial);
+  }, [open, initial]);
+  const names = methods.map((m) => m.name as string);
+  const valid = picked === '' ? !!noAdvanceLabel : names.includes(picked);
+  return (
+    <Modal open={open} onClose={onClose} title={title} dismissible className="bx-advance-modal">
+      <form
+        className="bx-stack"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (valid && !busy) onConfirm(picked);
+        }}
+      >
+        <div className="bx-advance-methods" role="radiogroup" aria-label={title}>
+          {methods.map((m) => (
+            <label key={m.name} className={cx('bx-advance-method', picked === m.name && 'bx-advance-method--active')} data-method={m.name}>
+              <input type="radio" name={`${id}-via`} value={m.name} checked={picked === m.name} onChange={() => setPicked(m.name)} />
+              <span className="bx-payment-name">{m.display_name}</span>
+            </label>
+          ))}
+          {noAdvanceLabel ? (
+            <label className={cx('bx-advance-method', 'bx-advance-none', picked === '' && 'bx-advance-method--active')} data-method="">
+              <input type="radio" name={`${id}-via`} value="" checked={picked === ''} onChange={() => setPicked('')} />
+              <span className="bx-payment-name">{noAdvanceLabel}</span>
+            </label>
+          ) : null}
+        </div>
+        <Button type="submit" className="bx-advance-pay" loading={busy} disabled={!valid}>
+          {picked === '' ? placeLabel : payLabel}
+        </Button>
+        <Button variant="ghost" onClick={onClose}>
+          Back
+        </Button>
+      </form>
+    </Modal>
+  );
+}
+
 export interface PaymentDueBoxProps {
   /** what is still to pay online (`paymentDue(order)` / `pendingDue(pending)`) */
   due: PaymentDue;
@@ -118,28 +186,33 @@ export interface PaymentDueBoxProps {
   busy?: boolean;
   /** heading; default "Advance due — Pay Rs X" / "Payment not received — Pay Rs X" (then shown under it) */
   title?: string;
-  /** the method of the try that didn't finish: the button reads "Try again" while it is picked */
-  retryMethod?: string;
+  /** the method of the last try: the main button pays with it again directly */
+  lastMethod?: string;
+  /** the main button (default "Pay Rs X"; the checkout panel says "Try again") */
+  primaryLabel?: string;
   className?: string;
-  /** more actions under the button */
+  /** more actions under the buttons */
   children?: ReactNode;
 }
 
-/** "Advance due — Pay Rs 150" with the store's online methods as radios and a pay button. */
-export function PaymentDueBox({ due, methods, onPay, busy, title, retryMethod, className, children }: PaymentDueBoxProps) {
+/**
+ * "Advance due — Pay Rs 150": a main button that pays this order again with the last (or only)
+ * method, and "Pay another way" opening the method modal. Every try is on the same order.
+ */
+export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, primaryLabel, className, children }: PaymentDueBoxProps) {
   const money = useMoney();
   const id = useId();
+  const [choosing, setChoosing] = useState(false);
   const names = methods.map((m) => m.name as string);
-  const initial = (due.via && names.includes(due.via) ? due.via : '') || (retryMethod && names.includes(retryMethod) ? retryMethod : '') || names[0] || '';
-  const [picked, setPicked] = useState(initial);
-  const method = names.includes(picked) ? picked : initial;
+  const known =
+    (lastMethod && names.includes(lastMethod) ? lastMethod : '') || (due.via && names.includes(due.via) ? due.via : '') || (names.length === 1 ? names[0]! : '');
   const amount = due.amount > 0 ? money(due.amount) : '';
   const heading = due.advance ? `Advance due — Pay ${amount}` : amount ? `Payment not received — Pay ${amount}` : 'Payment not received';
   const sub = [due.on_delivery != null ? `${money(due.on_delivery)} cash on delivery` : '', due.order_number ? `order #${due.order_number}` : '']
     .filter(Boolean)
     .join(' · ');
-  const label = due.advance ? 'Pay the advance with' : 'Pay with';
-  const button = retryMethod && method === retryMethod ? 'Try again' : amount ? `Pay ${amount}` : 'Pay now';
+  const payLabel = amount ? `Pay ${amount}` : 'Pay now';
+  const modalTitle = due.advance ? `Pay the ${amount} advance with` : amount ? `Pay ${amount} with` : 'Pay with';
   return (
     <section className={cx('bx-advance-due', className)} aria-labelledby={`${id}-title`} data-bx="payment-due">
       <h2 className="bx-advance-due-title" id={`${id}-title`}>
@@ -148,26 +221,33 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, retryMethod, c
       {title ? <p className="bx-strong bx-advance-due-amount">{heading}</p> : null}
       {sub ? <p className="bx-muted bx-advance-due-sub">{sub}</p> : null}
       {names.length ? (
-        <>
-          <p className="bx-advance-label" id={`${id}-label`}>
-            {label}
-          </p>
-          <div className="bx-payment-methods bx-advance-methods" role="radiogroup" aria-labelledby={`${id}-label`}>
-            {methods.map((m) => (
-              <label key={m.name} className={cx('bx-payment-method', 'bx-advance-method', method === m.name && 'bx-payment-method--active')} data-method={m.name}>
-                <input type="radio" name={`${id}-method`} value={m.name} checked={method === m.name} onChange={() => setPicked(m.name)} />
-                <span className="bx-payment-name">{m.display_name}</span>
-              </label>
-            ))}
-          </div>
-          <Button className="bx-advance-pay" loading={busy} disabled={!method} onClick={() => onPay(method)}>
-            {button}
+        <div className="bx-advance-due-actions">
+          <Button className="bx-advance-pay" loading={busy} onClick={() => (known ? onPay(known) : setChoosing(true))}>
+            {known ? primaryLabel || payLabel : payLabel}
           </Button>
-        </>
+          {names.length > 1 && known ? (
+            <Button variant="secondary" disabled={busy} onClick={() => setChoosing(true)}>
+              Pay another way
+            </Button>
+          ) : null}
+        </div>
       ) : (
         <p className="bx-muted">No online payment is available right now.</p>
       )}
       {children}
+      <AdvanceMethodModal
+        open={choosing}
+        onClose={() => setChoosing(false)}
+        title={modalTitle}
+        methods={methods}
+        initial={pickAdvanceVia(known, names)}
+        payLabel={payLabel}
+        busy={busy}
+        onConfirm={(via) => {
+          setChoosing(false);
+          if (via) onPay(via);
+        }}
+      />
     </section>
   );
 }
