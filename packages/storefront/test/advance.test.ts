@@ -19,6 +19,7 @@ import {
   pickAdvanceVia,
   retryRefused,
   toAdvance,
+  toCollectOnDelivery,
 } from '../src/core/index.js';
 
 const money = (n: number) => `Rs ${n.toLocaleString('en-IN')}`;
@@ -222,5 +223,17 @@ describe('server totals and the hold', () => {
     expect(holdSecondsOf({ hold_seconds: 0 })).toBeNull();
     expect(holdSecondsOf({})).toBeNull();
     expect(holdSecondsOf(null)).toBeNull();
+  });
+});
+
+describe('to pay on delivery', () => {
+  it('the advance part while it is unpaid, the server cod_to_collect once paid or without an advance', () => {
+    // before the advance is paid cod_to_collect is still the whole total
+    expect(toCollectOnDelivery({ cod_to_collect: 2500, advance: { status: 'due', amount: 150, on_delivery: 2350 } })).toBe(2350);
+    expect(toCollectOnDelivery({ cod_to_collect: 2500, advance: { due: 150, on_delivery: 2350 } })).toBe(2350);
+    expect(toCollectOnDelivery({ cod_to_collect: 2400, advance: { status: 'paid', amount: 150, on_delivery: 2350, paid_at: 'x' } })).toBe(2400);
+    expect(toCollectOnDelivery({ cod_to_collect: 2000, advance: null })).toBe(2000);
+    expect(toCollectOnDelivery({ advance: { status: 'paid', amount: 150, on_delivery: 2350 } })).toBe(2350);
+    expect(toCollectOnDelivery({})).toBeNull();
   });
 });

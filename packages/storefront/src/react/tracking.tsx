@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { initials } from '../core/format.js';
 import { orderLineFree, orderOfferSummary } from '../core/offers.js';
-import { advanceSplit, paymentDue } from '../core/advance.js';
+import { advanceSplit, paymentDue, toCollectOnDelivery } from '../core/advance.js';
 import { STORAGE_KEYS } from '../core/config.js';
 import { paymentMethodsFor } from '../core/payments.js';
 import { fieldError, errorMessage } from '../core/http.js';
@@ -371,7 +371,7 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
               </div>
               <div className="bx-total-row">
                 <dt>Cash on Delivery</dt>
-                <dd>{money(total - (order.partial_payment_amount || 0))}</dd>
+                <dd>{money(toCollectOnDelivery(order) ?? total - (order.partial_payment_amount || 0))}</dd>
               </div>
             </>
           ) : null}

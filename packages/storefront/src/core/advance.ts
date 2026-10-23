@@ -347,3 +347,18 @@ export const orderAdvance = (res: unknown): { amount: number; on_delivery: numbe
   if (!a || typeof a !== 'object' || !(Number(a.amount) > 0)) return null;
   return { amount: Number(a.amount), on_delivery: Number(a.on_delivery) || 0, required: a.required !== false };
 };
+
+/**
+ * "To pay on delivery" on the track page (§F/§H). While the advance isn't paid the server's
+ * `cod_to_collect` is still the whole total (nothing kept yet), so the advance's own
+ * `on_delivery` shows; once it is paid, and on every other order, `cod_to_collect` (net of a
+ * refunded advance). Null when the read says neither.
+ */
+export const toCollectOnDelivery = (o: any): number | null => {
+  const adv = o?.advance;
+  const unpaid = !!adv && (adv.status === 'due' || ((Number(adv.due) || 0) > 0 && !adv.paid_at && adv.status !== 'paid'));
+  if (unpaid) return Number(adv.on_delivery) || 0;
+  if (typeof o?.cod_to_collect === 'number' && Number.isFinite(o.cod_to_collect)) return o.cod_to_collect;
+  if (adv && adv.on_delivery != null) return Number(adv.on_delivery) || 0;
+  return null;
+};
