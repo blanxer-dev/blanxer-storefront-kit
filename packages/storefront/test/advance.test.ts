@@ -112,7 +112,8 @@ describe('advance words', () => {
   it('tile, picker, summary and button read the server amounts', () => {
     const w = advanceWords(toAdvance(quoted)!, money);
     expect(w.codLine).toBe('Rs 150 online now · rest on delivery');
-    expect(w.pickerLabel).toBe('Pay the Rs 150 advance with');
+    expect(w.modalTitle).toBe('Pay Rs 150 & place order');
+    expect(w.modalNote).toBe('Rs 2,350 cash on delivery');
     expect(w.payNowLabel).toBe('Pay now (advance)');
     expect(w.onDeliveryLabel).toBe('Pay on delivery');
     expect(w.button).toBe('Pay Rs 150 & place order');

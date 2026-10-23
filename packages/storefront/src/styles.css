@@ -157,6 +157,7 @@
 .bx-payment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .bx-advance-cod-line { font-size: 0.78rem; color: var(--bx-muted); }
 .bx-advance-modal .bx-modal-body { padding-top: 4px; }
+.bx-advance-modal-note { margin: -2px 0 4px; font-size: 0.875rem; }
 .bx-advance-methods { display: flex; flex-direction: column; gap: 6px; }
 .bx-advance-method { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--bx-border); border-radius: var(--bx-radius); cursor: pointer; font-size: 0.9rem; }
 .bx-advance-method input { accent-color: var(--bx-primary); width: 18px; height: 18px; margin: 0; }

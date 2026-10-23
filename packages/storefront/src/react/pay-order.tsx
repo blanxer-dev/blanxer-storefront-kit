@@ -113,8 +113,10 @@ export interface AdvanceMethodModalProps {
   open: boolean;
   /** close / back: nothing is placed or paid */
   onClose: () => void;
-  /** e.g. "Pay the Rs 150 advance with" */
+  /** e.g. "Pay Rs 150 & place order" */
   title: string;
+  /** the smaller line under the title, e.g. "Rs 2,350 cash on delivery" */
+  note?: string;
   /** the store's online methods */
   methods: PaymentMethod[];
   /** the method to start on (`pickAdvanceVia(...)`) */
@@ -131,10 +133,11 @@ export interface AdvanceMethodModalProps {
 }
 
 /**
- * "Pay the Rs 150 advance with": the store's online methods as compact radios, one confirm
+ * The pay modal ("Pay Rs 150 & place order" / "Rs 2,350 cash on delivery"): the store's online
+ * methods as compact radios, one confirm
  * button. Used when placing a COD order with an advance, and for "Pay another way".
  */
-export function AdvanceMethodModal({ open, onClose, title, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', busy, onConfirm }: AdvanceMethodModalProps) {
+export function AdvanceMethodModal({ open, onClose, title, note, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', busy, onConfirm }: AdvanceMethodModalProps) {
   const id = useId();
   const [picked, setPicked] = useState(initial);
   // every opening starts on the given method
@@ -152,6 +155,7 @@ export function AdvanceMethodModal({ open, onClose, title, methods, initial, pay
           if (valid && !busy) onConfirm(picked);
         }}
       >
+        {note ? <p className="bx-muted bx-advance-modal-note">{note}</p> : null}
         <div className="bx-advance-methods" role="radiogroup" aria-label={title}>
           {methods.map((m) => (
             <label key={m.name} className={cx('bx-advance-method', picked === m.name && 'bx-advance-method--active')} data-method={m.name}>
@@ -212,7 +216,8 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
     .filter(Boolean)
     .join(' · ');
   const payLabel = amount ? `Pay ${amount}` : 'Pay now';
-  const modalTitle = due.advance ? `Pay the ${amount} advance with` : amount ? `Pay ${amount} with` : 'Pay with';
+  const modalTitle = amount ? (due.advance ? `Pay ${amount}` : `Pay ${amount} online`) : 'Pay online';
+  const modalNote = due.advance && due.on_delivery != null ? `${money(due.on_delivery)} cash on delivery` : undefined;
   return (
     <section className={cx('bx-advance-due', className)} aria-labelledby={`${id}-title`} data-bx="payment-due">
       <h2 className="bx-advance-due-title" id={`${id}-title`}>
@@ -239,6 +244,7 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
         open={choosing}
         onClose={() => setChoosing(false)}
         title={modalTitle}
+        note={modalNote}
         methods={methods}
         initial={pickAdvanceVia(known, names)}
         payLabel={payLabel}

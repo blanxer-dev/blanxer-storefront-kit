@@ -184,7 +184,7 @@ Stores can ask for part of a cash-on-delivery order online first: the delivery c
 **Checkout (automatic).**
 - **The payment methods are unchanged.** The COD tile adds one line: "Rs 150 online now · rest on delivery" ("or …" when the advance is the shopper's choice).
 - **The summary** adds "Pay now (advance)" and "Pay on delivery" (`aria-live`). The button reads "Pay Rs 150 & place order", with "Rs 2,350 cash on delivery" under it.
-- **The advance modal.** Pressing that button (after the form checks) opens "Pay the Rs 150 advance with": the store's online methods as radios and "Pay Rs 150". The order is created only on confirm; Back places nothing. With shopper's choice the last option is "Pay all Rs 2,500 on delivery instead" (button "Place order", a plain COD order). A required advance with one online method goes straight to it (`advanceFlow`).
+- **The advance modal.** Pressing that button (after the form checks) opens a modal titled "Pay Rs 150 & place order" with "Rs 2,350 cash on delivery" under it: the store's online methods as radios and "Pay Rs 150". The order is created only on confirm; Back places nothing. With shopper's choice the last option is "Pay all Rs 2,500 on delivery instead" (button "Place order", a plain COD order). A required advance with one online method goes straight to it (`advanceFlow`).
 - **When COD is hidden:** where the advance is the whole order and required.
 - **The order** goes as `paymentMethod: 'COD'` + `advance_via`. When the answer has `advance`, the order is paid online with that method like any online order. When it is `null`, it is plain COD.
 - **Where the advance comes from:**

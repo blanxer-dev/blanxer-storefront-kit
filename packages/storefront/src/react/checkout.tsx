@@ -164,7 +164,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const [submitting, setSubmitting] = useState(false);
   const placingRef = useRef(false);
   const [testOrder, setTestOrder] = useState(false);
-  // advance payment: the "Pay the Rs X advance with" modal, and the method last picked there
+  // advance payment: the "Pay Rs X & place order" modal, and the method last picked there
   const [choosingAdvance, setChoosingAdvance] = useState(false);
   const lastVia = useRef('');
   // the order placed from this tab whose payment isn't confirmed yet (sessionStorage)
@@ -891,7 +891,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         <AdvanceMethodModal
           open={choosingAdvance}
           onClose={() => setChoosingAdvance(false)}
-          title={words.pickerLabel}
+          title={words.modalTitle}
+          note={words.modalNote}
           methods={methods.filter((m) => m.name !== 'COD')}
           initial={pickAdvanceVia(lastVia.current, online)}
           payLabel={words.payButton}

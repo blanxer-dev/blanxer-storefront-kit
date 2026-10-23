@@ -83,7 +83,7 @@ export const codOffer = (advance: Advance | null): CodOffer => {
 export type AdvanceChoice = string;
 
 /**
- * The method preselected in the "Pay the Rs X advance with" modal: kept while still offered,
+ * The method preselected in the pay modal ("Pay Rs X & place order"): kept while still offered,
  * else the shopper's remembered method when online, else the first online method.
  */
 export const pickAdvanceVia = (
@@ -105,7 +105,7 @@ export const activeAdvance = (paymentMethod: string, offer: CodOffer): Advance |
   paymentMethod === 'COD' && offer.mode === 'advance' ? offer.advance : null;
 
 /**
- * What "Pay Rs X & place order" does: `choose` opens the small "Pay the Rs X advance with" modal
+ * What "Pay Rs X & place order" does: `choose` opens the small pay modal ("Pay Rs X & place order")
  * (the order is created only when the shopper confirms there); `direct` goes straight to the
  * store's only online method (a required advance); `plain` is today's COD.
  */
@@ -131,8 +131,9 @@ export type Money = (n: number) => string;
 export const advanceWords = (advance: Advance, money: Money) => ({
   /** second line of the COD tile (shopper's choice: the advance is an option) */
   codLine: `${advance.required ? '' : 'or '}${money(advance.amount)} online now · rest on delivery`,
-  /** the modal's title, above the online methods */
-  pickerLabel: `Pay the ${money(advance.amount)} advance with`,
+  /** the pay modal's title and the smaller line under it (owner: same as the button) */
+  modalTitle: `Pay ${money(advance.amount)} & place order`,
+  modalNote: `${money(advance.on_delivery)} cash on delivery`,
   /** shopper's choice: the plain COD option in the modal */
   noAdvance: `Pay all ${money(advance.total)} on delivery instead`,
   /** the modal's button */
