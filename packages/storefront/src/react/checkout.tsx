@@ -892,7 +892,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           open={choosingAdvance}
           onClose={() => setChoosingAdvance(false)}
           title={words.modalTitle}
-          note={words.modalNote}
+          cod={money(offer.advance.on_delivery)}
           methods={methods.filter((m) => m.name !== 'COD')}
           initial={pickAdvanceVia(lastVia.current, online)}
           payLabel={words.payButton}
