@@ -362,3 +362,15 @@ export const toCollectOnDelivery = (o: any): number | null => {
   if (adv && adv.on_delivery != null) return Number(adv.on_delivery) || 0;
   return null;
 };
+
+const ORDER_ID = /^[a-f0-9]{24}$/i;
+
+/**
+ * The order /payment/failed offers to pay again: this tab's waiting order, else the order the
+ * gateway sent back (`?order=<id>`, e.g. an eSewa cancel, backend B1). Only a real order id.
+ */
+export const failedOrderId = (stored: (string | null | undefined)[], queryOrder?: unknown): string | null => {
+  for (const id of stored) if (id && ORDER_ID.test(String(id))) return String(id);
+  const q = Array.isArray(queryOrder) ? queryOrder[0] : queryOrder;
+  return typeof q === 'string' && ORDER_ID.test(q.trim()) ? q.trim() : null;
+};

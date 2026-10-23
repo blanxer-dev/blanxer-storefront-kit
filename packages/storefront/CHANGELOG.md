@@ -30,7 +30,7 @@ Needs the Blanxer backend from the advance-payment release. Older backends send 
   - No second order is placed while one waits for this cart.
 - **All stores: payment tiles stay real radio inputs** (keyboard-accessible).
 - **QR modals:** "Advance for order #1234 · Rs 2,350 on delivery" above the amount (QR inits that send `advance`). The countdown follows the hold the init answers (every attempt, retries included). With no hold left there is no countdown: the QR never shows "expired" and nothing is released on a timer. Older backends: create-order's `hold_seconds`, as before. The new `onUnpaid(reason)` prop fires when the QR is cancelled, expires or the shopper retries. With `onUnpaid`, the expired screen's main button is "Try again".
-- **`PaymentFailed`:** when this tab placed the order, the main action is "Try payment again" (`/track/<id>`, prop `trackHref`), with "Shop More" second. In that case the pending Purchase is kept for the retry.
+- **`PaymentFailed`:** when this tab placed the order, the main action is "Try payment again" (`/track/<id>`, prop `trackHref`), with "Shop More" second. In that case the pending Purchase is kept for the retry. With no waiting order in the tab it falls back to `?order=` (prop `order`; the gateway sends it back, e.g. an eSewa cancel).
 - **`OrderTracking`:**
   - An online payment or advance still due shows "Advance due — Pay Rs X" or "Payment not received — Pay Rs X", with the online methods as radios and a "Pay Rs X" button for this order. This box replaces the "order placed" banner.
   - The amount to pay is the order read's `amount_to_pay`.

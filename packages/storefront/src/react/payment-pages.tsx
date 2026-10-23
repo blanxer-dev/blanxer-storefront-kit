@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { STORAGE_KEYS } from '../core/config.js';
+import { failedOrderId } from '../core/advance.js';
 import { clearPendingOrder, firePurchase, readPendingOrder, takePendingPurchase } from '../client/index.js';
 import { useOptionalCart } from './cart.js';
 import { cx } from './ui.js';
@@ -75,11 +76,14 @@ export function PaymentSuccess({ className, children }: { className?: string; ch
  */
 export function PaymentFailed({
   method,
+  order,
   homeHref = '/',
   trackHref = (id: string) => `/track/${encodeURIComponent(id)}`,
   className,
 }: {
   method?: string;
+  /** the order the gateway sent back (`?order=`); read from the URL when not given */
+  order?: string;
   homeHref?: string;
   /** the tracking page of an order (default `/track/<id>`) */
   trackHref?: (orderId: string) => string;
@@ -89,7 +93,11 @@ export function PaymentFailed({
   useEffect(() => {
     let id: string | null = null;
     try {
-      id = readPendingOrder()?.order_id || sessionStorage.getItem(STORAGE_KEYS.checkoutOrderId);
+      // this tab's waiting order, else the one the gateway sent back (`?order=`, an eSewa cancel)
+      id = failedOrderId(
+        [readPendingOrder()?.order_id, sessionStorage.getItem(STORAGE_KEYS.checkoutOrderId)],
+        order ?? new URLSearchParams(window.location.search).get('order'),
+      );
     } catch {
       id = null;
     }

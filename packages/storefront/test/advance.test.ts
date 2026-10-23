@@ -20,6 +20,7 @@ import {
   retryRefused,
   toAdvance,
   toCollectOnDelivery,
+  failedOrderId,
 } from '../src/core/index.js';
 
 const money = (n: number) => `Rs ${n.toLocaleString('en-IN')}`;
@@ -235,5 +236,19 @@ describe('to pay on delivery', () => {
     expect(toCollectOnDelivery({ cod_to_collect: 2000, advance: null })).toBe(2000);
     expect(toCollectOnDelivery({ advance: { status: 'paid', amount: 150, on_delivery: 2350 } })).toBe(2350);
     expect(toCollectOnDelivery({})).toBeNull();
+  });
+});
+
+describe('the failed payment page', () => {
+  it('pays again the waiting order, else the order the gateway sent back', () => {
+    const a = '64b7f0c2a1b2c3d4e5f60718';
+    const b = '64b7f0c2a1b2c3d4e5f60719';
+    expect(failedOrderId([a, b], b)).toBe(a);
+    expect(failedOrderId([null, b], undefined)).toBe(b);
+    expect(failedOrderId([null, null], b)).toBe(b);
+    expect(failedOrderId([undefined], [b])).toBe(b);
+    expect(failedOrderId([], 'not-an-id')).toBeNull();
+    expect(failedOrderId([], '<script>')).toBeNull();
+    expect(failedOrderId([], undefined)).toBeNull();
   });
 });
