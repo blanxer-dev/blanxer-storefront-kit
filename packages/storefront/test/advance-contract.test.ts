@@ -16,6 +16,7 @@ import {
   initialCheckoutValues,
   orderAdvance,
   paymentDue,
+  payModalText,
   payOrderView,
   pendingDue,
   placedAmount,
@@ -24,6 +25,7 @@ import {
   retryRefused,
   toAdvance,
   toCollectOnDelivery,
+  waitingOnServer,
   type CartItem,
   type PaymentMethod,
 } from '../src/core/index.js';
@@ -339,3 +341,75 @@ describe('what the shopper reads', () => {
     expect(html(createElement(PaymentDueBox, { due: { ...due, amount: 2500 }, methods, onPay: () => {} }))).toMatch(/>Pay Rs\.? 2,500</);
   });
 });
+
+describe('the stored waiting order, checked with the server', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  it('a waiting order paid meanwhile is forgotten; still due pays the server amount_to_pay', () => {
+    expect(waitingOnServer(PUBLIC_ADVANCE_PAID)).toEqual({ state: 'paid' });
+    expect(waitingOnServer({ ...PUBLIC_ONLINE_UNPAID, status: 'Pending', payment_status: 'Paid', amount_to_pay: 0 })).toEqual({ state: 'paid' });
+    expect(waitingOnServer({ ...PUBLIC_ADVANCE_DUE, status: 'Cancelled' })).toEqual({ state: 'closed' });
+    expect(waitingOnServer({ ...PUBLIC_ONLINE_UNPAID, payment_status: 'Refunded' })).toEqual({ state: 'closed' });
+    expect(waitingOnServer({ ...PUBLIC_ONLINE_UNPAID, amount_to_pay: 0 })).toEqual({ state: 'closed' });
+    expect(waitingOnServer(PUBLIC_ADVANCE_DUE)).toEqual({ state: 'due', amount: 150, on_delivery: 2350 });
+    const { amount_to_pay: _a, ...older } = PUBLIC_ONLINE_UNPAID;
+    expect(waitingOnServer(older)).toEqual({ state: 'unknown' });
+  });
+  it('loadPendingOrder reads the order before the checkout offers to pay it again', async () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    });
+    vi.resetModules();
+    const c = await import('../src/client/index.js');
+    c.configureClient({ apiBase: 'https://api.test' });
+    const stale = { order_id: ORDER_ID, order_number: '1234', lines: ['p1_v1'], signature: 's', method: 'Esewa', amount: 1100, advance: null };
+    const answer = (o: unknown) => vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(o), { status: 200 })));
+    // paid meanwhile: forgotten, returned as paid
+    c.savePendingOrder(stale);
+    answer({ ...PUBLIC_ONLINE_UNPAID, status: 'Pending', payment_status: 'Paid', amount_to_pay: 0 });
+    expect(await c.loadPendingOrder(STORE_ID)).toEqual({ pending: null, paid: stale });
+    expect(c.readPendingOrder()).toBeNull();
+    // cancelled: forgotten, nothing paid
+    c.savePendingOrder(stale);
+    answer({ ...PUBLIC_ONLINE_UNPAID, status: 'Cancelled' });
+    expect(await c.loadPendingOrder(STORE_ID)).toEqual({ pending: null, paid: null });
+    // still due: the server's amount
+    c.savePendingOrder({ ...stale, amount: 999, advance: { amount: 999, on_delivery: 1, required: true } });
+    answer(PUBLIC_ADVANCE_DUE);
+    expect((await c.loadPendingOrder(STORE_ID)).pending).toMatchObject({ amount: 150, advance: { amount: 150, on_delivery: 2350 } });
+    expect(c.readPendingOrder()).toMatchObject({ amount: 150 });
+    // no answer: as stored
+    c.savePendingOrder(stale);
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new TypeError('Failed to fetch'))));
+    expect(await c.loadPendingOrder(STORE_ID)).toEqual({ pending: stale, paid: null });
+  });
+  it('the checkout waits for that read before the panel or Place order', () => {
+    const src = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'react', 'checkout.tsx'), 'utf8');
+    expect(src).toMatch(/loadPendingOrder\(storeId\)/);
+    expect(src).toMatch(/useEffect\(\(\) => \{\s*void checkStored\(\);/);
+    expect(src).toMatch(/disabled=\{[^}]*waitingCheck\}/);
+    expect(src).toMatch(/cart\.removeLines\(paidMeanwhile\.lines\)/);
+  });
+});
+
+describe('the pay modal with plain COD as a choice', () => {
+  it('plain COD picked: Place order · Rs total cash on delivery; a method again: the advance words', () => {
+    const w = advanceWords(toAdvance({ ...QUOTE_ADVANCE, required: false, on_delivery: 950, total: 1100 })!, money);
+    expect(w.noAdvanceButton).toBe('Place order · Rs 1,100 cash on delivery');
+    const words = { title: w.modalTitle, cod: money(950), payLabel: w.payButton, noAdvance: { title: w.noAdvanceTitle, cod: money(1100), button: w.noAdvanceButton } };
+    expect(payModalText('Esewa', words)).toEqual({ title: 'Pay Rs 150 & place order', cod: 'Rs 950', button: 'Pay Rs 150' });
+    expect(payModalText('', words)).toEqual({ title: 'Place order', cod: 'Rs 1,100', button: 'Place order · Rs 1,100 cash on delivery' });
+    const read = (f: string) => fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'react', f), 'utf8');
+    const modal = read('pay-order.tsx');
+    expect(modal).toMatch(/payModalText\(picked,/);
+    expect(modal).toMatch(/\{text\.button\}/);
+    expect(modal).toMatch(/<span>\{text\.title\}<\/span>/);
+    expect(read('checkout.tsx')).toMatch(/placeLabel=\{words\.noAdvanceButton\}\s*noAdvanceCod=\{money\(offer\.advance\.total\)\}/);
+  });
+});
+

@@ -12,7 +12,7 @@ import 'client-only';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
-import { advanceFromAnswer, parsePending, type Advance, type PendingOrder } from '../core/advance.js';
+import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type Advance, type PendingOrder } from '../core/advance.js';
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
@@ -209,6 +209,35 @@ export const clearPendingOrder = () => {
   } catch {
     /* ignore */
   }
+};
+
+/**
+ * The tab's waiting order, read from the server (`getOrder`) before the checkout offers to pay
+ * it again: the stored copy can be stale (paid by a webhook while the shopper was away). Paid
+ * meanwhile → forgotten and returned as `paid` (its lines should leave the cart); cancelled /
+ * returned / refunded / nothing to pay → forgotten; still due → the server's `amount_to_pay`;
+ * no answer, or an older backend without `amount_to_pay` → as stored. Never throws.
+ */
+export const loadPendingOrder = async (storeId?: string): Promise<{ pending: PendingOrder | null; paid: PendingOrder | null }> => {
+  const p = readPendingOrder();
+  if (!p || !storeId) return { pending: p, paid: null };
+  let o: unknown = null;
+  try {
+    o = await getOrder(storeId, p.order_id);
+  } catch {
+    return { pending: p, paid: null };
+  }
+  const s = waitingOnServer(o);
+  if (s.state === 'paid' || s.state === 'closed') {
+    clearPendingOrder();
+    return { pending: null, paid: s.state === 'paid' ? p : null };
+  }
+  if (s.state === 'due') {
+    const next = withServerDue(p, s);
+    savePendingOrder(next);
+    return { pending: next, paid: null };
+  }
+  return { pending: p, paid: null };
 };
 
 // ---------------------------------------------------------------- payments

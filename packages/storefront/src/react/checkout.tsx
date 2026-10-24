@@ -52,6 +52,7 @@ import {
   clearPendingOrder,
   firePurchase,
   getDeliveryCharges,
+  loadPendingOrder,
   localOrderMeta,
   placeOrder,
   readPendingOrder,
@@ -256,18 +257,38 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const words = offer.mode === 'advance' ? advanceWords(offer.advance, money) : null;
   const blocked = advanceBlocks(paymentMethod, offer, online) || (paymentMethod === 'COD' && !advanceFresh);
 
-  // A payment that didn't finish, for the cart as it is now: pay it again on the same order.
+  // A payment that didn't finish, for the cart as it is now: pay it again on the same order. The
+  // stored copy is read from the server first (Place order waits): paid meanwhile → forgotten,
+  // its lines leave the cart; cancelled / nothing to pay → forgotten; due → the server's amount.
+  const [waitingCheck, setWaitingCheck] = useState(true);
+  const [paidMeanwhile, setPaidMeanwhile] = useState<PendingOrder | null>(null);
+  const checkStored = () => {
+    setWaitingCheck(true);
+    return loadPendingOrder(storeId)
+      .then(({ pending: p, paid: done }) => {
+        if (done) setPaidMeanwhile(done);
+        setPending(p);
+      })
+      .finally(() => setWaitingCheck(false));
+  };
   useEffect(() => {
-    setPending(readPendingOrder());
+    void checkStored();
     // back from a gateway page (bfcache): the button isn't busy any more, the order still waits
     const onShow = (e: PageTransitionEvent) => {
       if (!e.persisted) return;
       setSubmitting(false);
-      setPending(readPendingOrder());
+      void checkStored();
     };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
   }, []);
+  useEffect(() => {
+    if (!paidMeanwhile || !cart.hydrated) return;
+    cart.removeLines(paidMeanwhile.lines);
+    notify({ type: 'success', title: 'Payment received', message: `Order #${paidMeanwhile.order_number} is paid.` });
+    setPaidMeanwhile(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paidMeanwhile, cart.hydrated]);
   const signature = useMemo(() => cartSignature(lines), [lines]);
   const waiting = cart.hydrated ? pendingFor(pending, signature) : null;
   const allOnline = useMemo(() => paymentMethodsFor(store, { codAllowed: false }), [store]);
@@ -868,7 +889,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
                 type="submit"
                 className="bx-place-order"
                 loading={submitting}
-                disabled={submitting || !paymentMethod || !lines.length || blocked}
+                disabled={submitting || !paymentMethod || !lines.length || blocked || waitingCheck}
               >
                 {active && words ? words.button : offerQuote ? `${l.placeOrder} · ${money(payable)}` : l.placeOrder}
               </Button>
@@ -897,6 +918,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           initial={pickAdvanceVia(lastVia.current, online)}
           payLabel={words.payButton}
           noAdvanceLabel={offer.optional ? words.noAdvance : undefined}
+          placeLabel={words.noAdvanceButton}
+          noAdvanceCod={money(offer.advance.total)}
           busy={submitting}
           onConfirm={confirmAdvance}
         />

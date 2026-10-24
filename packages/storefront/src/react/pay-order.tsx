@@ -7,7 +7,7 @@
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
-import { holdSecondsOf, payOrderView, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
+import { holdSecondsOf, payModalText, payOrderView, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
 import { errorMessage } from '../core/http.js';
 import type { PaymentMethod } from '../core/types.js';
 import { followPayment, startPayment, type PaymentStart } from '../client/index.js';
@@ -129,8 +129,10 @@ export interface AdvanceMethodModalProps {
   payLabel: string;
   /** shopper's choice at checkout: a last option for plain COD (value ''), e.g. "Pay all Rs 2,500 on delivery instead" */
   noAdvanceLabel?: string;
-  /** the confirm button while the plain COD option is picked (default "Place order") */
+  /** the confirm button while the plain COD option is picked (default "Place order"), e.g. "Place order · Rs 2,500 cash on delivery" */
   placeLabel?: string;
+  /** the whole order in cash, formatted (e.g. "Rs 2,500"): the title's cash line while the plain COD option is picked ("Place order" / "Rs 2,500 cash on delivery") */
+  noAdvanceCod?: string;
   busy?: boolean;
   /** an online method name, or '' for the plain COD option */
   onConfirm: (via: string) => void;
@@ -141,7 +143,7 @@ export interface AdvanceMethodModalProps {
  * methods as compact radios, one confirm
  * button. Used when placing a COD order with an advance, and for "Pay another way".
  */
-export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', busy, onConfirm }: AdvanceMethodModalProps) {
+export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', noAdvanceCod, busy, onConfirm }: AdvanceMethodModalProps) {
   const id = useId();
   const [picked, setPicked] = useState(initial);
   // every opening starts on the given method
@@ -150,20 +152,27 @@ export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial
   }, [open, initial]);
   const names = methods.map((m) => m.name as string);
   const valid = picked === '' ? !!noAdvanceLabel : names.includes(picked);
+  // the plain COD option picked: "Place order" / "Rs 2,500 cash on delivery" (back when a method is picked)
+  const text = payModalText(picked, {
+    title,
+    cod,
+    payLabel,
+    noAdvance: noAdvanceLabel ? { title: 'Place order', cod: noAdvanceCod, button: placeLabel } : undefined,
+  });
   return (
     <Modal
       open={open}
       onClose={onClose}
       title={
-        cod ? (
+        text.cod ? (
           <span className="bx-advance-modal-title">
-            <span>{title}</span>
+            <span>{text.title}</span>
             <span>
-              <strong className="bx-advance-modal-cod">{cod}</strong> cash on delivery
+              <strong className="bx-advance-modal-cod">{text.cod}</strong> cash on delivery
             </span>
           </span>
         ) : (
-          title
+          text.title
         )
       }
       dismissible
@@ -191,7 +200,7 @@ export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial
           ) : null}
         </div>
         <Button type="submit" className="bx-advance-pay" loading={busy} disabled={!valid}>
-          {picked === '' ? placeLabel : payLabel}
+          {text.button}
         </Button>
         <Button variant="ghost" onClick={onClose}>
           Back

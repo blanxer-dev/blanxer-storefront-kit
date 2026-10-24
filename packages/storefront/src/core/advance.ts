@@ -121,6 +121,18 @@ export const advanceFlow = (offer: CodOffer, online: string[]): AdvanceFlow => {
 export const advanceOrderFields = (advance: Advance | null, via: AdvanceChoice): { advance_via?: string } =>
   advance && via && isOnlineMethod(via) ? { advance_via: via } : {};
 
+/**
+ * The pay modal's head and button for the option picked: an online method → the advance words
+ * ("Pay Rs 150 & place order" / "Rs 950 cash on delivery" / "Pay Rs 150"); shopper's choice's
+ * plain COD option ('') → "Place order" / "Rs 1,100 cash on delivery" / "Place order · Rs 1,100
+ * cash on delivery" (the quote's total). Back to the advance words when a method is picked again.
+ */
+export const payModalText = (
+  via: string,
+  w: { title: string; cod?: string; payLabel: string; noAdvance?: { title: string; cod?: string; button: string } },
+): { title: string; cod?: string; button: string } =>
+  via === '' && w.noAdvance ? { title: w.noAdvance.title, cod: w.noAdvance.cod, button: w.noAdvance.button } : { title: w.title, cod: w.cod, button: w.payLabel };
+
 /** Place order is blocked: a required advance and no online method to pay it. */
 export const advanceBlocks = (paymentMethod: string, offer: CodOffer, online: string[]) =>
   paymentMethod === 'COD' && offer.mode === 'advance' && !offer.optional && !online.length;
@@ -136,6 +148,10 @@ export const advanceWords = (advance: Advance, money: Money) => ({
   modalNote: `${money(advance.on_delivery)} cash on delivery`,
   /** shopper's choice: the plain COD option in the modal */
   noAdvance: `Pay all ${money(advance.total)} on delivery instead`,
+  /** while that option is picked: the modal's title / cash line / button (the whole order in cash) */
+  noAdvanceTitle: 'Place order',
+  noAdvanceNote: `${money(advance.total)} cash on delivery`,
+  noAdvanceButton: `Place order · ${money(advance.total)} cash on delivery`,
   /** the modal's button */
   payButton: `Pay ${money(advance.amount)}`,
   payNowLabel: 'Pay now (advance)',
@@ -322,6 +338,39 @@ export const parsePending = (raw: string | null): PendingOrder | null => {
     return null;
   }
 };
+
+/**
+ * The waiting order as the server sees it now (the public order read), before the checkout
+ * offers to pay it again: the tab's stored copy can be stale (paid by a webhook / callback while
+ * the shopper was away). `paid` (Paid / Partial / Waiting Reconcile): forget it, its lines leave
+ * the cart; `closed` (cancelled, returned, refunded, or nothing left to pay): forget it, keep the
+ * cart; `due`: pay the server's `amount_to_pay`; `unknown` (no read, an older backend without
+ * `amount_to_pay`): as stored.
+ */
+export type WaitingOnServer =
+  | { state: 'paid' }
+  | { state: 'closed' }
+  | { state: 'due'; amount: number; on_delivery: number | null }
+  | { state: 'unknown' };
+
+export const waitingOnServer = (o: any): WaitingOnServer => {
+  if (!o || !o._id) return { state: 'unknown' };
+  const status = lc(o.status);
+  const payment = lc(o.payment_status);
+  if (status === 'cancelled' || status === 'returned' || payment === 'refunded') return { state: 'closed' };
+  if (SETTLED.includes(payment)) return { state: 'paid' };
+  if (typeof o.amount_to_pay !== 'number' || !Number.isFinite(o.amount_to_pay)) return { state: 'unknown' };
+  if (!(o.amount_to_pay > 0)) return { state: 'closed' };
+  const od = o.advance && typeof o.advance === 'object' ? Number(o.advance.on_delivery) : Number.NaN;
+  return { state: 'due', amount: o.amount_to_pay, on_delivery: Number.isFinite(od) ? od : null };
+};
+
+/** The stored waiting order with what the server says is due now (`waitingOnServer` → due). */
+export const withServerDue = (p: PendingOrder, due: { amount: number; on_delivery: number | null }): PendingOrder => ({
+  ...p,
+  amount: due.amount,
+  advance: p.advance ? { ...p.advance, amount: due.amount, on_delivery: due.on_delivery ?? p.advance.on_delivery } : null,
+});
 
 /** The waiting order still belongs to this cart (same lines, same quantities). */
 export const pendingFor = (pending: PendingOrder | null, signature: string): PendingOrder | null =>
