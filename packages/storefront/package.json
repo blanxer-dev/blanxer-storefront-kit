@@ -75,7 +75,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && cp src/styles.css dist/styles.css && chmod +x dist/cli/index.js",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
     "prepack": "npm run build"
   },
   "dependencies": {
