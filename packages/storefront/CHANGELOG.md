@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.3.0
+
+### Advance payment ("pay part online, rest on delivery") and paying an order again
+
+Needs the Blanxer backend from the advance-payment release. Older backends send no `advance` anywhere, and the checkout then works as in 0.2.0, except for the three changes marked **all stores** below. The server works out every amount; the package never computes an advance.
+
+- **Checkout, stores with the advance on** (`store.checkout.advance_payment.enabled`, from `check_domain`; display only):
+  - The payment methods stay as they were; only the Cash on delivery tile adds a second line, "Rs 150 online now · rest on delivery" ("or Rs 150 online now · rest on delivery" when the advance is the shopper's choice).
+  - The summary adds "Pay now (advance)" and "Pay on delivery" under the Total (`aria-live="polite"`). The button reads "Pay Rs 150 & place order", with "Rs 2,350 cash on delivery" under it.
+  - Pressing that button (after the form checks) opens a small modal titled "Pay Rs 150 & place order" with "Rs 2,350 cash on delivery" under it: the store's online methods as radios (the last pick, else the first, preselected) and "Pay Rs 150". The order is created only on confirm; closing it places nothing. With shopper's choice the last option is "Pay all Rs 2,500 on delivery instead" (button "Place order": a plain COD order). A required advance with exactly one online method skips the modal.
+  - COD is hidden where the advance is the whole order and required.
+  - Place order waits for the advance quote while COD is picked.
+  - The order is sent with `advance_via`. When the answer has `advance`, the order is paid like an online order with that method; when it is `null`, it is plain COD.
+- **Where the advance comes from:**
+  - Stores on Offers: the cart quote's new `advance`, always the COD advance whatever method is picked (one quote). The quote now also sends `customization_charge` per line.
+  - Other stores: `quoteAdvance` (same `/quote` endpoint, `payment: 'cod'`, the place, lines, legacy `coupon` id and phone; debounced; a stale request is aborted).
+  - A 404, network error or non-JSON answer is plain COD.
+- **Stores on Offers: the server's total.** When the quote carries `payable` (`{ customization, member_discount, total }`), the summary Total, "Place Order · Rs X" and the pixel value show `payable.total` and the package stops adding customization itself. Older backends: the 0.2.0 sum.
+- **All stores: the cart is kept until the payment is confirmed** for every online and advance order (redirect gateways included). The order waits in sessionStorage `checkout_pending_order` (`PendingOrder`). Its lines leave the cart on `/payment/success` or when the in-page QR confirms.
+- **All stores: retry on the same order.**
+  - When a QR is closed unpaid or expires, or the shopper comes back to checkout with the same cart, a "Payment not finished" panel replaces Place order. It offers "Try again" (the last method, same order id) and "Pay another way" (the same method modal, online methods only; not shown with a single method).
+  - A shopper's-choice advance order can switch to "Pay all in cash on delivery instead": the hold is released and a new plain COD order is placed.
+  - "Change the order details instead" releases the hold and forgets the waiting order, so the form can be edited and placed again.
+  - The hold is released by the payment attempt when known, else by the order's 10-digit phone (`releaseHold({ store_id, order_id, phone_number })`, e.g. after a failed redirect).
+  - "Pay Rs X" amounts come from the server's `amount_to_pay` (create-order, the order read).
+  - A retry refused as "already paid" goes to the success page. One refused as "cancelled" lets the shopper place a new order.
+  - No second order is placed while one waits for this cart.
+- **All stores: payment tiles stay real radio inputs** (keyboard-accessible).
+- **QR modals:** "Advance for order #1234 · Rs 2,350 on delivery" above the amount (QR inits that send `advance`). The countdown follows the hold the init answers (every attempt, retries included). With no hold left there is no countdown: the QR never shows "expired" and nothing is released on a timer. Older backends: create-order's `hold_seconds`, as before. The new `onUnpaid(reason)` prop fires when the QR is cancelled, expires or the shopper retries. With `onUnpaid`, the expired screen's main button is "Try again".
+- **`PaymentFailed`:** when this tab placed the order, the main action is "Try payment again" (`/track/<id>`, prop `trackHref`), with "Shop More" second. In that case the pending Purchase is kept for the retry. With no waiting order in the tab it falls back to `?order=` (prop `order`; the gateway sends it back, e.g. an eSewa cancel).
+- **`OrderTracking`:**
+  - An online payment or advance still due shows "Advance due — Pay Rs X" or "Payment not received — Pay Rs X", with the online methods as radios and a "Pay Rs X" button for this order. This box replaces the "order placed" banner.
+  - The amount to pay is the order read's `amount_to_pay`.
+  - A paid advance shows "Paid online (advance)" and "To pay on delivery" (the read's `cod_to_collect` when present, else the advance's `on_delivery`). The old partial-payment rows stay for staff-recorded partials.
+  - The payment status `Partial` reads "Advance paid".
+- **`/core`:**
+  - `advance.ts`, ported from the storefront: `toAdvance`, `codOffer`, `pickAdvanceVia`, `activeAdvance`, `advanceFlow`, `advanceOrderFields`, `advanceBlocks`, `advanceWords`, `paymentDue`, `pendingDue`, `placedAmount`, `advanceSplit`, `advanceInitLine`, `retryRefused`, `quotePayable`, `holdSecondsOf`, `toCollectOnDelivery`, `failedOrderId`, `cartSignature`, `PendingOrder` / `parsePending` / `pendingFor` / `PENDING_KEY`, `ONLINE_METHODS`.
+  - Kit-only helpers: `advancePaymentOn`, `advanceFromAnswer`, `orderAdvance`.
+  - `buildOrderPayload({ advance, advanceVia })`. `buildQuoteRequest({ coupon })` plus per-line `customization_charge`.
+  - Types: `Quote.advance` / `payable`, `OrderResponse.advance` / `status` / `amount_to_pay`, `PublicOrder` (`amount_to_pay`, `cod_to_collect`, hold), `PublicOrder`, `PublicOrderAdvance`, `StoreCheckoutSettings.advance_payment`. `STORAGE_KEYS.pendingOrder`.
+- **`/client`:** `quoteAdvance`, `readPendingOrder` / `savePendingOrder` / `clearPendingOrder`. `getOrder` is typed `PublicOrder`. `startPayment` may be called again for the same order. `releaseHold` takes `transaction_id` or `phone_number`.
+- **`/react`:** `usePayOrder` (start or restart a payment with the QR modals), `PaymentDueBox` ("Pay Rs X" + "Pay another way"), `AdvanceMethodModal`, `AdvanceSummaryRows`, `useAdvanceQuote`, `useOptionalCart`. The cart gains `removeLines(ids)`. `OfferSummary` takes `advance`.
+- **Styles:** `bx-advance-*` classes, `bx-sr-only`, `bx-badge--partial`, `bx-result-actions`.
+- Not in the kit: a logged-in member's `Authorization` header on the quote (custom sites have no customer login).
+
 ## 0.2.0
 
 ### Offers

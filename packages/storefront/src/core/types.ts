@@ -1,6 +1,7 @@
 // Shapes of the Blanxer public API that the package relies on. They are loose
 // on purpose (`[key: string]: any`): the API returns more than we type, and a
 // new backend field must never break a merchant's build.
+import type { AdvancePaymentSetting } from './advance.js';
 import type { OrderOffers } from './offers.js';
 
 export type Loose = { [key: string]: any };
@@ -27,6 +28,8 @@ export interface StoreCheckoutSettings extends Loose {
     allow_customer_cancellation?: boolean;
     [key: string]: any;
   };
+  /** Website advance payment ("pay part online, rest on delivery"). Display only: the quote and create-order decide. */
+  advance_payment?: AdvancePaymentSetting | null;
 }
 
 export interface StorePlugin {
@@ -214,9 +217,54 @@ export interface OrderResponse extends Loose {
   hold_expires_at?: string;
   /** What the offers did (stores on Offers): applications, the code result, totals. */
   offers?: OrderOffers;
+  /**
+   * An advance order (COD sent with `advance_via` where the advance applies): pay `amount` online
+   * now with that method, `on_delivery` in cash. null / absent: plain COD or a full online order.
+   */
+  advance?: { amount: number; on_delivery: number; basis?: 'delivery' | 'fixed' | 'percent'; required?: boolean } | null;
+  /** `Inactive` until an online payment or advance lands; `Pending` for plain COD. */
+  status?: string;
+  /** what is paid online now: the advance, the whole order (with delivery) for an online method, 0 for COD */
+  amount_to_pay?: number;
   /** Present (and `_id` absent) when the backend accepted a test order
    * (phone `0000000000` / mailinator email) without creating it. */
   success?: boolean;
+}
+
+/** The advance on a public order read: `due` = still to pay online, `paid` = taken. */
+export interface PublicOrderAdvance {
+  status: 'due' | 'paid';
+  /** due: to pay now; paid: what was paid */
+  amount: number;
+  on_delivery: number;
+  gateway: string | null;
+  paid_at: string | null;
+  /** the method picked at checkout */
+  via: string | null;
+}
+
+/** `GET /order/public/:store_id/id/:order_id` (the tracking page). */
+export interface PublicOrder extends Loose {
+  _id: string;
+  order_number?: number | string;
+  status?: string;
+  payment_status?: string;
+  /** `COD` on advance orders too (the rest is cash on delivery) */
+  payment_method?: string;
+  product_total_price?: number;
+  customization_total?: number;
+  delivery_charge?: number;
+  discount?: Loose & { d_value?: number; code?: string };
+  partial_payment_amount?: number;
+  /** null (or absent on older backends) for every order without a website advance */
+  advance?: PublicOrderAdvance | null;
+  /** what "Pay now" charges: the advance due, an unpaid online order's total, else 0 */
+  amount_to_pay?: number;
+  /** what the courier collects (total − the advance paid, net of refunds) */
+  cod_to_collect?: number;
+  /** while an Inactive order's checkout hold is on */
+  hold_seconds?: number;
+  hold_expires_at?: string;
 }
 
 export interface FlashSale {

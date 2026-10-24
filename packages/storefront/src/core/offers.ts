@@ -11,6 +11,7 @@
  * Stores not on Offers (`enabled: false`) keep the coupon flow (`coupon.ts`) unchanged.
  */
 import { formatCurrency } from './format.js';
+import type { Advance } from './advance.js';
 import type { CartItem, Loose, Store } from './types.js';
 
 export type OfferKind = 'amount_off' | 'free_delivery' | 'bxgy' | 'tiers' | 'bundle' | 'gift';
@@ -132,7 +133,8 @@ export interface OffersResponse {
 
 /** `POST /public/promotions/:store_id/quote` body. Ids and quantities only: the server prices. */
 export interface QuoteRequest {
-  products: { product: string; variant: string; quantity: number }[];
+  /** `customization_charge`: per unit, as on create-order (counted in the advance's total) */
+  products: { product: string; variant: string; quantity: number; customization_charge?: number }[];
   /** one code per order */
   code?: string;
   /** delivery place name (as in the delivery table); delivery offers wait for it */
@@ -145,6 +147,8 @@ export interface QuoteRequest {
   /** gift picked per offer id: `productId|variantId` */
   gift_choices?: Record<string, string>;
   delivery_charge?: number | null;
+  /** legacy coupon `_id` (stores not on Offers: the advance is worked from the total after it) */
+  coupon?: string;
 }
 
 export interface QuoteAllocation {
@@ -241,6 +245,16 @@ export interface Quote {
   totals: QuoteTotals;
   messages: QuoteMessage[];
   server_time?: string;
+  /**
+   * Cash on delivery with part paid online first (backends from the advance-payment release);
+   * null / absent = plain COD. Read it with `toAdvance` / `codOffer`.
+   */
+  advance?: Advance | null;
+  /**
+   * What the order will cost, as create-order prices it (newer backends): customization and a
+   * member discount included. Show it (`quotePayable`) instead of adding customization yourself.
+   */
+  payable?: { customization?: number; member_discount?: number; total: number };
 }
 
 export interface QuoteResponse {
@@ -282,7 +296,7 @@ export const isAddedLine = (line: unknown): boolean => !!(line as any)?.added_by
 
 export interface QuoteRequestInput {
   /** cart lines (what the shopper picked); lines with `added_by` are dropped */
-  lines: Array<Pick<CartItem, 'product' | 'variant' | 'quantity'> & { added_by?: string }>;
+  lines: Array<Pick<CartItem, 'product' | 'variant' | 'quantity'> & { added_by?: string; customization_charge?: number }>;
   code?: string | null;
   place?: string | null;
   /** checkout payment method name (`COD`, `Esewa`, …) or '' */
@@ -290,6 +304,8 @@ export interface QuoteRequestInput {
   phone?: string | null;
   removedOffers?: string[];
   giftChoices?: Record<string, string>;
+  /** legacy coupon `_id` (stores not on Offers, advance quote only) */
+  coupon?: string | null;
 }
 
 /** The quote body for a cart. Only what the shopper picked: product ids, variants, quantities. */
@@ -297,7 +313,13 @@ export const buildQuoteRequest = (input: QuoteRequestInput): QuoteRequest => {
   const req: QuoteRequest = {
     products: input.lines
       .filter((l) => !isAddedLine(l) && l.product && Number(l.quantity) > 0)
-      .map((l) => ({ product: String(l.product), variant: String(l.variant || ''), quantity: Math.floor(Number(l.quantity)) })),
+      .map((l) => ({
+        product: String(l.product),
+        variant: String(l.variant || ''),
+        quantity: Math.floor(Number(l.quantity)),
+        // per-unit customization, as create-order takes it: the server counts it in the advance
+        ...(Number(l.customization_charge) > 0 ? { customization_charge: Number(l.customization_charge) } : {}),
+      })),
   };
   const code = normalizeCode(input.code);
   if (code) req.code = code;
@@ -307,13 +329,14 @@ export const buildQuoteRequest = (input: QuoteRequestInput): QuoteRequest => {
   if (PHONE.test(phone)) req.phone = phone;
   if (input.removedOffers?.length) req.removed_offers = [...new Set(input.removedOffers)];
   if (input.giftChoices && Object.keys(input.giftChoices).length) req.gift_choices = { ...input.giftChoices };
+  if (input.coupon) req.coupon = String(input.coupon);
   return req;
 };
 
 /** Stable key for a quote body (same cart, same answer): dedupe and stale checks. */
 export const quoteKey = (req: QuoteRequest): string =>
   JSON.stringify([
-    req.products.map((p) => [p.product, p.variant, p.quantity]),
+    req.products.map((p) => [p.product, p.variant, p.quantity, p.customization_charge || 0]),
     req.code || '',
     req.place || '',
     req.payment ?? null,
@@ -321,6 +344,7 @@ export const quoteKey = (req: QuoteRequest): string =>
     [...(req.removed_offers || [])].sort(),
     Object.entries(req.gift_choices || {}).sort(),
     req.delivery_charge ?? null,
+    req.coupon || '',
   ]);
 
 /** The offers fields of a create-order body (`POST /order/:store_id`). */

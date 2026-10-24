@@ -37,6 +37,8 @@ import {
   type QuoteRequest,
 } from '../core/offers.js';
 import { errorMessage } from '../core/http.js';
+import { quotePayable, type Advance } from '../core/advance.js';
+import { AdvanceSummaryRows } from './advance-ui.js';
 import { isOutOfStock } from '../core/variants.js';
 import { ensureNumber } from '../core/format.js';
 import type { CartItem, Product, ProductVariant } from '../core/types.js';
@@ -728,18 +730,32 @@ export function OfferCodeField({ request, quote, error, collapsed = false, class
 
 export interface OfferSummaryProps {
   quote: Quote | null;
-  /** Σ customization charge × qty of the lines (not in the quote) */
+  /** Σ customization charge × qty of the lines; used only when the quote has no `payable` (older backends) */
   customization?: number;
   /** show the delivery row (checkout) */
   showDelivery?: boolean;
   /** delivery place, for the row label */
   place?: string;
   className?: string;
-  labels?: { subtotal?: string; delivery?: string; total?: string; free?: string; saving?: (amount: string) => string; deliveryLater?: string };
+  labels?: {
+    subtotal?: string;
+    delivery?: string;
+    total?: string;
+    free?: string;
+    saving?: (amount: string) => string;
+    deliveryLater?: string;
+    payNow?: string;
+    onDelivery?: string;
+  };
+  /**
+   * Checkout, cash on delivery with an advance (`activeAdvance(...)`): "Pay now (advance)" and
+   * "Pay on delivery" under the Total (server amounts, read out on change). Omit elsewhere.
+   */
+  advance?: Advance | null;
 }
 
 /** Sub-total, one row per offer, delivery, total and "You're saving" — all from the quote. */
-export function OfferSummary({ quote, customization = 0, showDelivery = false, place, className, labels }: OfferSummaryProps) {
+export function OfferSummary({ quote, customization = 0, showDelivery = false, place, className, labels, advance }: OfferSummaryProps) {
   const { display } = useOffers();
   const money = useMoney();
   if (!quote) return null;
@@ -751,7 +767,7 @@ export function OfferSummary({ quote, customization = 0, showDelivery = false, p
       <dl className="bx-totals">
         <div className="bx-total-row">
           <dt>{labels?.subtotal || 'Sub-total'}</dt>
-          <dd>{money(quote.totals.gross + customization)}</dd>
+          <dd>{money(quote.totals.gross + (typeof quote.payable?.customization === 'number' ? quote.payable.customization : customization))}</dd>
         </div>
         {rows.map((r) => (
           <div key={r.promotion_id} className="bx-total-row bx-total-row--discount" data-offer-kind={r.kind}>
@@ -779,9 +795,11 @@ export function OfferSummary({ quote, customization = 0, showDelivery = false, p
         ) : null}
         <div className="bx-total-row bx-total-row--grand">
           <dt>{labels?.total || 'Total'}</dt>
-          <dd>{money((showDelivery ? quote.totals.total : quote.totals.goods) + customization)}</dd>
+          {/* checkout: the server's payable (customization included) when it sends it */}
+          <dd>{money(showDelivery ? (quotePayable(quote) ?? quote.totals.total + customization) : quote.totals.goods + customization)}</dd>
         </div>
       </dl>
+      {advance !== undefined ? <AdvanceSummaryRows advance={advance} labels={{ payNow: labels?.payNow, onDelivery: labels?.onDelivery }} /> : null}
       {!showDelivery ? <p className="bx-muted bx-offer-summary-note">{labels?.deliveryLater || 'Delivery is added at checkout.'}</p> : null}
       {display.cart_savings && saving > 0 ? (
         <p className="bx-offer-savings">{labels?.saving ? labels.saving(money(saving)) : `You're saving ${money(saving)} on this order`}</p>

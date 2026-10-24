@@ -12,8 +12,9 @@ import 'client-only';
 import { STORAGE_KEYS, normalizeApiBase } from '../core/config.js';
 import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
+import { advanceFromAnswer, parsePending, type Advance, type PendingOrder } from '../core/advance.js';
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
-import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product } from '../core/types.js';
+import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
 
@@ -58,7 +59,7 @@ export const placeOrder = (storeId: string, payload: Record<string, any>): Promi
   call('POST', `/order/${storeId}`, payload);
 
 /** Public order view for the tracking page. */
-export const getOrder = (storeId: string, orderId: string): Promise<any> =>
+export const getOrder = (storeId: string, orderId: string): Promise<PublicOrder> =>
   call('GET', `/order/public/${storeId}/id/${enc(orderId)}`);
 
 /** Cancel (only Pending/Processing orders, store setting `allow_customer_cancellation`). */
@@ -75,8 +76,14 @@ export const submitReview = (body: {
   phone_number: string;
 }): Promise<any> => call('POST', `/order/public/submit-review`, body);
 
-/** Give an unpaid order's held units back early (QR closed on purpose, or its timer ran out). */
-export const releaseHold = (body: { store_id: string; order_id: string; transaction_id: string }): Promise<any> =>
+/**
+ * Give an unpaid order's held units back early (QR closed on purpose, its timer ran out, or the
+ * shopper drops the order). Name the payment attempt (`transaction_id`) or, with none (after a
+ * failed redirect), the order's 10-digit `phone_number`.
+ */
+export const releaseHold = (
+  body: { store_id: string; order_id: string } & ({ transaction_id: string; phone_number?: string } | { phone_number: string; transaction_id?: string }),
+): Promise<any> =>
   call('POST', `/order/public/release-hold`, body);
 
 // ---------------------------------------------------------------- coupons
@@ -158,13 +165,73 @@ export const quoteCart = async (storeId: string, body: QuoteRequest, init?: Requ
   }
 };
 
+// ---------------------------------------------------------------- advance payment
+
+/**
+ * The advance for a cart on a store NOT on Offers (stores on Offers get it on `quoteCart`'s
+ * quote). Same endpoint as the quote: `POST /public/promotions/:store_id/quote`, which answers
+ * `{ enabled: false, data: { advance, totals } }` there. Ask only when
+ * `advancePaymentOn(store)` and a place is picked; send `payment: 'cod'`, the place, the lines
+ * (with `customization_charge`), the legacy `coupon` id and the phone (`buildQuoteRequest`).
+ * Never throws (except an abort): an older backend, a 404, a network error or a non-JSON
+ * answer is null = plain cash on delivery, as today.
+ */
+export const quoteAdvance = async (storeId: string, body: QuoteRequest, init?: RequestInit): Promise<Advance | null> => {
+  try {
+    return advanceFromAnswer(await call<any>('POST', `/public/promotions/${storeId}/quote`, body, init));
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return null;
+  }
+};
+
+/** The order placed from this tab whose online payment (or advance) isn't confirmed yet. */
+export const readPendingOrder = (): PendingOrder | null => {
+  try {
+    return parsePending(sessionStorage.getItem(STORAGE_KEYS.pendingOrder));
+  } catch {
+    return null;
+  }
+};
+
+/** Keep the order waiting for payment (with its cart lines) until the payment is confirmed. */
+export const savePendingOrder = (p: PendingOrder) => {
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.pendingOrder, JSON.stringify(p));
+  } catch {
+    /* storage blocked */
+  }
+};
+
+export const clearPendingOrder = () => {
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.pendingOrder);
+  } catch {
+    /* ignore */
+  }
+};
+
 // ---------------------------------------------------------------- payments
 
 export type PaymentStart =
   | { type: 'none' }
   | { type: 'redirect'; url: string }
   | { type: 'form'; action: string; fields: Record<string, string> }
-  | { type: 'qr'; transaction: string; qr_message: string; amount: number; [k: string]: any }
+  | {
+      type: 'qr';
+      transaction: string;
+      qr_message: string;
+      /** what to pay now: the advance on an advance order, else the order total */
+      amount: number;
+      amount_to_pay?: number;
+      /** the checkout hold left (absent once it ended: then no timer) */
+      hold_seconds?: number;
+      hold_expires_at?: string;
+      /** QR inits on newer backends: for "Advance for order #1234 · Rs 2,350 on delivery" */
+      order_number?: number | string;
+      advance?: { amount: number; on_delivery: number } | null;
+      [k: string]: any;
+    }
   | {
       type: 'fonepay_checkout';
       transaction: string;
@@ -172,6 +239,11 @@ export type PaymentStart =
       qr_message: string;
       socket_url: string;
       amount: number;
+      amount_to_pay?: number;
+      hold_seconds?: number;
+      hold_expires_at?: string;
+      order_number?: number | string;
+      advance?: { amount: number; on_delivery: number } | null;
       banks: Array<{ bankName: string; bankCode: string; bankIcon: string; packageName: string; intentScheme: string }>;
       [k: string]: any;
     };
@@ -189,7 +261,11 @@ const INIT_PATH: Record<string, string> = {
 };
 
 /**
- * Start the gateway for a created order. `url` must be the site's own origin
+ * Start the gateway for a created order — or start it again for the same order after a failed,
+ * closed or expired try (any online order and advance orders; another method may be used; the
+ * server never places a second order). A refused retry throws `BlanxerApiError` with "This order
+ * is already paid." / "This order was cancelled. Place a new order." (`retryRefused` reads it).
+ * `url` must be the site's own origin
  * (`window.location.origin`); the gateway comes back to `<url>/payment/success`
  * or `<url>/payment/failed`. Returns what to do next — see `followPayment`.
  */
