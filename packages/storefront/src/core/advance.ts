@@ -253,6 +253,29 @@ export const retryRefused = (message: unknown): 'paid' | 'cancelled' | null => {
   return null;
 };
 
+/**
+ * What a "pay this order" panel shows (`PaymentDueBox`: checkout "Payment not finished", the
+ * tracking page). "Pay Rs X" only with the server's amount (`amount_to_pay`, or the advance
+ * create-order answered); without one (an older backend) no pay button: a link to the order's
+ * tracking page instead, never a total worked out here.
+ */
+export const payOrderView = (due: PaymentDue, money: Money) => {
+  const known = due.amount > 0;
+  return {
+    title: due.advance
+      ? known
+        ? `Advance due — Pay ${money(due.amount)}`
+        : 'Advance due'
+      : known
+        ? `Payment not received — Pay ${money(due.amount)}`
+        : 'Payment not received',
+    /** the pay button (and the method modal); null: show `trackHref` instead */
+    payLabel: known ? `Pay ${money(due.amount)}` : null,
+    modalTitle: known ? (due.advance ? `Pay ${money(due.amount)}` : `Pay ${money(due.amount)} online`) : null,
+    trackHref: known ? null : `/track/${due.order_id}`,
+  };
+};
+
 // ── the order waiting for payment, kept with the cart ────────────────────────────────────────
 
 /** The cart lines an order was placed with, as one comparable string. */

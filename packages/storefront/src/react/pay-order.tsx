@@ -6,7 +6,8 @@
  * the amount is always the init answer's (the advance on an advance order).
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { holdSecondsOf, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
+import Link from 'next/link';
+import { holdSecondsOf, payOrderView, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
 import { errorMessage } from '../core/http.js';
 import type { PaymentMethod } from '../core/types.js';
 import { followPayment, startPayment, type PaymentStart } from '../client/index.js';
@@ -229,13 +230,14 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
   const names = methods.map((m) => m.name as string);
   const known =
     (lastMethod && names.includes(lastMethod) ? lastMethod : '') || (due.via && names.includes(due.via) ? due.via : '') || (names.length === 1 ? names[0]! : '');
-  const amount = due.amount > 0 ? money(due.amount) : '';
-  const heading = due.advance ? `Advance due — Pay ${amount}` : amount ? `Payment not received — Pay ${amount}` : 'Payment not received';
+  // "Pay Rs X" only with the server's amount; none (older backend): a link to the tracking page
+  const view = payOrderView(due, money);
+  const heading = view.title;
   const sub = [due.on_delivery != null ? `${money(due.on_delivery)} cash on delivery` : '', due.order_number ? `order #${due.order_number}` : '']
     .filter(Boolean)
     .join(' · ');
-  const payLabel = amount ? `Pay ${amount}` : 'Pay now';
-  const modalTitle = amount ? (due.advance ? `Pay ${amount}` : `Pay ${amount} online`) : 'Pay online';
+  const payLabel = view.payLabel || '';
+  const modalTitle = view.modalTitle || '';
   const modalCod = due.advance && due.on_delivery != null ? money(due.on_delivery) : undefined;
   return (
     <section className={cx('bx-advance-due', className)} aria-labelledby={`${id}-title`} data-bx="payment-due">
@@ -244,7 +246,11 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
       </h2>
       {title ? <p className="bx-strong bx-advance-due-amount">{heading}</p> : null}
       {sub ? <p className="bx-muted bx-advance-due-sub">{sub}</p> : null}
-      {names.length ? (
+      {view.trackHref ? (
+        <Link className="bx-button bx-button--secondary bx-advance-due-track" href={view.trackHref}>
+          See your order to pay
+        </Link>
+      ) : names.length ? (
         <div className="bx-advance-due-actions">
           <Button className="bx-advance-pay" loading={busy} onClick={() => (known ? onPay(known) : setChoosing(true))}>
             {known ? primaryLabel || payLabel : payLabel}
@@ -260,7 +266,7 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
       )}
       {children}
       <AdvanceMethodModal
-        open={choosing}
+        open={choosing && !!view.payLabel}
         onClose={() => setChoosing(false)}
         title={modalTitle}
         cod={modalCod}

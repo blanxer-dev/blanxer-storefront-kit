@@ -16,6 +16,8 @@ import {
   initialCheckoutValues,
   orderAdvance,
   paymentDue,
+  payOrderView,
+  pendingDue,
   placedAmount,
   quoteOf,
   quotePayable,
@@ -317,5 +319,23 @@ describe('what the shopper reads', () => {
     expect(online).toMatch(/Payment not received — Pay Rs\.? 2,500/);
     expect(online).not.toContain('cash on delivery');
     expect(html(createElement(PaymentDueBox, { due, methods, onPay: () => {}, lastMethod: 'Esewa', primaryLabel: 'Try again' }))).toContain('>Try again<');
+  });
+  it('a pay panel without the server amount: no pay button, a link to the track page', () => {
+    // an order placed on an older backend (no amount_to_pay): the waiting order keeps amount 0
+    expect(placedAmount({ _id: ORDER_ID, total_price: 2300, delivery_charge: 200 })).toBe(0);
+    const due = pendingDue({ order_id: ORDER_ID, order_number: '1234', lines: [], signature: 's', method: 'Esewa', amount: 0, advance: null });
+    expect(payOrderView(due, money)).toEqual({ title: 'Payment not received', payLabel: null, modalTitle: null, trackHref: `/track/${ORDER_ID}` });
+    const out = html(createElement(PaymentDueBox, { due, methods, onPay: () => {}, lastMethod: 'Esewa', primaryLabel: 'Try again' }));
+    expect(out).toContain(`href="/track/${ORDER_ID}"`);
+    expect(out).toContain('See your order to pay');
+    expect(out).not.toMatch(/Try again|Pay now|Pay another way|<button/);
+    // with the server amount: Pay Rs amount_to_pay
+    expect(payOrderView({ ...due, amount: 2500 }, money)).toEqual({
+      title: 'Payment not received — Pay Rs 2,500',
+      payLabel: 'Pay Rs 2,500',
+      modalTitle: 'Pay Rs 2,500 online',
+      trackHref: null,
+    });
+    expect(html(createElement(PaymentDueBox, { due: { ...due, amount: 2500 }, methods, onPay: () => {} }))).toMatch(/>Pay Rs\.? 2,500</);
   });
 });
