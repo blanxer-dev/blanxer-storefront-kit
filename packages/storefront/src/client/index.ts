@@ -14,6 +14,7 @@ import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
 import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type Advance, type PendingOrder } from '../core/advance.js';
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
+import { capsFromCheck, noCaps, stockCheckBody, type CapLine, type StockCaps } from '../core/stock.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
@@ -85,6 +86,29 @@ export const releaseHold = (
   body: { store_id: string; order_id: string } & ({ transaction_id: string; phone_number?: string } | { phone_number: string; transaction_id?: string }),
 ): Promise<any> =>
   call('POST', `/order/public/release-hold`, body);
+
+/**
+ * How many of each cart line this checkout may have: `POST /order/public/stock-check`
+ * (`{ store_id, lines: [{ product, variant?, quantity }] }`, quantities of the same product /
+ * variant summed by `stockCheckBody`). Resolves to the server's caps (`available` for
+ * stop-selling lines; continue-selling lines have none). Never blocks a checkout: a 404 (an
+ * older backend), a network error, a rate limit or a non-JSON answer is "no caps". Only an
+ * abort is thrown.
+ */
+export const stockCheck = async (
+  storeId: string,
+  lines: Pick<CapLine, 'product' | 'variant' | 'quantity'>[],
+  init?: RequestInit,
+): Promise<StockCaps> => {
+  const body = stockCheckBody(storeId, lines);
+  if (!storeId || !body.lines.length) return noCaps();
+  try {
+    return capsFromCheck(await call<any>('POST', `/order/public/stock-check`, body, init));
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return noCaps();
+  }
+};
 
 // ---------------------------------------------------------------- coupons
 
@@ -294,6 +318,9 @@ const INIT_PATH: Record<string, string> = {
  * closed or expired try (any online order and advance orders; another method may be used; the
  * server never places a second order). A refused retry throws `BlanxerApiError` with "This order
  * is already paid." / "This order was cancelled. Place a new order." (`retryRefused` reads it).
+ * When the order's stock is gone the server starts nothing (no transaction, no QR, nothing
+ * charged) and answers 400 with `stock_error` (`SOLD_OUT` / `STOCK_HELD`): `toStockRefusal(err)`
+ * reads it; never offer to pay that order again unless it is `STOCK_HELD`.
  * `url` must be the site's own origin
  * (`window.location.origin`); the gateway comes back to `<url>/payment/success`
  * or `<url>/payment/failed`. Returns what to do next — see `followPayment`.

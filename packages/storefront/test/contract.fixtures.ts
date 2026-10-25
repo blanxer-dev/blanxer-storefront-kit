@@ -156,3 +156,78 @@ export const REFUSED = {
   advancePaid: 'The advance for this order is already paid.',
   cancelled: 'This order was cancelled. Place a new order.',
 };
+
+// ---------------------------------------------------------------- stock (stock-oversell contract)
+// Backend answers when the stock is gone, field for field as the backend sends them
+// (`src/core/handlers/stock.error.ts`; api-contract §2, §4, §9; the same fixtures as the Blanxer
+// storefront's src/features/checkout/stock.fixtures.ts).
+
+export const BAG = '64b7f0c2a1b2c3d4e5f60801';
+export const BAG_RED = '64b7f0c2a1b2c3d4e5f60802';
+export const MUG = '64b7f0c2a1b2c3d4e5f60803';
+
+/** §2: a payment start / retry with no stock left for a line (HTTP 400, nothing created). */
+export const SOLD_OUT_AT_PAY = {
+  message: 'Sorry, Hot-water bag just sold out. You were not charged.',
+  stock_error: {
+    code: 'SOLD_OUT',
+    lines: [{ product_id: BAG, variant_id: BAG_RED, name: 'Hot-water bag', variant_name: 'Red', wanted: 2, available: 0 }],
+    order_id: ORDER_ID,
+    order_number: 2133,
+  },
+};
+
+/** §2: the last units are in other shoppers' checkouts (HTTP 400). */
+export const STOCK_HELD_AT_PAY = {
+  message: "The last units of Hot-water bag are in other shoppers' checkouts right now. Please try again in about 2 minutes. You were not charged.",
+  stock_error: {
+    code: 'STOCK_HELD',
+    lines: [{ product_id: BAG, variant_id: BAG_RED, name: 'Hot-water bag', variant_name: 'Red', wanted: 2, available: 0 }],
+    order_id: ORDER_ID,
+    order_number: 2133,
+    retry_after_seconds: 120,
+  },
+};
+
+/** §9: create-order with a short stop-selling line (HTTP 400, no order). */
+export const OUT_OF_STOCK_AT_CREATE = {
+  message: 'Only 1 of Hot-water bag left.',
+  stock_error: {
+    code: 'OUT_OF_STOCK',
+    lines: [{ product_id: BAG, variant_id: BAG_RED, name: 'Hot-water bag', variant_name: 'Red', wanted: 3, available: 1 }],
+  },
+};
+
+/** §5: staff only (lead confirm / re-open): never shown to a shopper. */
+export const NO_STOCK_TO_CONFIRM = {
+  message: "Hot-water bag has 0 left, so this order can't be confirmed. Create a new order instead.",
+  stock_error: { code: 'NO_STOCK_TO_CONFIRM', lines: [], new_order: {} },
+};
+
+/** §9: `POST /order/public/stock-check` answer (`available` null for continue-selling). */
+export const STOCK_CHECK = {
+  lines: [
+    { product: BAG, variant: BAG_RED, quantity: 3, available: 1, continue_selling: false },
+    { product: MUG, variant: null, quantity: 5, available: null, continue_selling: true },
+  ],
+};
+
+/** §2: every successful init now carries the fresh hold. */
+export const QR_INIT_FRESH_HOLD = { ...QR_INIT_ADVANCE, transaction: 'tx_3', hold_expires_at: '2026-10-25T10:05:00.000Z', hold_seconds: 300 };
+
+/** §4: the public order read of a payment that landed on a cancelled order with no stock. */
+export const PUBLIC_PAID_AFTER_CANCEL = publicOrder({
+  order_number: 2133,
+  status: 'Cancelled',
+  payment_status: 'Paid',
+  payment_method: 'Esewa',
+  stock_short: { state: 'open', reason: 'paid_after_cancel' },
+});
+
+/** §1/§4: paid (live), the stock was gone: still Pending, the store will be in touch. */
+export const PUBLIC_PAID_NO_STOCK = publicOrder({
+  status: 'Pending',
+  payment_status: 'Paid',
+  payment_method: 'Esewa',
+  stock_short: { state: 'open', reason: 'paid_no_stock' },
+});

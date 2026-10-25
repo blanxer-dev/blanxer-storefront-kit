@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { initials } from '../core/format.js';
 import { orderLineFree, orderOfferSummary } from '../core/offers.js';
 import { advanceSplit, paymentDue, toCollectOnDelivery } from '../core/advance.js';
+import { refusalEndsOrder, stockShortNote, type StockRefusal } from '../core/stock.js';
 import { STORAGE_KEYS } from '../core/config.js';
 import { paymentMethodsFor } from '../core/payments.js';
 import { fieldError, errorMessage } from '../core/http.js';
@@ -14,6 +15,7 @@ import { cancelOrder, getOrder, submitReview } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
 import { PaymentDueBox, usePayOrder } from './pay-order.js';
+import { StockNotice } from './stock-ui.js';
 import { Button, Modal, TextArea, TextInput, cx } from './ui.js';
 
 /** Group lines of the same product for the review list (variants joined). */
@@ -159,6 +161,8 @@ export interface OrderTrackingProps {
   orderId: string;
   /** True when arriving from checkout (`?from=checkout`): shows the "order placed" banner. */
   fromCheckout?: boolean;
+  /** where "Change my order" goes after a payment refused for stock (default `/checkout`) */
+  changeOrderHref?: string;
   className?: string;
 }
 
@@ -170,7 +174,7 @@ const paymentStatusLabel = (s: string) => (String(s || '').toLowerCase() === 'pa
  * delivered. An online payment or advance still due is paid here, on this order ("Advance due —
  * Pay Rs X"); a paid advance shows "Paid online (advance)" / "To pay on delivery".
  */
-export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackingProps) {
+export function OrderTracking({ orderId, fromCheckout, changeOrderHref, className }: OrderTrackingProps) {
   const { store, storeId } = useBlanxer();
   const money = useMoney();
   const [order, setOrder] = useState<any>(null);
@@ -193,10 +197,16 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
     load();
   }, [load]);
 
+  // a payment refused because the stock is gone (SOLD_OUT): this order is never offered for payment again
+  const [stockEnded, setStockEnded] = useState<StockRefusal | null>(null);
   const pay = usePayOrder({
     // already paid / cancelled meanwhile: show the order as it is now
     onRefused: () => load(),
     onUnpaid: () => load(),
+    onStockRefused: (r) => {
+      if (refusalEndsOrder(r)) setStockEnded(r);
+    },
+    changeOrderHref,
   });
   const onlineMethods = useMemo(() => paymentMethodsFor(store, { codAllowed: false }), [store]);
   const payDue = (method: string) => {
@@ -234,14 +244,25 @@ export function OrderTracking({ orderId, fromCheckout, className }: OrderTrackin
   const cancelEligible = ['Pending', 'Processing'].includes(order.status) && !!store?.checkout?.extras?.allow_customer_cancellation;
   const reviewProducts = groupByProduct(order.ordered_products || []);
   const statusClass = (s: string) => `bx-badge bx-badge--${String(s || '').toLowerCase().replace(/\s+/g, '-')}`;
-  const due = paymentDue(order);
+  const due = stockEnded ? null : paymentDue(order);
   const split = advanceSplit(order);
+  // paid, but the stock was gone (§4): what happens now, in the contract's words
+  const shortNote = stockShortNote(order);
 
   return (
     <div className={cx('bx-track', className)} data-bx="track">
-      {due ? (
+      {shortNote ? (
+        <div className="bx-notice bx-stock-notice bx-stock-notice--short" role="status" data-bx="stock-short">
+          <p>{shortNote}</p>
+        </div>
+      ) : null}
+      {stockEnded ? (
+        pay.stockRefusal ? null : (
+          <StockNotice refusal={stockEnded} onChangeOrder={() => pay.changeOrder(stockEnded, order._id)} />
+        )
+      ) : due ? (
         <PaymentDueBox due={due} methods={onlineMethods} busy={pay.busy} onPay={payDue} />
-      ) : fromCheckout ? (
+      ) : fromCheckout && !shortNote ? (
         <div className="bx-notice bx-notice--success">
           <p className="bx-strong">Congratulations! Your order has been placed successfully!</p>
           <p>Thank you for your purchase. You will receive a confirmation SMS or call soon.</p>

@@ -179,6 +179,24 @@
 .bx-track .bx-advance-due { margin-bottom: 16px; }
 .bx-result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
+/* stock the server says isn't there: refused orders / payments, the cart held to the stock check */
+.bx-stock-notice { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #fecaca; border-radius: var(--bx-radius); background: #fef2f2; font-size: 0.875rem; }
+.bx-stock-notice--held { border-color: #fde68a; background: #fffbeb; }
+.bx-stock-notice--short { border-color: #fde68a; background: #fffbeb; }
+.bx-stock-notice p { margin: 0; }
+.bx-stock-notice-title { font-size: 1rem; font-weight: 700; }
+.bx-stock-notice-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.bx-stock-notice-line { display: flex; justify-content: space-between; gap: 12px; }
+.bx-stock-notice-name { min-width: 0; overflow-wrap: anywhere; }
+.bx-stock-notice-left { flex: none; font-weight: 600; }
+.bx-stock-notice-left--none { color: var(--bx-danger); }
+.bx-stock-notice-actions { display: flex; flex-direction: column; gap: 8px; }
+.bx-stock-notice-change, .bx-stock-notice-retry { width: 100%; min-height: 48px; }
+.bx-stock-modal .bx-stock-notice { padding: 0; border: 0; background: transparent; }
+.bx-stock-left { margin: 2px 0 0; font-size: 0.78rem; font-weight: 600; color: var(--bx-danger); }
+.bx-track .bx-stock-notice { margin-bottom: 16px; }
+.bx-cart > .bx-stock-notice { margin-bottom: 12px; }
+
 /* offers (stores on Offers; colours come from the store's offer settings via --bx-offer-tone) */
 .bx-offer-link { border: 0; background: none; padding: 0; font: inherit; color: var(--bx-primary); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .bx-offer-badges { position: absolute; top: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 1; pointer-events: none; }

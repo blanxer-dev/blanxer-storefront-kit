@@ -4,15 +4,24 @@
  * "Pay another way" after a failed, closed or expired try, and "Pay Rs X" on the tracking page.
  * Every try starts the gateway for the SAME order id (the server never places a second order);
  * the amount is always the init answer's (the advance on an advance order).
+ *
+ * A start the server refuses because the order's stock is gone (`stock_error`, nothing charged)
+ * shows the stock notice instead of an error: SOLD_OUT → that order is over (the waiting order is
+ * forgotten and is never offered for payment again), "Change my order" holds the cart to what is
+ * left so a new order is placed; STOCK_HELD → "Try again" on the same order after the server's wait.
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { holdSecondsOf, payModalText, payOrderView, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
 import { errorMessage } from '../core/http.js';
+import { capsFromRefusal, refusalEndsOrder, toStockRefusal, type StockRefusal } from '../core/stock.js';
 import type { PaymentMethod } from '../core/types.js';
-import { followPayment, startPayment, type PaymentStart } from '../client/index.js';
+import { clearPendingOrder, followPayment, readPendingOrder, startPayment, type PaymentStart } from '../client/index.js';
 import { useBlanxer } from './context.js';
+import { useOptionalCart } from './cart.js';
 import { useMoney } from './money.js';
+import { StockNoticeModal } from './stock-ui.js';
 import { FonepayCheckoutModal, QrPaymentModal, type FonepayCheckoutData, type PaymentUnpaidReason, type QrPaymentData } from './payment-modals.js';
 import { Button, Modal, cx } from './ui.js';
 
@@ -39,6 +48,19 @@ export interface UsePayOrderOptions {
   onUnpaid?: (reason: Exclude<PaymentUnpaidReason, 'retry'>, method: string, orderId: string) => void;
   /** init failed for another reason (after the error toast) */
   onError?: (method: string, orderId: string) => void;
+  /**
+   * the server refused to start it because the order's stock is gone (nothing was charged; the
+   * stock notice is shown by `modals`). `refusalEndsOrder(refusal)`: that order is over (the
+   * waiting order is already forgotten); else (STOCK_HELD) the same order may be tried again.
+   */
+  onStockRefused?: (refusal: StockRefusal, method: string, orderId: string) => void;
+  /**
+   * "Change my order" in the stock notice. Default: forget the waiting order, hold the cart to
+   * the server's `available` (a line at 0 removed) and go to `changeOrderHref`.
+   */
+  onChangeOrder?: (refusal: StockRefusal, orderId: string) => void;
+  /** where the default "Change my order" goes (default `/checkout`) */
+  changeOrderHref?: string;
 }
 
 /** Start (or restart) the gateway for an order, with the in-page QR modals. Render `modals`. */
@@ -47,6 +69,10 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
   const [qr, setQr] = useState<QrPaymentData | null>(null);
   const [fonepay, setFonepay] = useState<FonepayCheckoutData | null>(null);
   const [busy, setBusy] = useState(false);
+  // a start refused for stock: the notice (cleared on close, "Try again" or "Change my order")
+  const [stock, setStock] = useState<{ refusal: StockRefusal; method: string; orderId: string } | null>(null);
+  const cart = useOptionalCart();
+  const router = useRouter();
   const last = useRef<{ method: string; orderId: string } | null>(null);
   const optsRef = useRef(opts);
   optsRef.current = opts;
@@ -79,6 +105,16 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
       return 'left';
     } catch (e) {
       setBusy(false);
+      // stock gone: nothing was started or charged. Never a generic error, never this order's QR.
+      const refusal = toStockRefusal(e);
+      if (refusal) {
+        setQr(null);
+        setFonepay(null);
+        if (refusalEndsOrder(refusal) && readPendingOrder()?.order_id === orderId) clearPendingOrder();
+        setStock({ refusal, method, orderId });
+        optsRef.current.onStockRefused?.(refusal, method, orderId);
+        return 'failed';
+      }
       const serverMessage = String((e as any)?.body?.message || '');
       const refused = retryRefused(serverMessage);
       if (refused) {
@@ -100,14 +136,51 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
     else optsRef.current.onUnpaid?.(reason, l.method, l.orderId);
   };
 
+  // "Change my order": the refused order is left as it is (Inactive); a new one is placed from the changed cart
+  const changeOrder = (refusal: StockRefusal, orderId: string) => {
+    setStock(null);
+    if (optsRef.current.onChangeOrder) {
+      optsRef.current.onChangeOrder(refusal, orderId);
+      return;
+    }
+    if (readPendingOrder()?.order_id === orderId) clearPendingOrder();
+    cart?.capLines(capsFromRefusal(refusal));
+    router.push(optsRef.current.changeOrderHref || '/checkout');
+  };
+
+  // STOCK_HELD: the same order again, once the server's wait is over
+  const retryHeld = () => {
+    const s = stock;
+    if (!s) return;
+    setStock(null);
+    void start(s.method, s.orderId);
+  };
+
   const modals = (
     <>
       <QrPaymentModal open={!!qr} data={qr} onClose={() => setQr(null)} onSuccess={() => optsRef.current.onPaid?.()} onUnpaid={unpaid} />
       <FonepayCheckoutModal open={!!fonepay} data={fonepay} onClose={() => setFonepay(null)} onSuccess={() => optsRef.current.onPaid?.()} onUnpaid={unpaid} />
+      <StockNoticeModal
+        open={!!stock}
+        refusal={stock?.refusal ?? null}
+        onClose={() => setStock(null)}
+        onChangeOrder={() => stock && changeOrder(stock.refusal, stock.orderId)}
+        onRetry={stock && !refusalEndsOrder(stock.refusal) ? retryHeld : undefined}
+        busy={busy}
+      />
     </>
   );
 
-  return { start, busy, open: !!qr || !!fonepay, modals };
+  return {
+    start,
+    busy,
+    open: !!qr || !!fonepay,
+    modals,
+    /** the stock notice showing now (a refused start), else null */
+    stockRefusal: stock?.refusal ?? null,
+    /** "Change my order" for a refusal shown elsewhere (e.g. after the notice was closed) */
+    changeOrder,
+  };
 }
 
 export interface AdvanceMethodModalProps {

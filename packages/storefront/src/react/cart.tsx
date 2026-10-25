@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { STORAGE_KEYS } from '../core/config.js';
 import { cartTotals } from '../core/cart.js';
 import { contentId } from '../core/order.js';
+import { capCart, type CartChange, type StockCaps } from '../core/stock.js';
 import type { CartItem } from '../core/types.js';
 import { trackEvent } from '../client/index.js';
 
@@ -62,6 +63,12 @@ export interface CartContextValue {
   removeSelectedFromCart: () => void;
   /** Remove these lines (an order's lines once its payment is confirmed); resets the cart if nothing else is left. */
   removeLines: (ids: string[]) => void;
+  /**
+   * Hold lines to the server's stock caps (`capsFromCheck` / `capsFromRefusal`): lines of the
+   * same product / variant share its units in cart order, a line left with 0 is removed. Only
+   * the lines in `ids` (default: all) are changed. Returns what changed (empty: nothing).
+   */
+  capLines: (caps: StockCaps, ids?: string[]) => CartChange[];
   resetCart: () => void;
 }
 
@@ -163,6 +170,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
     const remainingIds = new Set(remaining.map((el) => el.id));
     seenIds.current = remainingIds;
     setSelectedIds((prev) => new Set([...prev].filter((id) => remainingIds.has(id))));
+  };
+
+  const capLines: CartContextValue['capLines'] = (caps, ids) => {
+    const only = ids ? new Set(ids) : null;
+    const target = only ? items.filter((el) => only.has(el.id)) : items;
+    const { lines: capped, changes } = capCart(target, caps);
+    if (!changes.length) return [];
+    const kept = new Map(capped.map((el) => [el.id, el]));
+    const next = items.flatMap((el) => (only && !only.has(el.id) ? [el] : kept.has(el.id) ? [kept.get(el.id)!] : []));
+    if (!next.length) {
+      resetCart();
+      return changes;
+    }
+    setItems(next);
+    save(next);
+    return changes;
   };
 
   const setQuantity: CartContextValue['setQuantity'] = (payload) => {
@@ -301,6 +324,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     deselectAll,
     removeSelectedFromCart,
     removeLines,
+    capLines,
     resetCart,
   };
 
