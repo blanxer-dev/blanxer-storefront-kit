@@ -20,8 +20,11 @@ import {
   stockLineLeft,
   stockNoticeTitle,
   stockShortNote,
+  stockWaitLeft,
   stockWords,
+  STORAGE_KEYS,
   toStockRefusal,
+  waitingProof,
   type CartItem,
 } from '../src/core/index.js';
 import { StockNotice } from '../src/react/stock-ui.js';
@@ -352,5 +355,124 @@ describe('the pages use the server answers only', () => {
     const pay = read('react/pay-order.tsx');
     expect(pay).toMatch(/const refusal = toStockRefusal\(e\);\s*if \(refusal\) \{\s*setQr\(null\);\s*setFonepay\(null\);/);
     expect(pay.indexOf('toStockRefusal(e)')).toBeLessThan(pay.indexOf("notify({ type: 'error'"));
+  });
+});
+
+describe('an order waiting for payment (contract v1.2)', () => {
+  it('the stock check carries the waiting order and one proof, as release-hold does', () => {
+    expect(waitingProof(ORDER_ID, 'txn1', '9800000000')).toEqual({ order_id: ORDER_ID, transaction_id: 'txn1' });
+    expect(waitingProof(ORDER_ID, undefined, ' 9800000000 ')).toEqual({ order_id: ORDER_ID, phone_number: '9800000000' });
+    // no proof: the check is not made while it waits (its own hold would count)
+    expect(waitingProof(ORDER_ID, undefined, '98000')).toBeNull();
+    expect(waitingProof(null, 'txn1')).toBeNull();
+    expect(stockCheckBody('store1', [line('a', BAG, BAG_RED, 1)], { order_id: ORDER_ID, transaction_id: 'txn1' })).toEqual({
+      store_id: 'store1',
+      lines: [{ product: BAG, variant: BAG_RED, quantity: 1 }],
+      order_id: ORDER_ID,
+      transaction_id: 'txn1',
+    });
+  });
+
+  it("a STOCK_HELD wait is kept per order: every pay button waits until it's over", () => {
+    const now = 1_000_000;
+    const waits = { [ORDER_ID]: now + 90_500 };
+    expect(stockWaitLeft(waits, ORDER_ID, now)).toBe(91);
+    expect(stockWaitLeft(waits, ORDER_ID, now + 91_000)).toBe(0);
+    expect(stockWaitLeft(waits, 'other', now)).toBe(0);
+    expect(stockWaitLeft(null, ORDER_ID, now)).toBe(0);
+  });
+});
+
+describe('this tab: the STOCK_HELD wait and the code kept with a waiting order', () => {
+  const memory = () => {
+    const m = new Map<string, string>();
+    return {
+      getItem: (k: string) => (m.has(k) ? m.get(k)! : null),
+      setItem: (k: string, v: string) => void m.set(k, String(v)),
+      removeItem: (k: string) => void m.delete(k),
+      clear: () => m.clear(),
+    };
+  };
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+  const loadClient = async () => {
+    vi.resetModules();
+    vi.stubGlobal('sessionStorage', memory());
+    const c = await import('../src/client/index.js');
+    c.configureClient({ apiBase: 'https://api.test' });
+    return c;
+  };
+  const args = { store: STORE_ID, order: ORDER_ID, url: 'https://shop.test' };
+
+  it('a STOCK_HELD refusal makes this order wait as the server said; SOLD_OUT does not', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(STOCK_HELD_AT_PAY), { status: 400 })));
+    let c = await loadClient();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(STOCK_HELD_AT_PAY), { status: 400 })));
+    await c.startPayment('QR_Dynamic', args).catch(() => {});
+    expect(c.stockWaitFor(ORDER_ID)).toBeGreaterThan(115);
+    expect(c.stockWaitFor(ORDER_ID)).toBeLessThanOrEqual(120);
+    expect(c.stockWaitFor('another-order')).toBe(0);
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEYS.stockWait)!)).toHaveProperty(ORDER_ID);
+
+    c = await loadClient();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(SOLD_OUT_AT_PAY), { status: 400 })));
+    await c.startPayment('QR_Dynamic', args).catch(() => {});
+    expect(c.stockWaitFor(ORDER_ID)).toBe(0);
+  });
+
+  it('while an order waits, the stock check sends it with its proof', async () => {
+    const c = await loadClient();
+    const fetch = vi.fn(async () => new Response(JSON.stringify(STOCK_CHECK), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    await c.stockCheck(STORE_ID, [line('a', BAG, BAG_RED, 3)], { order_id: ORDER_ID, transaction_id: 'txn9' });
+    const [, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ store_id: STORE_ID, lines: [{ product: BAG, variant: BAG_RED, quantity: 3 }], order_id: ORDER_ID, transaction_id: 'txn9' });
+  });
+
+  it("the shopper's code: kept with the order, given back once when it is given up, gone once it is paid or forgotten", async () => {
+    const c = await loadClient();
+    c.keepOrderChoices(ORDER_ID, { offers: { code: 'TIHAR10', gifts: {}, removed: [] }, promo: 'TIHAR10' });
+    expect(c.takeOrderChoices('other')).toBeNull();
+    expect(c.takeOrderChoices(ORDER_ID)).toEqual({ offers: { code: 'TIHAR10', gifts: {}, removed: [] }, promo: 'TIHAR10' });
+    expect(c.takeOrderChoices(ORDER_ID)).toBeNull();
+    c.keepOrderChoices(ORDER_ID, { promo: 'TIHAR10' });
+    c.clearPendingOrder();
+    expect(c.takeOrderChoices(ORDER_ID)).toBeNull();
+    // nothing to keep: nothing stored
+    c.keepOrderChoices(ORDER_ID, {});
+    expect(sessionStorage.getItem(STORAGE_KEYS.orderChoices)).toBeNull();
+  });
+});
+
+describe('the pages: the wait, the proof and the code', () => {
+  const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'src');
+  const read = (f: string) => fs.readFileSync(path.join(SRC, f), 'utf8');
+  it("the pay panel's own buttons wait for the server's STOCK_HELD wait too, and no start while it runs", () => {
+    const pay = read('react/pay-order.tsx');
+    expect(pay).toMatch(/disabled=\{waitLeft > 0\}[\s\S]{0,120}\{waitLeft > 0 \? retryLabel\(waitLeft\)/);
+    expect(pay).toMatch(/disabled=\{busy \|\| waitLeft > 0\}[\s\S]{0,80}Pay another way/);
+    expect(pay).toMatch(/const start = async[^{]*\{\s*\/\/[^\n]*\n\s*if \(stockWaitFor\(orderId\) > 0\) return 'failed';/);
+  });
+  it("the shopper's code is kept with the waiting order and given back when it is given up", () => {
+    const checkout = read('react/checkout.tsx');
+    expect(checkout.indexOf('orderChoices.snapshot()')).toBeGreaterThan(0);
+    expect(checkout.indexOf('orderChoices.snapshot()')).toBeLessThan(checkout.indexOf('offers.clearChoices()'));
+    expect(checkout).toMatch(/savePendingOrder\(waitingOrder\);\s*orderChoices\.keep\(res\._id, choicesBefore\);/);
+    expect(checkout).toMatch(/const forgetPending = \(\)[^{]*\{\s*const p = readPendingOrder\(\);\s*const back = p \? orderChoices\.restore\(p\.order_id\) : null;/);
+    // cash on delivery instead: the code goes with the new order at once
+    expect(checkout).toMatch(/const back = forgetPending\(\);[\s\S]*?placeNew\('COD', '', null, back\)/);
+    // a refused payment start gives the code back before the waiting order is forgotten
+    expect(read('react/pay-order.tsx')).toMatch(/const giveUp = \(orderId: string\) => \{\s*orderChoices\.restore\(orderId\);\s*if \(readPendingOrder\(\)\?\.order_id === orderId\) clearPendingOrder\(\);/);
+  });
+  it('a waiting order is checked with its proof, else not at all; a shortage is told, never capped behind the back', () => {
+    const checkout = read('react/checkout.tsx');
+    expect(checkout).toMatch(/waitingProof\(waiting\.order_id, waiting\.transaction, values\.customer_phone_number\)/);
+    expect(checkout).toMatch(/\(!waiting \|\| !!waitingStockProof\)/);
+    const ui = read('react/stock-ui.tsx');
+    // with a waiting order: onShort once per answer, and return before capLines
+    expect(ui).toMatch(/if \(waiting\) \{[\s\S]*?onShort\?\.\([\s\S]*?return;\s*\}\s*cart\.capLines/);
+    expect(read('react/cart-lines.tsx')).toMatch(/waitingProof\(p\.order_id, p\.transaction\)/);
   });
 });

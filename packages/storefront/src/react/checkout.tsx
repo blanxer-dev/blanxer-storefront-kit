@@ -50,7 +50,7 @@ import {
   type PendingOrder,
 } from '../core/advance.js';
 import { todayISODate } from '../core/format.js';
-import { capCart, capsFromRefusal, refusalEndsOrder, refusalFromChanges, toStockRefusal, type StockRefusal } from '../core/stock.js';
+import { capCart, capsFromRefusal, refusalEndsOrder, refusalFromChanges, toStockRefusal, waitingProof, type StockCaps, type StockRefusal } from '../core/stock.js';
 import { validation } from '../core/validation.js';
 import type { Coupon, DeliveryTable, OrderResponse, PaymentMethodName } from '../core/types.js';
 import {
@@ -70,6 +70,7 @@ import {
   splitName,
   takePendingPurchase,
   trackEvent,
+  type OrderChoices,
 } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useCart } from './cart.js';
@@ -79,7 +80,7 @@ import { OfferCodeField, OfferGiftPicker, OfferSummary } from './offer-ui.js';
 import { useMoney } from './money.js';
 import { AdvanceSummaryRows, useAdvanceQuote } from './advance-ui.js';
 import { AdvanceMethodModal, PaymentDueBox, usePayOrder } from './pay-order.js';
-import { StockNotice, StockNoticeModal, useCartStockCaps } from './stock-ui.js';
+import { StockNotice, StockNoticeModal, useCartStockCaps, useOrderChoices } from './stock-ui.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
 
 export interface CheckoutLabels {
@@ -184,7 +185,11 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   // stock: create-order refused (modal), or the cart held to the stock check (inline note)
   const [stockRefused, setStockRefused] = useState<StockRefusal | null>(null);
   const [stockChanged, setStockChanged] = useState<StockRefusal | null>(null);
+  // an order of this cart waits and the stock check says short: told once, nothing changed until the shopper acts
+  const [stockShort, setStockShort] = useState<{ refusal: StockRefusal; caps: StockCaps } | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
+  // the shopper's code across an order that waits for its payment (back when that order is given up)
+  const orderChoices = useOrderChoices();
 
   // coupon
   const [couponCode, setCouponCode] = useState('');
@@ -418,7 +423,11 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     return out;
   };
 
-  const forgetPending = () => {
+  // The waiting order is given up (refused, changed, cash instead): the shopper's code comes back
+  // for the replacement order (the server prices it again). Returns what came back.
+  const forgetPending = (): OrderChoices | null => {
+    const p = readPendingOrder();
+    const back = p ? orderChoices.restore(p.order_id) : null;
     clearPendingOrder();
     setPending(null);
     try {
@@ -426,6 +435,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     } catch {
       /* ignore */
     }
+    return back;
   };
 
   // Payment confirmed: only now do the ordered lines leave the cart.
@@ -482,11 +492,19 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     },
   });
 
-  // The server's caps for this cart while the checkout is shown (not while an order of this tab
-  // waits for its payment: its own hold would count against it). A cart above them is held to them.
+  // The server's caps for this cart while the checkout is shown. A cart above them is held to
+  // them. While an order of this cart waits for its payment the check carries the order and its
+  // proof (v1.2: its own hold isn't counted), else none is made; a shortage then is told once
+  // ("Change my order") and the cart is not changed behind the shopper's back.
+  const waitingStockProof = useMemo(
+    () => (waiting ? waitingProof(waiting.order_id, waiting.transaction, values.customer_phone_number) : null),
+    [waiting, values.customer_phone_number],
+  );
   const stock = useCartStockCaps({
-    enabled: !orderPlaced && !waitingCheck && !pending && !submitting && !pay.open,
+    enabled: !orderPlaced && !waitingCheck && (!waiting || !!waitingStockProof) && !submitting && !pay.open,
     onCapped: (changes) => setStockChanged(refusalFromChanges(changes)),
+    waiting: waitingStockProof,
+    onShort: (refusal, caps) => setStockShort({ refusal, caps }),
   });
 
   const payAgain = (method: string) => {
@@ -525,10 +543,10 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     if (!p?.advance || p.advance.required) return;
     setSubmitting(true);
     await releaseWaiting(p);
-    forgetPending();
+    const back = forgetPending();
     takePendingPurchase();
     setPaymentMethod('COD');
-    await placeNew('COD', '', null);
+    await placeNew('COD', '', null, back);
   };
 
   /** Form errors shown and the first one focused; true when the form is fine. */
@@ -564,7 +582,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     void placeNew('COD', via, via ? active : null);
   };
 
-  const placeNew = async (method: string, via: string, adv: Advance | null) => {
+  /** `back`: the code given back by an order just given up (state isn't updated yet in this call) */
+  const placeNew = async (method: string, via: string, adv: Advance | null, back?: OrderChoices | null) => {
     if (placingRef.current) return;
     if (!formOk()) return;
     if (!lines.length || !method) return;
@@ -598,11 +617,13 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         couponId: quote.coupon.valid && coupon?._id ? coupon._id : '',
         // a code the latest quote rejected isn't sent (the shopper sees why); with no quote yet the server decides
         offers: offersOn
-          ? {
-              code: !offerQuote || offerQuote.code?.status === 'applied' ? offers.code : '',
-              removedOffers: offers.removedOffers,
-              giftChoices: offers.giftChoices,
-            }
+          ? back?.offers
+            ? { code: back.offers.code || '', removedOffers: back.offers.removed || [], giftChoices: back.offers.gifts || {} }
+            : {
+                code: !offerQuote || offerQuote.code?.status === 'applied' ? offers.code : '',
+                removedOffers: offers.removedOffers,
+                giftChoices: offers.giftChoices,
+              }
           : undefined,
         meta: buildOrderMeta(),
         advance: adv,
@@ -628,6 +649,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       // built locally only against an older backend.
       const purchase =
         res.meta || localOrderMeta(lines as any, payable, String(res.order_number || ''));
+      // the code is used: not for the next order (kept with an order that waits for its payment, back if it is given up)
+      const choicesBefore = orderChoices.snapshot();
       if (offersOn) offers.clearChoices();
       try {
         sessionStorage.setItem(STORAGE_KEYS.checkoutOrderId, res._id);
@@ -662,6 +685,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         advance: resAdvance,
       };
       savePendingOrder(waitingOrder);
+      orderChoices.keep(res._id, choicesBefore);
       setPending(waitingOrder);
       const outcome = await pay.start(payWith, res._id, res.hold_seconds);
       if (outcome !== 'left') setSubmitting(false);
@@ -977,6 +1001,21 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           onConfirm={confirmAdvance}
         />
       ) : null}
+      <StockNoticeModal
+        open={!!stockShort}
+        refusal={stockShort?.refusal ?? null}
+        onClose={() => setStockShort(null)}
+        onChangeOrder={async () => {
+          const s = stockShort;
+          setStockShort(null);
+          if (!s) return;
+          // give the waiting order up (its units back, the code back), then hold the cart to what is left
+          if (waiting) await releaseWaiting(waiting);
+          forgetPending();
+          takePendingPurchase();
+          cart.capLines(s.caps, lines.map((x) => x.id));
+        }}
+      />
       <StockNoticeModal
         open={!!stockRefused}
         refusal={stockRefused}

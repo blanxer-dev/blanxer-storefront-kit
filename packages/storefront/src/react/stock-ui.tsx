@@ -6,19 +6,42 @@
  * cart's caps from `POST /order/public/stock-check`. Every number is the server's.
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { capCart, noCaps, retryLabel, stockCheckBody, stockLineLeft, stockLineName, stockNoticeTitle, type CapLine, type CartChange, type StockCaps, type StockRefusal } from '../core/stock.js';
-import { stockCheck } from '../client/index.js';
+import { STORAGE_KEYS } from '../core/config.js';
+import {
+  capCart,
+  noCaps,
+  refusalFromChanges,
+  retryLabel,
+  stockCheckBody,
+  stockLineLeft,
+  stockLineName,
+  stockNoticeTitle,
+  type CapLine,
+  type CartChange,
+  type StockCaps,
+  type StockRefusal,
+  type WaitingProof,
+} from '../core/stock.js';
+import type { CartItem } from '../core/types.js';
+import { keepOrderChoices, stockCheck, takeOrderChoices, type OrderChoices } from '../client/index.js';
+import { useOffers } from './offers.js';
 import { useBlanxer } from './context.js';
 import { useOptionalCart } from './cart.js';
 import { Button, Modal, cx } from './ui.js';
 
 const NO_CAPS: StockCaps = noCaps();
+const NO_LINES: CartItem[] = [];
 
 export interface UseStockCapsOptions {
   /** the lines the checkout would order (the cart's selected lines) */
   lines: CapLine[];
-  /** ask only while true (e.g. not while an order waits for its payment: its own hold would count) */
+  /** ask only while true */
   enabled?: boolean;
+  /**
+   * this cart's order that waits for its payment, with its proof (`waitingProof`), so its own
+   * hold isn't counted (contract v1.2). While an order waits and there is no proof, don't ask.
+   */
+  waiting?: WaitingProof | null;
   /** debounce, ms (default 400) */
   delayMs?: number;
 }
@@ -26,22 +49,25 @@ export interface UseStockCapsOptions {
 /**
  * The server's caps for these lines (`stockCheck`, debounced, a stale request aborted). `caps`
  * keeps the last answer (empty until one comes, and for an older backend); `fresh` is true once
- * it is for the lines as they are now. `check()` asks right away (before Place order).
+ * it is for the lines as they are now; `checked` is the request that answer is for (act once per
+ * answer). `check()` asks right away (before Place order).
  */
-export function useStockCaps({ lines, enabled = true, delayMs = 400 }: UseStockCapsOptions) {
+export function useStockCaps({ lines, enabled = true, waiting, delayMs = 400 }: UseStockCapsOptions) {
   const { storeId } = useBlanxer();
-  const key = useMemo(() => JSON.stringify(stockCheckBody(storeId, lines).lines), [storeId, lines]);
+  const key = useMemo(() => JSON.stringify(stockCheckBody(storeId, lines, waiting)), [storeId, lines, waiting]);
   const [answer, setAnswer] = useState<{ key: string; caps: StockCaps } | null>(null);
   const linesRef = useRef(lines);
   linesRef.current = lines;
+  const waitingRef = useRef(waiting);
+  waitingRef.current = waiting;
   const keyRef = useRef(key);
   keyRef.current = key;
 
   useEffect(() => {
-    if (!enabled || !storeId || key === '[]') return;
+    if (!enabled || !storeId || !linesRef.current.length) return;
     const ctrl = new AbortController();
     const t = window.setTimeout(() => {
-      stockCheck(storeId, linesRef.current, { signal: ctrl.signal })
+      stockCheck(storeId, linesRef.current, waitingRef.current, { signal: ctrl.signal })
         .then((caps) => setAnswer({ key, caps }))
         .catch(() => {});
     }, delayMs);
@@ -54,7 +80,7 @@ export function useStockCaps({ lines, enabled = true, delayMs = 400 }: UseStockC
   const check = useCallback(async (): Promise<StockCaps> => {
     const k = keyRef.current;
     try {
-      const caps = await stockCheck(storeId, linesRef.current);
+      const caps = await stockCheck(storeId, linesRef.current, waitingRef.current);
       setAnswer({ key: k, caps });
       return caps;
     } catch {
@@ -62,30 +88,90 @@ export function useStockCaps({ lines, enabled = true, delayMs = 400 }: UseStockC
     }
   }, [storeId]);
 
-  return { caps: answer?.caps ?? NO_CAPS, fresh: !!answer && answer.key === key, check };
+  return { caps: answer?.caps ?? NO_CAPS, fresh: !!answer && answer.key === key, checked: answer?.key ?? '', check };
+}
+
+export interface UseCartStockCapsOptions {
+  enabled?: boolean;
+  /** no order waits: the cart was held to the answer, this is what changed */
+  onCapped?: (changes: CartChange[]) => void;
+  /** this cart's order that waits for its payment, with its proof (see `useStockCaps`) */
+  waiting?: WaitingProof | null;
+  /**
+   * an order waits and the answer is short: told once per answer, the cart is NOT changed behind
+   * the shopper's back ("Change my order": give the waiting order up, then `cart.capLines(caps)`)
+   */
+  onShort?: (refusal: StockRefusal, caps: StockCaps) => void;
+  delayMs?: number;
 }
 
 /**
- * `useStockCaps` over the cart's selected lines, holding the cart to the answer: when the
- * server allows fewer than the cart has, the lines are capped (removed at 0) and `onCapped`
- * gets what changed (show it with `<StockNotice refusal={refusalFromChanges(changes)} onDismiss={…} />`).
+ * `useStockCaps` over the cart's selected lines. No order waiting: when the server allows fewer
+ * than the cart has, the lines are capped (removed at 0) and `onCapped` gets what changed (show
+ * it with `<StockNotice refusal={refusalFromChanges(changes)} onDismiss={…} />`). An order
+ * waiting: `onShort` once per answer, nothing changed.
  */
-export function useCartStockCaps({ enabled = true, onCapped, delayMs }: { enabled?: boolean; onCapped?: (changes: CartChange[]) => void; delayMs?: number } = {}) {
+export function useCartStockCaps({ enabled = true, onCapped, waiting, onShort, delayMs }: UseCartStockCapsOptions = {}) {
   const cart = useOptionalCart();
-  const lines = cart?.selectedItems ?? [];
+  const lines = cart?.selectedItems ?? NO_LINES;
   const on = enabled && !!cart?.hydrated;
-  const stock = useStockCaps({ lines, enabled: on, delayMs });
-  const onCappedRef = useRef(onCapped);
-  onCappedRef.current = onCapped;
+  const stock = useStockCaps({ lines, enabled: on, waiting, delayMs });
+  const cbs = useRef({ onCapped, onShort });
+  cbs.current = { onCapped, onShort };
+  const toldFor = useRef('');
   useEffect(() => {
     if (!on || !stock.fresh || !cart) return;
     const { changes } = capCart(lines, stock.caps);
     if (!changes.length) return;
+    if (waiting) {
+      const told = `${waiting.order_id}:${stock.checked}`;
+      if (toldFor.current === told) return;
+      toldFor.current = told;
+      cbs.current.onShort?.(refusalFromChanges(changes)!, stock.caps);
+      return;
+    }
     cart.capLines(stock.caps, lines.map((l) => l.id));
-    onCappedRef.current?.(changes);
+    cbs.current.onCapped?.(changes);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [on, stock.fresh, stock.caps]);
   return stock;
+}
+
+/**
+ * The shopper's code (and Offers picks) across an order that waits for its payment: placing it
+ * clears them, so `snapshot()` them before clearing and `keep(order_id, choices)` once it waits;
+ * `restore(order_id)` when that order is given up (refused for stock, "Change my order", changed
+ * details, cash on delivery instead) puts them back, so the replacement order sends the code again
+ * and the server prices it again. Gone once the order is paid (`clearPendingOrder`).
+ */
+export function useOrderChoices() {
+  const offers = useOffers();
+  const snapshot = (): OrderChoices => {
+    let promo = '';
+    try {
+      promo = localStorage.getItem(STORAGE_KEYS.promoCode) || '';
+    } catch {
+      /* private mode */
+    }
+    return { offers: offers.enabled ? offers.choices() : undefined, promo: promo || undefined };
+  };
+  return {
+    snapshot,
+    keep: (order_id: string, choices: OrderChoices) => keepOrderChoices(order_id, choices),
+    /** what was put back (null: nothing kept for that order) */
+    restore: (order_id: string): OrderChoices | null => {
+      const c = takeOrderChoices(order_id);
+      if (!c) return null;
+      if (c.offers) offers.restoreChoices(c.offers);
+      else if (c.promo)
+        try {
+          localStorage.setItem(STORAGE_KEYS.promoCode, c.promo);
+        } catch {
+          /* private mode */
+        }
+      return c;
+    },
+  };
 }
 
 export interface StockNoticeProps {

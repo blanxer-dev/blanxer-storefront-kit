@@ -14,7 +14,7 @@ import { BlanxerApiError, readBody } from '../core/http.js';
 import { paymentFlow } from '../core/payments.js';
 import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type Advance, type PendingOrder } from '../core/advance.js';
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
-import { capsFromCheck, noCaps, stockCheckBody, type CapLine, type StockCaps } from '../core/stock.js';
+import { capsFromCheck, noCaps, stockCheckBody, stockWaitLeft, toStockRefusal, type CapLine, type StockCaps, type WaitingProof } from '../core/stock.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
@@ -91,16 +91,19 @@ export const releaseHold = (
  * How many of each cart line this checkout may have: `POST /order/public/stock-check`
  * (`{ store_id, lines: [{ product, variant?, quantity }] }`, quantities of the same product /
  * variant summed by `stockCheckBody`). Resolves to the server's caps (`available` for
- * stop-selling lines; continue-selling lines have none). Never blocks a checkout: a 404 (an
- * older backend), a network error, a rate limit or a non-JSON answer is "no caps". Only an
- * abort is thrown.
+ * stop-selling lines; continue-selling lines have none). `waiting`: this cart's order that waits
+ * for its payment with its proof (`waitingProof`: the last attempt's transaction, else the
+ * order's phone), so its own hold isn't counted (backends from contract v1.2; a wrong proof just
+ * counts every hold). Never blocks a checkout: a 404 (an older backend), a network error, a rate
+ * limit or a non-JSON answer is "no caps". Only an abort is thrown.
  */
 export const stockCheck = async (
   storeId: string,
   lines: Pick<CapLine, 'product' | 'variant' | 'quantity'>[],
+  waiting?: WaitingProof | null,
   init?: RequestInit,
 ): Promise<StockCaps> => {
-  const body = stockCheckBody(storeId, lines);
+  const body = stockCheckBody(storeId, lines, waiting);
   if (!storeId || !body.lines.length) return noCaps();
   try {
     return capsFromCheck(await call<any>('POST', `/order/public/stock-check`, body, init));
@@ -230,8 +233,71 @@ export const savePendingOrder = (p: PendingOrder) => {
 export const clearPendingOrder = () => {
   try {
     sessionStorage.removeItem(STORAGE_KEYS.pendingOrder);
+    sessionStorage.removeItem(STORAGE_KEYS.orderChoices);
   } catch {
     /* ignore */
+  }
+};
+
+// a STOCK_HELD wait, per order (this tab)
+const readStockWaits = (): Record<string, number> => {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.stockWait) || '{}');
+    return v && typeof v === 'object' ? v : {};
+  } catch {
+    return {};
+  }
+};
+
+/** The server said "try again in N seconds" for this order (STOCK_HELD). `startPayment` notes it itself. */
+export const noteStockWait = (order_id: string, seconds: number | null | undefined) => {
+  if (!order_id || !(Number(seconds) > 0)) return;
+  try {
+    const now = Date.now();
+    const waits = Object.fromEntries(Object.entries(readStockWaits()).filter(([, until]) => Number(until) > now));
+    sessionStorage.setItem(STORAGE_KEYS.stockWait, JSON.stringify({ ...waits, [order_id]: now + Number(seconds) * 1000 }));
+  } catch {
+    /* private mode: the notice's own countdown still runs */
+  }
+};
+
+/** Seconds left before this order may be paid again (0: now). */
+export const stockWaitFor = (order_id: string) => stockWaitLeft(readStockWaits(), order_id, Date.now());
+
+/** The shopper's code and offer picks an order was placed with. */
+export interface OrderChoices {
+  /** stores on Offers: the code, gift picks and removed offers (`OffersContextValue.choices()`) */
+  offers?: { code?: string; removed?: string[]; gifts?: Record<string, string> };
+  /** the `?promo=` code kept for the next order */
+  promo?: string;
+}
+
+/**
+ * Placing an order clears the code; for an order that waits for its payment it is kept here
+ * (sessionStorage `checkout_order_choices`) until that order is paid (`clearPendingOrder`) or
+ * given up (`takeOrderChoices`).
+ */
+export const keepOrderChoices = (order_id: string, choices: OrderChoices) => {
+  if (!choices.offers && !choices.promo) return;
+  try {
+    sessionStorage.setItem(STORAGE_KEYS.orderChoices, JSON.stringify({ order_id, ...choices }));
+  } catch {
+    /* private mode: the code is not kept */
+  }
+};
+
+/**
+ * The choices an order was placed with, once the shopper gives that order up (refused for stock,
+ * or changed): the replacement order sends the code again and the server prices it again. Once.
+ */
+export const takeOrderChoices = (order_id: string): OrderChoices | null => {
+  try {
+    const v = JSON.parse(sessionStorage.getItem(STORAGE_KEYS.orderChoices) || 'null');
+    if (!v || v.order_id !== order_id) return null;
+    sessionStorage.removeItem(STORAGE_KEYS.orderChoices);
+    return { offers: v.offers, promo: typeof v.promo === 'string' ? v.promo : undefined };
+  } catch {
+    return null;
   }
 };
 
@@ -320,7 +386,8 @@ const INIT_PATH: Record<string, string> = {
  * is already paid." / "This order was cancelled. Place a new order." (`retryRefused` reads it).
  * When the order's stock is gone the server starts nothing (no transaction, no QR, nothing
  * charged) and answers 400 with `stock_error` (`SOLD_OUT` / `STOCK_HELD`): `toStockRefusal(err)`
- * reads it; never offer to pay that order again unless it is `STOCK_HELD`.
+ * reads it; never offer to pay that order again unless it is `STOCK_HELD` (then not before
+ * `stockWaitFor(order)` is 0: the wait is noted here).
  * `url` must be the site's own origin
  * (`window.location.origin`); the gateway comes back to `<url>/payment/success`
  * or `<url>/payment/failed`. Returns what to do next — see `followPayment`.
@@ -336,7 +403,15 @@ export async function startPayment(
   const url = args.url || window.location.origin;
   const body: Record<string, any> = { store: args.store, order: args.order, url };
   if (method === 'QR_Dynamic') body.self = true;
-  const res: any = await call('POST', path, body);
+  let res: any;
+  try {
+    res = await call('POST', path, body);
+  } catch (e) {
+    // stock held in other checkouts: every "Try again" / "Pay" for this order waits as the server said
+    const stock = toStockRefusal(e);
+    if (stock?.code === 'STOCK_HELD') noteStockWait(args.order, stock.retry_after_seconds);
+    throw e;
+  }
 
   if (flow === 'form') {
     const { action_url, ...fields } = res || {};

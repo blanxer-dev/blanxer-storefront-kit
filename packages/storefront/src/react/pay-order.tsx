@@ -9,19 +9,22 @@
  * shows the stock notice instead of an error: SOLD_OUT → that order is over (the waiting order is
  * forgotten and is never offered for payment again), "Change my order" holds the cart to what is
  * left so a new order is placed; STOCK_HELD → "Try again" on the same order after the server's wait.
+ * That wait is kept per order (`stockWaitFor`): no start for the order until it is over, and the
+ * pay panel's own buttons read "Try again in 1:58" meanwhile. An order given up gives the
+ * shopper's code back (`useOrderChoices`).
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { holdSecondsOf, payModalText, payOrderView, pickAdvanceVia, retryRefused, type PaymentDue } from '../core/advance.js';
 import { errorMessage } from '../core/http.js';
-import { capsFromRefusal, refusalEndsOrder, toStockRefusal, type StockRefusal } from '../core/stock.js';
+import { capsFromRefusal, refusalEndsOrder, retryLabel, toStockRefusal, type StockRefusal } from '../core/stock.js';
 import type { PaymentMethod } from '../core/types.js';
-import { clearPendingOrder, followPayment, readPendingOrder, startPayment, type PaymentStart } from '../client/index.js';
+import { clearPendingOrder, followPayment, readPendingOrder, startPayment, stockWaitFor, type PaymentStart } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useOptionalCart } from './cart.js';
 import { useMoney } from './money.js';
-import { StockNoticeModal } from './stock-ui.js';
+import { StockNoticeModal, useOrderChoices } from './stock-ui.js';
 import { FonepayCheckoutModal, QrPaymentModal, type FonepayCheckoutData, type PaymentUnpaidReason, type QrPaymentData } from './payment-modals.js';
 import { Button, Modal, cx } from './ui.js';
 
@@ -73,12 +76,20 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
   const [stock, setStock] = useState<{ refusal: StockRefusal; method: string; orderId: string } | null>(null);
   const cart = useOptionalCart();
   const router = useRouter();
+  const orderChoices = useOrderChoices();
+  /** the order is given up here: the shopper's code back for the next order, the waiting order forgotten */
+  const giveUp = (orderId: string) => {
+    orderChoices.restore(orderId);
+    if (readPendingOrder()?.order_id === orderId) clearPendingOrder();
+  };
   const last = useRef<{ method: string; orderId: string } | null>(null);
   const optsRef = useRef(opts);
   optsRef.current = opts;
 
   /** Resolves 'qr' (modal open), 'left' (redirect / form on its way), or 'failed'. */
   const start = async (method: string, orderId: string, holdSeconds?: number): Promise<'qr' | 'left' | 'failed'> => {
+    // the server's STOCK_HELD wait for this order isn't over: nothing is started
+    if (stockWaitFor(orderId) > 0) return 'failed';
     setBusy(true);
     last.current = { method, orderId };
     try {
@@ -110,7 +121,7 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
       if (refusal) {
         setQr(null);
         setFonepay(null);
-        if (refusalEndsOrder(refusal) && readPendingOrder()?.order_id === orderId) clearPendingOrder();
+        if (refusalEndsOrder(refusal)) giveUp(orderId);
         setStock({ refusal, method, orderId });
         optsRef.current.onStockRefused?.(refusal, method, orderId);
         return 'failed';
@@ -143,7 +154,7 @@ export function usePayOrder(opts: UsePayOrderOptions = {}) {
       optsRef.current.onChangeOrder(refusal, orderId);
       return;
     }
-    if (readPendingOrder()?.order_id === orderId) clearPendingOrder();
+    giveUp(orderId);
     cart?.capLines(capsFromRefusal(refusal));
     router.push(optsRef.current.changeOrderHref || '/checkout');
   };
@@ -309,6 +320,14 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
   const money = useMoney();
   const id = useId();
   const [choosing, setChoosing] = useState(false);
+  // the server said "try again in N seconds" for this order (STOCK_HELD): every button here waits too
+  const [waitLeft, setWaitLeft] = useState(0);
+  useEffect(() => {
+    const tick = () => setWaitLeft(stockWaitFor(due.order_id));
+    tick();
+    const t = window.setInterval(tick, 1000);
+    return () => window.clearInterval(t);
+  }, [due.order_id, busy]);
   const names = methods.map((m) => m.name as string);
   const known =
     (lastMethod && names.includes(lastMethod) ? lastMethod : '') || (due.via && names.includes(due.via) ? due.via : '') || (names.length === 1 ? names[0]! : '');
@@ -334,11 +353,11 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
         </Link>
       ) : names.length ? (
         <div className="bx-advance-due-actions">
-          <Button className="bx-advance-pay" loading={busy} onClick={() => (known ? onPay(known) : setChoosing(true))}>
-            {known ? primaryLabel || payLabel : payLabel}
+          <Button className="bx-advance-pay" loading={busy} disabled={waitLeft > 0} onClick={() => (known ? onPay(known) : setChoosing(true))}>
+            {waitLeft > 0 ? retryLabel(waitLeft) : known ? primaryLabel || payLabel : payLabel}
           </Button>
           {names.length > 1 && known ? (
-            <Button variant="secondary" disabled={busy} onClick={() => setChoosing(true)}>
+            <Button variant="secondary" disabled={busy || waitLeft > 0} onClick={() => setChoosing(true)}>
               Pay another way
             </Button>
           ) : null}
@@ -355,10 +374,10 @@ export function PaymentDueBox({ due, methods, onPay, busy, title, lastMethod, pr
         methods={methods}
         initial={pickAdvanceVia(known, names)}
         payLabel={payLabel}
-        busy={busy}
+        busy={busy || waitLeft > 0}
         onConfirm={(via) => {
           setChoosing(false);
-          if (via) onPay(via);
+          if (via && stockWaitFor(due.order_id) <= 0) onPay(via);
         }}
       />
     </section>

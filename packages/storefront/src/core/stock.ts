@@ -112,6 +112,15 @@ export const refusalEndsOrder = (r: StockRefusal) => r.code !== 'STOCK_HELD';
 export const stockNoticeTitle = (code: StockCode) =>
   code === 'STOCK_HELD' ? 'In other shoppers\' checkouts' : code === 'SOLD_OUT' ? 'Just sold out' : 'Not enough in stock';
 
+/**
+ * Seconds left of a STOCK_HELD wait kept per order (`{ [order_id]: until ms }`): every "Try again"
+ * / "Pay" for that order waits for it, not only the notice's own button.
+ */
+export const stockWaitLeft = (waits: Record<string, number> | null | undefined, order_id: string, now: number) => {
+  const until = Number(waits?.[order_id]);
+  return Number.isFinite(until) && until > now ? Math.ceil((until - now) / 1000) : 0;
+};
+
 /** "Try again in 1:58" while the server's wait runs, then "Try again". */
 export const retryLabel = (secondsLeft: number) => {
   const s = Math.max(0, Math.ceil(secondsLeft));
@@ -162,8 +171,30 @@ export const capsFromRefusal = (r: Pick<StockRefusal, 'lines'> | null): StockCap
   return caps;
 };
 
-/** `POST /order/public/stock-check` body (§9): one line per product / variant, quantities summed. */
-export const stockCheckBody = (store_id: string, lines: Pick<CapLine, 'product' | 'variant' | 'quantity'>[]) => {
+/**
+ * The order of this cart that waits for its payment, sent with the stock check (contract v1.2) so
+ * its own hold isn't counted against the shopper; the proof is the one release-hold takes: the
+ * last attempt's transaction, else the order's 10-digit phone (a wrong one: all holds count).
+ */
+export interface WaitingProof {
+  order_id: string;
+  transaction_id?: string;
+  phone_number?: string;
+}
+
+/** The proof to send, or null when there is none (then the check is not made while it waits). */
+export const waitingProof = (order_id: string | null | undefined, transaction?: string | null, phone?: string | null): WaitingProof | null => {
+  if (!order_id) return null;
+  if (transaction) return { order_id, transaction_id: String(transaction) };
+  const p = String(phone || '').trim();
+  return /^[0-9]{10}$/.test(p) ? { order_id, phone_number: p } : null;
+};
+
+/**
+ * `POST /order/public/stock-check` body (§9): one line per product / variant, quantities summed;
+ * with the waiting order and its proof when one waits.
+ */
+export const stockCheckBody = (store_id: string, lines: Pick<CapLine, 'product' | 'variant' | 'quantity'>[], waiting?: WaitingProof | null) => {
   const sum = new Map<string, { product: string; variant?: string; quantity: number }>();
   for (const l of lines) {
     if (!l?.product) continue;
@@ -172,7 +203,7 @@ export const stockCheckBody = (store_id: string, lines: Pick<CapLine, 'product' 
     if (prev) prev.quantity += whole(l.quantity);
     else sum.set(k, { product: String(l.product), ...(l.variant ? { variant: String(l.variant) } : {}), quantity: whole(l.quantity) });
   }
-  return { store_id, lines: [...sum.values()] };
+  return { store_id, lines: [...sum.values()], ...(waiting ? waiting : {}) };
 };
 
 /**

@@ -6,7 +6,7 @@ import { initials } from '../core/format.js';
 import { blanxerImageLoader } from '../next/image-loader.js';
 import type { CartItem } from '../core/types.js';
 import { addedLines, isFreeLine, lineOffers, quoteLineFor, type Quote } from '../core/offers.js';
-import { canAddOne, lineCap, refusalFromChanges, stockLineLeft, type StockCaps, type StockRefusal } from '../core/stock.js';
+import { canAddOne, lineCap, refusalFromChanges, stockLineLeft, waitingProof, type StockCaps, type StockRefusal, type WaitingProof } from '../core/stock.js';
 import { readPendingOrder } from '../client/index.js';
 import { useCart } from './cart.js';
 import { StockNotice, useCartStockCaps } from './stock-ui.js';
@@ -184,14 +184,23 @@ export function CartLines({ selectable = true, editable = true, productHref, cla
 
 /** Full cart page body: lines + selected total + checkout button. */
 /**
- * The cart's stock caps while the cart is shown (not while an order of this tab waits for its
- * payment: its own hold would count against it), lines held to them, and the notice saying so.
+ * The cart's stock caps while the cart is shown, lines held to them and the notice saying so.
+ * While an order of this tab waits for its payment the check carries it and its last attempt
+ * (v1.2: its own hold isn't counted; no attempt yet: no check) and only "+" / "Only N left" follow
+ * the answer: nothing is changed behind the shopper's back.
  */
 function useCartStock() {
-  const [waitingOrder, setWaitingOrder] = useState(true);
-  useEffect(() => setWaitingOrder(!!readPendingOrder()), []);
+  const [waiting, setWaiting] = useState<{ proof: WaitingProof | null; pending: boolean }>({ proof: null, pending: true });
+  useEffect(() => {
+    const p = readPendingOrder();
+    setWaiting({ proof: p ? waitingProof(p.order_id, p.transaction) : null, pending: !!p });
+  }, []);
   const [notice, setNotice] = useState<StockRefusal | null>(null);
-  const stock = useCartStockCaps({ enabled: !waitingOrder, onCapped: (changes) => setNotice(refusalFromChanges(changes)) });
+  const stock = useCartStockCaps({
+    enabled: !waiting.pending || !!waiting.proof,
+    waiting: waiting.proof,
+    onCapped: (changes) => setNotice(refusalFromChanges(changes)),
+  });
   // lines left: "Continue with the rest"; none left: the empty cart's own "Continue shopping"
   const cart = useCart();
   const view = notice ? <StockNotice refusal={notice} onDismiss={cart.items.length ? () => setNotice(null) : undefined} /> : null;

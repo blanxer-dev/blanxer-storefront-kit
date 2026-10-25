@@ -7,7 +7,7 @@ export { CartProvider, useCart, useOptionalCart } from './cart.js';
 export type { CartContextValue } from './cart.js';
 export { CartLines, CartView } from './cart-lines.js';
 export { OffersProvider, useOffers, useProductOffers, useCartQuote, useOfferClock } from './offers.js';
-export type { OffersContextValue, UseCartQuoteOptions, CartQuoteState } from './offers.js';
+export type { OffersContextValue, OfferChoices, UseCartQuoteOptions, CartQuoteState } from './offers.js';
 export {
   OfferBadges,
   OfferCardHint,
@@ -52,5 +52,5 @@ export { StockAlertForm as BackInStockForm } from './stock-alert.js';
 export { Pixel } from './pixel.js';
 export { Money, useMoney } from './money.js';
 export { BlanxerImage } from './image.js';
-export { StockNotice, StockNoticeModal, useStockCaps, useCartStockCaps } from './stock-ui.js';
-export type { StockNoticeProps, UseStockCapsOptions } from './stock-ui.js';
+export { StockNotice, StockNoticeModal, useStockCaps, useCartStockCaps, useOrderChoices } from './stock-ui.js';
+export type { StockNoticeProps, UseStockCapsOptions, UseCartStockCapsOptions } from './stock-ui.js';
