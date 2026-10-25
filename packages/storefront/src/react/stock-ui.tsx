@@ -150,7 +150,7 @@ export function StockNotice({ refusal, onChangeOrder, changeLabel = 'Change my o
                 {stockLineName(l)}
                 {l.wanted > 0 ? <span className="bx-muted"> · you wanted {l.wanted}</span> : null}
               </span>
-              <span className={cx('bx-stock-notice-left', l.available > 0 ? 'bx-stock-notice-left--some' : 'bx-stock-notice-left--none')}>{stockLineLeft(l)}</span>
+              <span className={cx('bx-stock-notice-left', l.available > 0 ? 'bx-stock-notice-left--some' : 'bx-stock-notice-left--none')}>{stockLineLeft(l, refusal.code)}</span>
             </li>
           ))}
         </ul>

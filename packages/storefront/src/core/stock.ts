@@ -118,8 +118,9 @@ export const retryLabel = (secondsLeft: number) => {
   return s > 0 ? `Try again in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Try again';
 };
 
-/** What a line says in the sold-out notice: "Sold out" / "Only 1 left". */
-export const stockLineLeft = (l: Pick<StockLine, 'available'>) => (l.available > 0 ? `Only ${l.available} left` : 'Sold out');
+/** What a line says in the notice: "Sold out" / "Only 1 left" / "In other checkouts" (STOCK_HELD). */
+export const stockLineLeft = (l: Pick<StockLine, 'available'>, code?: StockCode) =>
+  l.available > 0 ? `Only ${l.available} left` : code === 'STOCK_HELD' ? 'In other checkouts' : 'Sold out';
 
 // ── capping the cart at what the server allows ───────────────────────────────────────────────
 

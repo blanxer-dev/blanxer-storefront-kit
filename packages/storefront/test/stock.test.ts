@@ -111,6 +111,8 @@ describe('a stock refusal', () => {
     expect(stockWords('OUT_OF_STOCK', [{ ...lines[0]!, available: 1 }])).toBe('Only 1 of Hot-water bag (Red) left.');
     expect(stockLineLeft({ available: 0 })).toBe('Sold out');
     expect(stockLineLeft({ available: 2 })).toBe('Only 2 left');
+    // held by other shoppers, not sold: said so
+    expect(stockLineLeft({ available: 0 }, 'STOCK_HELD')).toBe('In other checkouts');
   });
 });
 
