@@ -29,6 +29,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 - **No customer login.** Nothing in the package calls `/customer/auth`, accounts, wishlist or rewards.
 - **Offers are priced by the server.** For stores on Offers, every total, line saving, gift line, free delivery and code result comes from the cart quote. Nothing in the package (or a site) computes a discount itself. See [Offers](#offers).
 - **The advance is worked out by the server.** "Pay part online, rest on delivery" amounts come from the quote and the order; nothing computes an advance. See [Advance payment and retry](#advance-payment-and-retry).
+- **Stock is the server's.** The cart is held to the server's stock check, and an order or payment refused for stock shows the server's words; nothing works out stock. See [Stock](#stock).
 
 ## Subpaths
 
@@ -59,7 +60,7 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 
 ### `@blanxer-dev/storefront/client` (browser only)
 
-`placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `getOffers(storeId)`, `getProductOffers(storeId, productId)`, `quoteCart(storeId, body)` → `Quote | null`, `quoteAdvance(storeId, body)` → `Advance | null`, `readPendingOrder` / `savePendingOrder` / `clearPendingOrder`, `getProductPublic(storeId, idOrSlug)`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + GTM dataLayer + Blanxer CAPI relay with one event id; Purchase is never relayed), `firePurchase(order.meta)` (browser Purchase with the id and value the backend returned; the backend sends its own server Purchase), `pushMetaEvent` / `dlPush` (GTM dataLayer), `rememberCheckoutUser`, `localOrderMeta`, `savePendingPurchase` / `takePendingPurchase`, plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
+`placeOrder(storeId, payload)`, `applyCoupon({ store, code, products })`, `getOffers(storeId)`, `getProductOffers(storeId, productId)`, `quoteCart(storeId, body)` → `Quote | null`, `quoteAdvance(storeId, body)` → `Advance | null`, `stockCheck(storeId, lines)` → `StockCaps`, `readPendingOrder` / `savePendingOrder` / `clearPendingOrder`, `getProductPublic(storeId, idOrSlug)`, `startPayment(method, { store, order, url? })` → `PaymentStart` (`none` / `redirect` / `form` / `qr` / `fonepay_checkout`), `followPayment(start)` (navigates or auto-posts the eSewa/NPX form), `checkPayment('qr' | 'fonepay_checkout', transaction)` → `boolean`, `releaseHold({ store_id, order_id, transaction_id })`, `getOrder(storeId, orderId)`, `cancelOrder({ store_id, order_id, phone_number })`, `submitReview({ store_id, product_id, order_id, rating, review, phone_number })`, `requestStockAlert({ store, product, variant_id?, phone?, email?, product_name?, product_url? })`, `submitForm(storeId, slug, data)`, `trackEvent(event, customData?, { eventId?, email?, phone? })` (Meta pixel + GTM dataLayer + Blanxer CAPI relay with one event id; Purchase is never relayed), `firePurchase(order.meta)` (browser Purchase with the id and value the backend returned; the backend sends its own server Purchase), `pushMetaEvent` / `dlPush` (GTM dataLayer), `rememberCheckoutUser`, `localOrderMeta`, `savePendingPurchase` / `takePendingPurchase`, plus `getDeliveryCharges`, `getFlashSaleForProduct`, `notifyFlashSale`, `uploadCustomFieldImage`, `pingAnalytics`, `pixelTrack`, `getEventId`, `buildOrderMeta`, `initMetaCapi`, `configureClient`, `BlanxerApiError`, `errorMessage`, `fieldError`.
 
 `url` on orders and payments is always the site's own origin (`window.location.origin`); gateways return through the API to `<url>/payment/success` or `<url>/payment/failed`.
 
@@ -69,8 +70,8 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 |---|---|
 | `<BlanxerProvider>` | `store` (from `getClientStore()`/`toClientStore()`), `apiBase?`, `theme?: BlanxerTheme`, `notify?: (n: Notice) => void`, `children`. Includes the cart, offers (`OffersProvider`), `?promo=` capture, the session ping, Meta CAPI switch, CSS variables and toasts |
 | `useBlanxer()` / `useStore()` | `{ store, storeId, apiBase, notify }` / store |
-| `CartProvider`, `useCart()` | cart in localStorage `cart_items` (+ selection in `cart_selection`): `items`, `selectedItems`, `count`, `totalPrice`, `addToCart`, `removeFromCart`, `removeLine`, `setQuantity`, `toggleSelection`, `selectAll`, `deselectAll`, `removeSelectedFromCart`, `resetCart`, `hydrated`, `open`/`setOpen` |
-| `<CartLines>` | `selectable?`, `editable?`, `productHref?`, `className?`, `empty?`, `quote?` (stores on Offers: line offers and server-added gift lines) |
+| `CartProvider`, `useCart()` | cart in localStorage `cart_items` (+ selection in `cart_selection`): `items`, `selectedItems`, `count`, `totalPrice`, `addToCart`, `removeFromCart`, `removeLine`, `setQuantity`, `toggleSelection`, `selectAll`, `deselectAll`, `removeSelectedFromCart`, `removeLines`, `capLines(caps, ids?)`, `resetCart`, `hydrated`, `open`/`setOpen` |
+| `<CartLines>` | `selectable?`, `editable?`, `productHref?`, `className?`, `empty?`, `quote?` (stores on Offers: line offers and server-added gift lines), `caps?` (the server's stock caps: "+" stops there, "Only N left") |
 | `<CartView>` | `checkoutHref?`, `continueHref?`, `className?` |
 | `<AddToCart>` | `product`, `selection?`, `showPrice?`, `showVariants?`, `showCustomFields?`, `showQuantity?`, `showFlashSale?`, `showStockAlert?`, `checkoutHref?`, `labels?: { add, checkout, outOfStock, comingSoon, added }`, `onAdded?`, `className?`, `children?` |
 | `useProductSelection(product)`, `<VariantPicker selection>`, `<CustomFields selection>`, `<QuantityPicker selection>` | build your own product form from the same state (`ProductSelection`) |
@@ -78,13 +79,14 @@ The site needs no secret. Never put an `sk_` key, MCP token, password or gateway
 | `<Checkout>` | `delivery?` (from `getDeliveryCharges()`; fetched in the browser if omitted), `labels?: Partial<CheckoutLabels>`, `className?`, `header?`, `footer?`, `paymentMethodIcons?: Partial<Record<PaymentMethodName, ReactNode>>`, `onOrderPlaced?(order, method)` |
 | `<PaymentSuccess>` | `className?`, `children?` |
 | `<PaymentFailed>` | `method?` (`?method=`), `homeHref?`, `trackHref?: (orderId) => string` (default `/track/<id>`), `className?` |
-| `<OrderTracking>` | `orderId`, `fromCheckout?`, `className?` |
+| `<OrderTracking>` | `orderId`, `fromCheckout?`, `changeOrderHref?` (where "Change my order" goes after a payment refused for stock; default `/checkout`), `className?` |
 | `<BlanxerForm>` | `form` (from `getForm()`), `className?`, `onSubmitted?` |
 | `<StockAlertForm>` (alias `BackInStockForm`) | `product`, `variantId?`, `className?` |
 | `<Pixel>` | `store?`. Loads the Meta Pixel (digits-only id, once; skipped if GTM already set up the same pixel), GA4, GTM and Clarity from the store's plugins. Pushes `bx_page_view` to GTM on every route change. |
 | `<Money amount>`, `useMoney()`, `<BlanxerImage>` | store currency label; `next/image` with the Blanxer loader |
 | `QrPaymentModal`, `FonepayCheckoutModal`, `PaymentCloseConfirm`, `usePaymentHold`, `formatTimeLeft`, `qrSeconds` | the in-page payment screens `Checkout` uses (`onUnpaid?(reason)`: closed, expired or "Try again") |
-| `usePayOrder(opts?)`, `<PaymentDueBox>`, `<AdvanceSummaryRows>`, `useAdvanceQuote(opts)` | paying an existing order again, the "Advance due" box, the Pay now / Pay on delivery rows, the advance for stores not on Offers (see [Advance payment and retry](#advance-payment-and-retry)) |
+| `usePayOrder(opts?)`, `<PaymentDueBox>`, `<AdvanceMethodModal>`, `<AdvanceSummaryRows>`, `useAdvanceQuote(opts)` | paying an existing order again, the "Advance due" box, the pay modal, the Pay now / Pay on delivery rows, the advance for stores not on Offers (see [Advance payment and retry](#advance-payment-and-retry)) |
+| `<StockNotice>`, `<StockNoticeModal>`, `useStockCaps(opts)`, `useCartStockCaps(opts?)` | the stock notice and the cart's stock caps (see [Stock](#stock)) |
 
 Styling: import `@blanxer-dev/storefront/styles.css` once (optional), then override `--bx-*` variables (`--bx-primary`, `--bx-bg`, `--bx-fg`, `--bx-muted`, `--bx-border`, `--bx-surface`, `--bx-danger`, `--bx-success`, `--bx-radius`, `--bx-font`) or the `bx-*` classes. `BlanxerProvider` sets `--bx-primary` from the store's theme colour; its `theme` prop wins over that.
 
@@ -113,6 +115,7 @@ There is no prop to remove it. Restyle it through `.bx-powered-by`; don't hide i
   - **The browser:** the pixel fires once with the same `purchase_event_id`, so Meta keeps one.
   - **Every event is also pushed to GTM's `dataLayer`** in GA4 ecommerce shape (`view_item`, `add_to_cart`, `begin_checkout`, `add_payment_info`, `purchase`, …) with `meta_event_id`. Agencies can add page-level tags in GTM without code.
 - eSewa and NPX: auto-posted form. Khalti, Fonepay and Nabil card: redirect. Blanxer QR and Fonepay QR: QR modal with a countdown from `hold_seconds` (minus 20 s), auto-check every 5 s and on return to the tab. Checkout by Fonepay: bank list on mobile, QR on desktop, Fonepay websocket + check every 10 s. Closing a live QR asks first and then releases the hold; expiry releases it too.
+- Stock: the lines are checked with the server while the checkout is shown and again before Place order; a create-order or payment start refused for stock shows the server's words with "Change my order" (see [Stock](#stock)).
 - The cart is cleared right after the order for plain COD, and for every online or advance order only once the payment is confirmed (`/payment/success` or the QR's confirmation). An order whose payment didn't finish is paid again on the same order, never placed twice (see [Advance payment and retry](#advance-payment-and-retry)).
 
 ## `@blanxer-dev/storefront/seo`
@@ -131,7 +134,7 @@ There is no prop to remove it. Restyle it through `.bx-powered-by`; don't hide i
 
 ## Extra subpaths
 
-- `@blanxer-dev/storefront/core`: the pure logic (delivery, COD rule, coupons, payment method list, order payload, custom fields, validation, variants, formatting, store helpers, types). Safe on server and client.
+- `@blanxer-dev/storefront/core`: the pure logic (delivery, COD rule, coupons, payment method list, order payload, custom fields, validation, variants, formatting, store helpers, offers, advance, stock, types). Safe on server and client.
 - `@blanxer-dev/storefront/image-loader`: the default loader as a default export (for `loaderFile`).
 - `@blanxer-dev/storefront/styles.css`: default styles.
 
@@ -214,6 +217,17 @@ The pure rules are in `/core` (`advance.ts`, the same functions as the Blanxer s
 - kit-only: `advancePaymentOn`, `advanceFromAnswer`, `orderAdvance`.
 
 Never show an amount you worked out yourself.
+
+## Stock
+
+Needs the backend from the stock-oversell release; older backends send no `stock_error` and have no stock check, and nothing changes. **The server decides every number.**
+
+- **The cart's caps.** `stockCheck(storeId, lines)` (`POST /order/public/stock-check`, quantities of one product / variant summed) answers how many of each line this checkout may have (`available`; none for continue-selling products). `CartView` and `Checkout` ask while they are shown (debounced; not while an order of this tab waits for its payment). "+" stops at the cap and the line says "Only N left". A cart above the caps is held to them (a line at 0 removed) and the notice says so ("Only 1 of Hot-water bag (Red) left.", "Continue with the rest"). Before Place order the checkout asks again; a cart that had to change is not placed. A failed check (404, network, junk) caps nothing.
+- **Create-order refused** (`stock_error.code` `OUT_OF_STOCK` or `STOCK_HELD`): the server's `message` with each line ("Sold out" / "Only 1 left") in a small modal, with "Change my order" (the cart held to `available`; the shopper places a new order) and, for `STOCK_HELD`, "Try again" after `retry_after_seconds`.
+- **A payment start refused** (`SOLD_OUT` / `STOCK_HELD`, nothing charged; the checkout's first payment, "Payment not finished", the tracking page's "Pay Rs X", the expired QR's "Try again"): the same notice, the QR closed. `SOLD_OUT` ends that order here: the waiting order is forgotten, no pay button is offered for it again, and "Change my order" holds the cart and goes to the checkout for a new order (the old one stays Inactive). `STOCK_HELD` keeps the order: "Try again" on it after the wait.
+- **`/track/<id>`** with an open `stock_short`: "We received your payment, but this order was cancelled. The store will refund you." or "We received your payment, but an item in this order sold out. The store will contact you to refund you or change the order."
+
+**Building your own.** Read errors with `toStockRefusal(err)` (null for anything else, staff-only codes included) and show `<StockNotice refusal={…} onChangeOrder={…} onRetry={…} />`; hold the cart with `cart.capLines(capsFromRefusal(r))`. `usePayOrder` shows the notice in its `modals` by itself (`onStockRefused`, `onChangeOrder`, `changeOrderHref`). Pure helpers in `/core` (`stock.ts`, the same functions as the Blanxer storefront): `toStockRefusal`, `stockWords`, `stockNoticeTitle`, `retryLabel`, `stockLineName`, `stockLineLeft`, `refusalEndsOrder`, `stockKey`, `noCaps`, `capsFromRefusal`, `stockCheckBody`, `capsFromCheck`, `capCart`, `canAddOne`, `lineCap`, `refusalFromChanges`, `stockShortNote`.
 
 ## Deviations from the storefront and the contract
 
