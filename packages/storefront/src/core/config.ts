@@ -23,4 +23,10 @@ export const STORAGE_KEYS = {
   ping: 'ping',
   checkoutOrderId: 'checkout_order_id',
   pixelPurchasePending: 'pixel_purchase_pending',
+  /** The order placed from this tab whose online payment (or advance) isn't confirmed yet (`PendingOrder`). */
+  pendingOrder: 'checkout_pending_order',
+  /** STOCK_HELD waits per order (`{ [order_id]: until ms }`): every pay button for it waits. */
+  stockWait: 'checkout_stock_wait',
+  /** The shopper's code / offer picks kept with the waiting order (`{ order_id, offers?, promo? }`). */
+  orderChoices: 'checkout_order_choices',
 } as const;

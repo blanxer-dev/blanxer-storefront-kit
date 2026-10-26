@@ -3,11 +3,11 @@ export { BlanxerProvider } from './provider.js';
 export type { BlanxerProviderProps, BlanxerTheme } from './provider.js';
 export { useBlanxer, useStore } from './context.js';
 export type { Notice, NoticeType, BlanxerContextValue } from './context.js';
-export { CartProvider, useCart } from './cart.js';
+export { CartProvider, useCart, useOptionalCart } from './cart.js';
 export type { CartContextValue } from './cart.js';
 export { CartLines, CartView } from './cart-lines.js';
 export { OffersProvider, useOffers, useProductOffers, useCartQuote, useOfferClock } from './offers.js';
-export type { OffersContextValue, UseCartQuoteOptions, CartQuoteState } from './offers.js';
+export type { OffersContextValue, OfferChoices, UseCartQuoteOptions, CartQuoteState } from './offers.js';
 export {
   OfferBadges,
   OfferCardHint,
@@ -34,9 +34,14 @@ export { FlashSaleStrip, formatCountdown } from './flash-sale.js';
 export type { FlashSaleStripProps } from './flash-sale.js';
 export { StockAlertForm } from './stock-alert.js';
 export type { StockAlertFormProps } from './stock-alert.js';
+export { AdvanceSummaryRows, useAdvanceQuote } from './advance-ui.js';
+export type { AdvanceSummaryRowsProps, UseAdvanceQuoteOptions } from './advance-ui.js';
+export { usePayOrder, PaymentDueBox, AdvanceMethodModal, PAYMENT_ERRORS } from './pay-order.js';
+export type { UsePayOrderOptions, PaymentDueBoxProps, AdvanceMethodModalProps } from './pay-order.js';
 export { Checkout } from './checkout.js';
 export type { CheckoutProps, CheckoutLabels } from './checkout.js';
 export { QrPaymentModal, FonepayCheckoutModal, PaymentCloseConfirm } from './payment-modals.js';
+export type { QrPaymentData, FonepayCheckoutData, FonepayBank, PaymentModalProps, PaymentUnpaidReason } from './payment-modals.js';
 export { usePaymentHold, formatTimeLeft, qrSeconds } from './payment-hold.js';
 export { PaymentSuccess, PaymentFailed } from './payment-pages.js';
 export { OrderTracking } from './tracking.js';
@@ -47,3 +52,5 @@ export { StockAlertForm as BackInStockForm } from './stock-alert.js';
 export { Pixel } from './pixel.js';
 export { Money, useMoney } from './money.js';
 export { BlanxerImage } from './image.js';
+export { StockNotice, StockNoticeModal, useStockCaps, useCartStockCaps, useOrderChoices } from './stock-ui.js';
+export type { StockNoticeProps, UseStockCapsOptions, UseCartStockCapsOptions } from './stock-ui.js';

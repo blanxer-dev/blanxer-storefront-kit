@@ -152,6 +152,51 @@
 .bx-notice p { margin: 0 0 4px; }
 .bx-checkout--empty { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
 
+/* advance payment (cash on delivery with part paid online first) and paying an order again */
+.bx-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.bx-payment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bx-advance-cod-line { font-size: 0.78rem; color: var(--bx-muted); }
+.bx-advance-modal .bx-modal-body { padding-top: 4px; }
+.bx-advance-modal-title { display: flex; flex-direction: column; }
+.bx-advance-modal-cod { font-weight: 700; color: var(--bx-primary); }
+.bx-advance-methods { display: flex; flex-direction: column; gap: 6px; }
+.bx-advance-method { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--bx-border); border-radius: var(--bx-radius); cursor: pointer; font-size: 0.9rem; }
+.bx-advance-method input { accent-color: var(--bx-primary); width: 18px; height: 18px; margin: 0; }
+.bx-advance-method--active { border-color: var(--bx-primary); box-shadow: inset 0 0 0 1px var(--bx-primary); }
+.bx-advance-method:focus-within { outline: 2px solid var(--bx-primary); outline-offset: 2px; }
+.bx-advance-none { color: var(--bx-muted); }
+.bx-advance-due-actions { display: flex; flex-direction: column; gap: 8px; }
+.bx-advance-split:empty { display: none; }
+.bx-advance-split .bx-totals { margin-top: 4px; padding-top: 8px; border-top: 1px dashed var(--bx-border); }
+.bx-advance-row--now { font-weight: 600; }
+.bx-advance-under-button { margin: -4px 0 0; text-align: center; }
+.bx-advance-init-line { margin: 0; font-size: 0.85rem; color: var(--bx-muted); text-align: center; }
+.bx-advance-due { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #fde68a; border-radius: var(--bx-radius); background: #fffbeb; }
+.bx-advance-due-title { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.bx-advance-due-amount, .bx-advance-due-sub { margin: 0; }
+.bx-advance-pay { width: 100%; min-height: 48px; }
+.bx-advance-retry-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; }
+.bx-track .bx-advance-due { margin-bottom: 16px; }
+.bx-result-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+/* stock the server says isn't there: refused orders / payments, the cart held to the stock check */
+.bx-stock-notice { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid #fecaca; border-radius: var(--bx-radius); background: #fef2f2; font-size: 0.875rem; }
+.bx-stock-notice--held { border-color: #fde68a; background: #fffbeb; }
+.bx-stock-notice--short { border-color: #fde68a; background: #fffbeb; }
+.bx-stock-notice p { margin: 0; }
+.bx-stock-notice-title { font-size: 1rem; font-weight: 700; }
+.bx-stock-notice-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.bx-stock-notice-line { display: flex; justify-content: space-between; gap: 12px; }
+.bx-stock-notice-name { min-width: 0; overflow-wrap: anywhere; }
+.bx-stock-notice-left { flex: none; font-weight: 600; }
+.bx-stock-notice-left--none { color: var(--bx-danger); }
+.bx-stock-notice-actions { display: flex; flex-direction: column; gap: 8px; }
+.bx-stock-notice-change, .bx-stock-notice-retry { width: 100%; min-height: 48px; }
+.bx-stock-modal .bx-stock-notice { padding: 0; border: 0; background: transparent; }
+.bx-stock-left { margin: 2px 0 0; font-size: 0.78rem; font-weight: 600; color: var(--bx-danger); }
+.bx-track .bx-stock-notice { margin-bottom: 16px; }
+.bx-cart > .bx-stock-notice { margin-bottom: 12px; }
+
 /* offers (stores on Offers; colours come from the store's offer settings via --bx-offer-tone) */
 .bx-offer-link { border: 0; background: none; padding: 0; font: inherit; color: var(--bx-primary); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .bx-offer-badges { position: absolute; top: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 1; pointer-events: none; }
@@ -293,6 +338,7 @@
 .bx-badge--processing { background: #ede9fe; color: #5b21b6; }
 .bx-badge--cancelled, .bx-badge--refunded { background: #fee2e2; color: #991b1b; }
 .bx-badge--unpaid { background: #f3f4f6; color: #374151; }
+.bx-badge--partial { background: #dcfce7; color: #166534; }
 .bx-stars { display: inline-flex; gap: 2px; }
 .bx-star { border: 0; background: transparent; font-size: 1.4rem; color: #d1d5db; cursor: default; padding: 0 2px; }
 button.bx-star { cursor: pointer; }

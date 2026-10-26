@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { releaseHold } from '../client/index.js';
+import { holdSecondsOf } from '../core/advance.js';
 
 // Ported from the storefront's use-payment-hold.ts.
 //
@@ -12,11 +13,15 @@ import { releaseHold } from '../client/index.js';
 // The hold is released ONLY when the timer runs out or the shopper confirms
 // closing the QR — never on tab switch or page leave, because shoppers pay in
 // their banking app while the QR stays open here.
+//
+// The hold comes from the payment init's answer (every attempt, retries included). When it says
+// none (the hold has ended, e.g. a retry after expiry), there is no countdown: the QR stays
+// usable, never shows "expired", and nothing is released on a timer.
 
 export const DEFAULT_HOLD_SECONDS = 280; // older backends send no hold time
 export const HOLD_GRACE_SECONDS = 20;
 
-/** Seconds the QR stays usable for a given `hold_seconds`. */
+/** Seconds the QR stays usable for a given `hold_seconds` (older backends: no hold → 280). */
 export const qrSeconds = (holdSeconds: unknown): number => {
   const h = Number(holdSeconds) || 0;
   return h > HOLD_GRACE_SECONDS ? h - HOLD_GRACE_SECONDS : DEFAULT_HOLD_SECONDS;
@@ -26,7 +31,8 @@ export interface HoldData {
   order_id: string;
   store_id: string;
   transaction: string;
-  hold_seconds?: number;
+  /** hold left from the init answer; absent / 0 = no countdown */
+  hold_seconds?: number | null;
   [k: string]: any;
 }
 
@@ -53,14 +59,18 @@ export function usePaymentHold({
     if (!open) return;
     releasedRef.current = false;
     settledRef.current = false;
-    setDeadline(Date.now() + qrSeconds(data?.hold_seconds) * 1000);
+    const hold = holdSecondsOf(data);
+    // the grace keeps a last-second payment inside the hold; a nearly-ended hold shows what's left
+    setDeadline(hold == null ? 0 : Date.now() + (hold > HOLD_GRACE_SECONDS ? hold - HOLD_GRACE_SECONDS : hold) * 1000);
     setNow(Date.now());
     const t = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(t);
   }, [open, data?.transaction, data?.hold_seconds]);
 
   const timeLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : 0;
-  const expired = open && deadline > 0 && timeLeft <= 0;
+  /** a countdown runs (the init said how long the hold lasts) */
+  const timed = deadline > 0;
+  const expired = open && timed && timeLeft <= 0;
 
   const release = useCallback(async () => {
     if (releasedRef.current || settledRef.current) return;
@@ -100,7 +110,7 @@ export function usePaymentHold({
     };
   }, [open, expired, data?.transaction, checkEverySeconds, runCheck]);
 
-  return { timeLeft, expired, release, settledRef };
+  return { timeLeft, expired, timed, release, settledRef };
 }
 
 export function formatTimeLeft(seconds: number) {

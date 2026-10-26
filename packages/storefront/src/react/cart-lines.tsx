@@ -1,12 +1,15 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { initials } from '../core/format.js';
 import { blanxerImageLoader } from '../next/image-loader.js';
 import type { CartItem } from '../core/types.js';
 import { addedLines, isFreeLine, lineOffers, quoteLineFor, type Quote } from '../core/offers.js';
+import { canAddOne, lineCap, refusalFromChanges, stockLineLeft, waitingProof, type StockCaps, type StockRefusal, type WaitingProof } from '../core/stock.js';
+import { readPendingOrder } from '../client/index.js';
 import { useCart } from './cart.js';
+import { StockNotice, useCartStockCaps } from './stock-ui.js';
 import { useMoney } from './money.js';
 import { useCartQuote, useOffers } from './offers.js';
 import { OfferCodeField, OfferGiftPicker, OfferMessages, OfferProgress, OfferSummary } from './offer-ui.js';
@@ -32,10 +35,15 @@ export interface CartLinesProps {
    * the server's price, and gift lines the server added are listed with a "Free" label.
    */
   quote?: Quote | null;
+  /**
+   * The server's stock caps (`useStockCaps` / `useCartStockCaps`): "+" stops at the cap and the
+   * line says "Only N left". `CartView` and `Checkout` pass them.
+   */
+  caps?: StockCaps | null;
 }
 
 /** The cart lines (image, name, variant, custom fields, price × qty, controls). */
-export function CartLines({ selectable = true, editable = true, productHref, className, empty, quote }: CartLinesProps) {
+export function CartLines({ selectable = true, editable = true, productHref, className, empty, quote, caps }: CartLinesProps) {
   const cart = useCart();
   const money = useMoney();
   const offers = useOffers();
@@ -53,6 +61,10 @@ export function CartLines({ selectable = true, editable = true, productHref, cla
         const lineDeals = lineOffers(quote, ql);
         // a shared offer is split over lines in paisa; lines show whole rupees, totals stay exact
         const lineSaving = Math.round(lineDeals.reduce((t, d) => t + d.amount, 0));
+        // the server's cap: "+" stops there (what checkout orders = the selected lines, this one included)
+        const pool = cart.selectedIds.has(line.id) ? cart.selectedItems : [...cart.selectedItems, line];
+        const atCap = !!caps && !canAddOne(line, pool, caps);
+        const cap = atCap ? lineCap(line, caps!) : null;
         return (
           <li key={line.id} className={cx('bx-cart-line', !cart.selectedIds.has(line.id) && 'bx-cart-line--unselected')}>
             {selectable ? (
@@ -91,6 +103,7 @@ export function CartLines({ selectable = true, editable = true, productHref, cla
                 {money(line.price)}
                 {line.customization_charge ? <span className="bx-cart-meta"> + {money(line.customization_charge)} extra</span> : null} × {line.quantity}
               </p>
+              {cap !== null ? <p className="bx-stock-left">{stockLineLeft({ available: cap })}</p> : null}
               {editable ? (
                 <div className="bx-cart-controls">
                   <div className="bx-qty bx-qty--small" role="group" aria-label="Quantity">
@@ -98,7 +111,7 @@ export function CartLines({ selectable = true, editable = true, productHref, cla
                       −
                     </button>
                     <span className="bx-qty-value">{line.quantity}</span>
-                    <button type="button" className="bx-qty-btn" aria-label="Increase quantity" onClick={() => cart.setQuantity({ ...line, quantity: line.quantity + 1 })}>
+                    <button type="button" className="bx-qty-btn" aria-label="Increase quantity" disabled={atCap} onClick={() => cart.setQuantity({ ...line, quantity: line.quantity + 1 })}>
                       +
                     </button>
                   </div>
@@ -170,14 +183,40 @@ export function CartLines({ selectable = true, editable = true, productHref, cla
 }
 
 /** Full cart page body: lines + selected total + checkout button. */
+/**
+ * The cart's stock caps while the cart is shown, lines held to them and the notice saying so.
+ * While an order of this tab waits for its payment the check carries it and its last attempt
+ * (v1.2: its own hold isn't counted; no attempt yet: no check) and only "+" / "Only N left" follow
+ * the answer: nothing is changed behind the shopper's back.
+ */
+function useCartStock() {
+  const [waiting, setWaiting] = useState<{ proof: WaitingProof | null; pending: boolean }>({ proof: null, pending: true });
+  useEffect(() => {
+    const p = readPendingOrder();
+    setWaiting({ proof: p ? waitingProof(p.order_id, p.transaction) : null, pending: !!p });
+  }, []);
+  const [notice, setNotice] = useState<StockRefusal | null>(null);
+  const stock = useCartStockCaps({
+    enabled: !waiting.pending || !!waiting.proof,
+    waiting: waiting.proof,
+    onCapped: (changes) => setNotice(refusalFromChanges(changes)),
+  });
+  // lines left: "Continue with the rest"; none left: the empty cart's own "Continue shopping"
+  const cart = useCart();
+  const view = notice ? <StockNotice refusal={notice} onDismiss={cart.items.length ? () => setNotice(null) : undefined} /> : null;
+  return { caps: stock.caps, notice: view };
+}
+
 export function CartView({ checkoutHref = '/checkout', continueHref = '/products', className }: { checkoutHref?: string; continueHref?: string; className?: string }) {
   const cart = useCart();
   const money = useMoney();
   const offersOn = useOffers().enabled;
+  const stock = useCartStock();
   if (!cart.hydrated) return <div className={cx('bx-cart', className)} aria-busy="true" />;
   if (!cart.items.length) {
     return (
       <div className={cx('bx-cart bx-cart--empty', className)}>
+        {stock.notice}
         <p>Your cart is empty.</p>
         <Link className="bx-button bx-button--primary" href={continueHref}>
           Continue shopping
@@ -185,11 +224,12 @@ export function CartView({ checkoutHref = '/checkout', continueHref = '/products
       </div>
     );
   }
-  if (offersOn) return <OffersCartView checkoutHref={checkoutHref} className={className} />;
+  if (offersOn) return <OffersCartView checkoutHref={checkoutHref} className={className} caps={stock.caps} notice={stock.notice} />;
   const n = cart.selectedItems.length;
   return (
     <div className={cx('bx-cart', className)}>
-      <CartLines />
+      {stock.notice}
+      <CartLines caps={stock.caps} />
       <div className="bx-cart-footer">
         <p className="bx-cart-total">
           Sub-total ({n} {n === 1 ? 'item' : 'items'}): <strong>{money(cart.selectedTotalPrice)}</strong>
@@ -208,7 +248,7 @@ export function CartView({ checkoutHref = '/checkout', continueHref = '/products
 }
 
 /** Cart body for stores on Offers: progress, lines with offers and gifts, messages, code, totals from the quote. */
-function OffersCartView({ checkoutHref, className }: { checkoutHref: string; className?: string }) {
+function OffersCartView({ checkoutHref, className, caps, notice }: { checkoutHref: string; className?: string; caps: StockCaps; notice: ReactNode }) {
   const cart = useCart();
   const money = useMoney();
   const { quote, request, fresh, loading, error } = useCartQuote();
@@ -217,8 +257,9 @@ function OffersCartView({ checkoutHref, className }: { checkoutHref: string; cla
   const saving = quote ? quote.totals.promo_discount : 0;
   return (
     <div className={cx('bx-cart bx-cart--offers', className)} aria-busy={loading || undefined}>
+      {notice}
       <OfferProgress quote={quote} />
-      <CartLines quote={quote} />
+      <CartLines quote={quote} caps={caps} />
       <OfferGiftPicker quote={quote} />
       <OfferMessages quote={quote} />
       <div className="bx-cart-footer bx-cart-footer--offers">

@@ -54,10 +54,17 @@ export interface OffersContextValue {
   chooseGift: (offerId: string, productId: string, variantId?: string | null) => void;
   /** Forget the code, removals and gift picks (after an order is placed). */
   clearChoices: () => void;
+  /** The code, removals and gift picks now (kept with an order that waits for its payment). */
+  choices: () => OfferChoices;
+  /** Put them back (that order was given up, e.g. refused for stock): the next order sends them again. */
+  restoreChoices: (saved: OfferChoices) => void;
   refresh: () => void;
   /** Turn offers off for this page (the quote endpoint isn't there): the coupon flow takes over. */
   disable: () => void;
 }
+
+/** The shopper's saved code, removed offers and gift picks. */
+export type OfferChoices = { code?: string; removed?: string[]; gifts?: Record<string, string> };
 
 const OffersContext = createContext<OffersContextValue | null>(null);
 
@@ -75,6 +82,8 @@ const OFF: OffersContextValue = {
   giftChoices: {},
   chooseGift: () => {},
   clearChoices: () => {},
+  choices: () => ({}),
+  restoreChoices: () => {},
   refresh: () => {},
   disable: () => {},
 };
@@ -203,6 +212,17 @@ export function OffersProvider({ children }: { children: ReactNode }) {
     writeStorage(STORAGE_KEYS.promoCode, '');
     writeStorage(STORAGE_KEYS.offerChoices, '');
   }, []);
+  const restoreChoices = useCallback((saved: OfferChoices) => {
+    if (!saved || typeof saved !== 'object') return;
+    const c = normalizeCode(saved.code || '');
+    const removed = Array.isArray(saved.removed) ? saved.removed.map(String) : [];
+    const gifts = saved.gifts && typeof saved.gifts === 'object' ? saved.gifts : {};
+    setCodeState(c);
+    setRemoved(removed);
+    setGifts(gifts);
+    writeStorage(STORAGE_KEYS.promoCode, c);
+    saveChoices(removed, gifts);
+  }, []);
   const refresh = useCallback(() => setTick((t) => t + 1), []);
   const disable = useCallback(() => setDisabled(true), []);
 
@@ -222,11 +242,13 @@ export function OffersProvider({ children }: { children: ReactNode }) {
       giftChoices: enabled ? giftChoices : {},
       chooseGift,
       clearChoices,
+      choices: () => ({ code, removed: removedOffers, gifts: giftChoices }),
+      restoreChoices,
       refresh,
       disable,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ready, enabled, list, hint?.enabled, code, removedOffers, giftChoices, setCode, removeOffer, restoreOffer, chooseGift, clearChoices, refresh, disable],
+    [ready, enabled, list, hint?.enabled, code, removedOffers, giftChoices, setCode, removeOffer, restoreOffer, chooseGift, clearChoices, restoreChoices, refresh, disable],
   );
 
   return <OffersContext.Provider value={value}>{children}</OffersContext.Provider>;

@@ -11,7 +11,7 @@ Docs: https://developers.blanxer.com · agent index: https://developers.blanxer.
 
 ## Working in this repo
 
-npm workspaces. The starter depends on `@blanxer-dev/storefront@^0.2.0`, which npm links to `packages/storefront` here and installs from npm when the starter is used on its own.
+npm workspaces. The starter depends on `@blanxer-dev/storefront@^0.3.0`, which npm links to `packages/storefront` here and installs from npm when the starter is used on its own.
 
 ```bash
 npm install
