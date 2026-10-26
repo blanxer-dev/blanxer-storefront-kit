@@ -3,6 +3,7 @@
 // new backend field must never break a merchant's build.
 import type { AdvancePaymentSetting } from './advance.js';
 import type { OrderOffers } from './offers.js';
+import type { PublicStockShort } from './stock.js';
 
 export type Loose = { [key: string]: any };
 
@@ -265,6 +266,11 @@ export interface PublicOrder extends Loose {
   /** while an Inactive order's checkout hold is on */
   hold_seconds?: number;
   hold_expires_at?: string;
+  /**
+   * Paid, but the stock was gone (backends from the stock-oversell release; absent before):
+   * `null` when never short. Open → the track page says what happens (`stockShortNote`).
+   */
+  stock_short?: PublicStockShort | null;
 }
 
 export interface FlashSale {

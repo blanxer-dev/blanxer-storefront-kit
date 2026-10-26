@@ -14,6 +14,12 @@
  * it, and the order is then paid like an online order. Every online order (and advance order)
  * keeps the cart until its payment is confirmed; a try that didn't finish is paid again on the
  * same order ("Payment not finished"), never placed twice.
+ *
+ * Stock (stock-oversell contract §2, §9): the cart is held to the server's stock check while the
+ * checkout is shown and checked again before Place order (a cart that had to change is not
+ * placed: the notice says what changed). A create-order or payment start refused for stock shows
+ * the server's words with "Change my order" (and "Try again" for stock held in other checkouts),
+ * never a generic error; a payment refused as sold out is never offered again.
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -44,6 +50,7 @@ import {
   type PendingOrder,
 } from '../core/advance.js';
 import { todayISODate } from '../core/format.js';
+import { capCart, capsFromRefusal, refusalEndsOrder, refusalFromChanges, toStockRefusal, waitingProof, type StockCaps, type StockRefusal } from '../core/stock.js';
 import { validation } from '../core/validation.js';
 import type { Coupon, DeliveryTable, OrderResponse, PaymentMethodName } from '../core/types.js';
 import {
@@ -63,6 +70,7 @@ import {
   splitName,
   takePendingPurchase,
   trackEvent,
+  type OrderChoices,
 } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useCart } from './cart.js';
@@ -72,6 +80,7 @@ import { OfferCodeField, OfferGiftPicker, OfferSummary } from './offer-ui.js';
 import { useMoney } from './money.js';
 import { AdvanceSummaryRows, useAdvanceQuote } from './advance-ui.js';
 import { AdvanceMethodModal, PaymentDueBox, usePayOrder } from './pay-order.js';
+import { StockNotice, StockNoticeModal, useCartStockCaps, useOrderChoices } from './stock-ui.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
 
 export interface CheckoutLabels {
@@ -173,6 +182,14 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const offers = useOffers();
   const offersOn = offers.enabled;
   const [codeError, setCodeError] = useState('');
+  // stock: create-order refused (modal), or the cart held to the stock check (inline note)
+  const [stockRefused, setStockRefused] = useState<StockRefusal | null>(null);
+  const [stockChanged, setStockChanged] = useState<StockRefusal | null>(null);
+  // an order of this cart waits and the stock check says short: told once, nothing changed until the shopper acts
+  const [stockShort, setStockShort] = useState<{ refusal: StockRefusal; caps: StockCaps } | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  // the shopper's code across an order that waits for its payment (back when that order is given up)
+  const orderChoices = useOrderChoices();
 
   // coupon
   const [couponCode, setCouponCode] = useState('');
@@ -406,7 +423,11 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     return out;
   };
 
-  const forgetPending = () => {
+  // The waiting order is given up (refused, changed, cash instead): the shopper's code comes back
+  // for the replacement order (the server prices it again). Returns what came back.
+  const forgetPending = (): OrderChoices | null => {
+    const p = readPendingOrder();
+    const back = p ? orderChoices.restore(p.order_id) : null;
     clearPendingOrder();
     setPending(null);
     try {
@@ -414,6 +435,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     } catch {
       /* ignore */
     }
+    return back;
   };
 
   // Payment confirmed: only now do the ordered lines leave the cart.
@@ -453,6 +475,36 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     },
     onUnpaid: () => setPending(readPendingOrder()),
     onError: () => setSubmitting(false),
+    // the stock is gone (nothing charged): sold out → that order is over, never paid again;
+    // held in other checkouts → the same order, "Try again" after the server's wait
+    onStockRefused: (r) => {
+      if (refusalEndsOrder(r)) {
+        forgetPending();
+        takePendingPurchase();
+      } else setPending(readPendingOrder());
+      setSubmitting(false);
+    },
+    // "Change my order": the old order is left (Inactive); the cart is held to what is left and placed anew
+    onChangeOrder: (r) => {
+      forgetPending();
+      takePendingPurchase();
+      cart.capLines(capsFromRefusal(r), lines.map((x) => x.id));
+    },
+  });
+
+  // The server's caps for this cart while the checkout is shown. A cart above them is held to
+  // them. While an order of this cart waits for its payment the check carries the order and its
+  // proof (v1.2: its own hold isn't counted), else none is made; a shortage then is told once
+  // ("Change my order") and the cart is not changed behind the shopper's back.
+  const waitingStockProof = useMemo(
+    () => (waiting ? waitingProof(waiting.order_id, waiting.transaction, values.customer_phone_number) : null),
+    [waiting, values.customer_phone_number],
+  );
+  const stock = useCartStockCaps({
+    enabled: !orderPlaced && !waitingCheck && (!waiting || !!waitingStockProof) && !submitting && !pay.open,
+    onCapped: (changes) => setStockChanged(refusalFromChanges(changes)),
+    waiting: waitingStockProof,
+    onShort: (refusal, caps) => setStockShort({ refusal, caps }),
   });
 
   const payAgain = (method: string) => {
@@ -491,10 +543,10 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     if (!p?.advance || p.advance.required) return;
     setSubmitting(true);
     await releaseWaiting(p);
-    forgetPending();
+    const back = forgetPending();
     takePendingPurchase();
     setPaymentMethod('COD');
-    await placeNew('COD', '', null);
+    await placeNew('COD', '', null, back);
   };
 
   /** Form errors shown and the first one focused; true when the form is fine. */
@@ -530,14 +582,25 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     void placeNew('COD', via, via ? active : null);
   };
 
-  const placeNew = async (method: string, via: string, adv: Advance | null) => {
+  /** `back`: the code given back by an order just given up (state isn't updated yet in this call) */
+  const placeNew = async (method: string, via: string, adv: Advance | null, back?: OrderChoices | null) => {
     if (placingRef.current) return;
     if (!formOk()) return;
     if (!lines.length || !method) return;
 
     placingRef.current = true;
     setSubmitting(true);
+    setStockChanged(null);
     try {
+      // the stock again, right before placing: a cart above the server's caps is changed, not placed
+      const caps = await stock.check();
+      const capped = capCart(lines, caps);
+      if (capped.changes.length) {
+        cart.capLines(caps, lines.map((x) => x.id));
+        setStockChanged(refusalFromChanges(capped.changes));
+        setSubmitting(false);
+        return;
+      }
       // matching data for Meta (this browser session only)
       rememberCheckoutUser({
         email: values.customer_email,
@@ -554,11 +617,13 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         couponId: quote.coupon.valid && coupon?._id ? coupon._id : '',
         // a code the latest quote rejected isn't sent (the shopper sees why); with no quote yet the server decides
         offers: offersOn
-          ? {
-              code: !offerQuote || offerQuote.code?.status === 'applied' ? offers.code : '',
-              removedOffers: offers.removedOffers,
-              giftChoices: offers.giftChoices,
-            }
+          ? back?.offers
+            ? { code: back.offers.code || '', removedOffers: back.offers.removed || [], giftChoices: back.offers.gifts || {} }
+            : {
+                code: !offerQuote || offerQuote.code?.status === 'applied' ? offers.code : '',
+                removedOffers: offers.removedOffers,
+                giftChoices: offers.giftChoices,
+              }
           : undefined,
         meta: buildOrderMeta(),
         advance: adv,
@@ -584,6 +649,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       // built locally only against an older backend.
       const purchase =
         res.meta || localOrderMeta(lines as any, payable, String(res.order_number || ''));
+      // the code is used: not for the next order (kept with an order that waits for its payment, back if it is given up)
+      const choicesBefore = orderChoices.snapshot();
       if (offersOn) offers.clearChoices();
       try {
         sessionStorage.setItem(STORAGE_KEYS.checkoutOrderId, res._id);
@@ -618,10 +685,18 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         advance: resAdvance,
       };
       savePendingOrder(waitingOrder);
+      orderChoices.keep(res._id, choicesBefore);
       setPending(waitingOrder);
       const outcome = await pay.start(payWith, res._id, res.hold_seconds);
       if (outcome !== 'left') setSubmitting(false);
     } catch (err) {
+      // not enough stock (OUT_OF_STOCK / STOCK_HELD): the server's words, no order was made
+      const refusal = toStockRefusal(err);
+      if (refusal) {
+        setStockRefused(refusal);
+        setSubmitting(false);
+        return;
+      }
       const fe: Record<string, string> = {};
       for (const k of ERROR_FIELDS) {
         const m = fieldError(err, k);
@@ -643,6 +718,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     return (
       <div className={cx('bx-checkout bx-checkout--empty', className)}>
         {header}
+        {stockChanged ? <StockNotice refusal={stockChanged} /> : null}
         <p>{l.emptyCart}</p>
         <Link className="bx-button bx-button--primary" href="/products">
           {l.continueShopping}
@@ -690,7 +766,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   return (
     <div className={cx('bx-checkout', className)} data-bx="checkout">
       {header}
-      <form className="bx-checkout-grid" onSubmit={onSubmit} noValidate>
+      <form ref={formRef} className="bx-checkout-grid" onSubmit={onSubmit} noValidate>
         <div className="bx-checkout-form">
           <h1 className="bx-checkout-title">{l.title}</h1>
 
@@ -778,7 +854,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
 
         <aside className="bx-checkout-summary" aria-label={l.summary}>
           <h2 className="bx-section-title">{l.summary}</h2>
-          <CartLines selectable editable quote={offerQuote} />
+          <CartLines selectable editable quote={offerQuote} caps={stock.caps} />
           <OfferGiftPicker quote={offerQuote} />
           {offersOn && lines.length ? <OfferCodeField request={cq.request} quote={offerQuote} error={codeError} /> : null}
           {offerQuote ? (
@@ -860,6 +936,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           ) : null}
 
           {testOrder ? <p className="bx-notice">Test order accepted — no order was created for this test phone/email.</p> : null}
+          {stockChanged ? <StockNotice refusal={stockChanged} onDismiss={() => setStockChanged(null)} /> : null}
 
           {waiting && !pay.open && !submitting ? (
             <PaymentDueBox
@@ -924,6 +1001,35 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           onConfirm={confirmAdvance}
         />
       ) : null}
+      <StockNoticeModal
+        open={!!stockShort}
+        refusal={stockShort?.refusal ?? null}
+        onClose={() => setStockShort(null)}
+        onChangeOrder={async () => {
+          const s = stockShort;
+          setStockShort(null);
+          if (!s) return;
+          // give the waiting order up (its units back, the code back), then hold the cart to what is left
+          if (waiting) await releaseWaiting(waiting);
+          forgetPending();
+          takePendingPurchase();
+          cart.capLines(s.caps, lines.map((x) => x.id));
+        }}
+      />
+      <StockNoticeModal
+        open={!!stockRefused}
+        refusal={stockRefused}
+        onClose={() => setStockRefused(null)}
+        onChangeOrder={() => {
+          if (stockRefused) cart.capLines(capsFromRefusal(stockRefused), lines.map((x) => x.id));
+          setStockRefused(null);
+        }}
+        onRetry={() => {
+          setStockRefused(null);
+          formRef.current?.requestSubmit();
+        }}
+        busy={submitting}
+      />
       {pay.modals}
     </div>
   );

@@ -14,3 +14,4 @@ export * from './cart.js';
 export * from './checkout.js';
 export * from './offers.js';
 export * from './advance.js';
+export * from './stock.js';
