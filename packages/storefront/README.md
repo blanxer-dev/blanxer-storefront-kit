@@ -232,7 +232,7 @@ Needs the backend from the stock-oversell release; older backends send no `stock
 
 ## Store pickup
 
-Needs the backend from the store-pickup release (TSK-154). Older backends send no `store_pickup` and nothing changes. Only Platinum stores on advanced inventory with 2+ outlets can turn it on (Setting → Checkout → Store pickup); **the server decides everything again on create.**
+Needs the backend from the store-pickup release (TSK-154). Older backends send no `store_pickup` and nothing changes. Only Platinum stores on advanced inventory can turn it on (Setting → Checkout → Store pickup); one outlet is enough (the shopper sees that one store); **the server decides everything again on create.**
 
 - **`Checkout`** shows "How do you want it?" (Home delivery / Pick up at store) when `check_domain` lists pickup outlets (`store.store_pickup.outlets`). A pickup lists the outlets with what each has of the cart (`pickupStock(storeId, lines)` → `POST /order/public/pickup-stock`, minus other checkouts' holds), tags the server's recommended one and moves to it when the picked one is short ("Lalitpur has everything in your cart."). Place order waits while the picked store lacks the cart.
 - **No delivery charge** ("Store pickup · Thamel  FREE"); the address is still asked. The order sends `fulfilment: 'pickup'` + `pickup_outlet` (`buildOrderPayload({ …, pickupOutlet })`), the quote `fulfilment: 'pickup'` (`useCartQuote({ pickup })`, `useAdvanceQuote({ pickup })`).

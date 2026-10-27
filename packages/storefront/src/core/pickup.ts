@@ -50,7 +50,11 @@ export const recommendLine = (picked: string, rows: PickupStockRow[] | null, rec
   if (!rows?.length) return '';
   if (rows.find((r) => r._id === picked)?.in_stock) return '';
   const rec = rows.find((r) => r._id === recommended);
-  return rec ? `${rec.name} has everything in your cart.` : 'No store has everything in your cart right now. Choose home delivery.';
+  if (rec) return `${rec.name} has everything in your cart.`;
+  // a store with one pickup outlet (backend FU-1b) has no other store to suggest
+  return rows.length === 1
+    ? 'The store doesn’t have everything in your cart right now. Choose home delivery.'
+    : 'No store has everything in your cart right now. Choose home delivery.';
 };
 
 /** What the order call adds for a pickup ({} for a delivery). */
