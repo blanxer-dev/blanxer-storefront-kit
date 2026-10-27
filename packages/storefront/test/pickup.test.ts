@@ -42,6 +42,9 @@ describe('store pickup', () => {
     expect(pickupStockLine(rows[1])).toBe('In stock');
     expect(pickupStockLine(rows[0])).toBe('Only 1 of Pashmina left here');
     expect(recommendLine('a', rows, 'b')).toBe('Lalitpur has everything in your cart.');
+    // one pickup outlet (a one-shop store): nothing else to suggest
+    expect(recommendLine('a', [rows[0]], null)).toMatch(/^The store doesn’t have everything/);
+    expect(recommendLine('a', rows, null)).toMatch(/^No store has everything/);
     expect(pickupBlocks('pickup', 'a', rows)).toMatch(/another store/);
     expect(pickupBlocks('delivery', '', rows)).toBe('');
   });
