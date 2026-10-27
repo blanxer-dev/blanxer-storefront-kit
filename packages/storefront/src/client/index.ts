@@ -15,6 +15,8 @@ import { paymentFlow } from '../core/payments.js';
 import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type Advance, type PendingOrder } from '../core/advance.js';
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
 import { capsFromCheck, noCaps, stockCheckBody, stockWaitLeft, toStockRefusal, type CapLine, type StockCaps, type WaitingProof } from '../core/stock.js';
+import { pickupStockBody } from '../core/pickup.js';
+import type { PickupStockRow } from '../core/types.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
 export { BlanxerApiError, errorMessage, fieldError } from '../core/http.js';
@@ -110,6 +112,29 @@ export const stockCheck = async (
   } catch (e) {
     if (isAbort(e)) throw e;
     return noCaps();
+  }
+};
+
+// ---------------------------------------------------------------- store pickup
+
+/**
+ * What each of the store's pickup outlets has of these lines (`POST /order/public/pickup-stock`,
+ * minus other checkouts' holds) and the outlet the server recommends. A store without pickup, an
+ * older backend or a failed call answers `{ outlets: [], recommended: null }`.
+ */
+export const pickupStock = async (
+  storeId: string,
+  lines: Parameters<typeof pickupStockBody>[1],
+  init?: RequestInit,
+): Promise<{ outlets: PickupStockRow[]; recommended: string | null }> => {
+  const body = pickupStockBody(storeId, lines);
+  if (!storeId || !body.lines.length) return { outlets: [], recommended: null };
+  try {
+    const r = await call<any>('POST', `/order/public/pickup-stock`, body, init);
+    return { outlets: Array.isArray(r?.outlets) ? r.outlets : [], recommended: r?.recommended || null };
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return { outlets: [], recommended: null };
   }
 };
 

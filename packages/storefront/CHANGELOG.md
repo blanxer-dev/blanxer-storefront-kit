@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0
+
+### Store pickup
+
+Needs the Blanxer backend from the store-pickup release (TSK-154). Older backends send no `store_pickup`, and the checkout works as in 0.3.1.
+
+- **Checkout:** "How do you want it?" (Home delivery / Pick up at store) when the store lists pickup outlets; each outlet with what it has of the cart (`POST /order/public/pickup-stock`) and a Recommended tag; the picked store follows the stock; Place order waits while the picked store lacks the cart. A pickup has no delivery charge ("Store pickup · Thamel"), sends `fulfilment: 'pickup'` + `pickup_outlet`, and prices the quote with `fulfilment: 'pickup'`.
+- **Paying for a pickup:** "Pay at store" instead of cash on delivery (new `payAtStoreIcon` prop; still `COD` on the order), hidden when the store takes pickups paid online only; the store's pickup advance (from the quote) with "at the store" in every advance word. A pickup never takes the delivery advance.
+- **Tracking:** "Store pickup · <outlet>" on the delivery row.
+- **`/core`:** `pickup.ts` (`pickupOutletsOf`, `pickupPaymentOf`, `pickedOutlet`, `pickupStockLine`, `recommendLine`, `pickupOrderFields`, `pickupBlocks`, `pickupMethods`, `pickupStockBody`, `pickupLabel`); `quoteCheckout({ pickup })`; `buildOrderPayload({ pickupOutlet })`; `buildQuoteRequest({ pickup })` (+ `fulfilment` in `quoteKey`); `advanceWords(advance, money, 'store')`. Types `PickupOutlet`, `PickupStockRow`, `OrderFulfilment`; `Store.store_pickup`; `OrderResponse.fulfilment`, `PublicOrder.fulfilment`.
+- **`/client`:** `pickupStock(storeId, lines)` (never throws except an abort; a failed call or a store without pickup is `{ outlets: [], recommended: null }`).
+- **`/react`:** `PickupChoice`, `usePickupStock`; `useCartQuote({ pickup })`, `useAdvanceQuote({ pickup })`, `AdvanceSummaryRows atStore`, `AdvanceMethodModal cashSuffix`.
+- **Styles:** `bx-pickup*`.
+
 ## 0.3.1
 
 ### Stop orders for stock that isn't there

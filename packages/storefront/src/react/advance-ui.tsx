@@ -17,15 +17,17 @@ export interface AdvanceSummaryRowsProps {
   advance: Advance | null;
   className?: string;
   labels?: { payNow?: string; onDelivery?: string };
+  /** a store pickup: the rest is paid at the store ("Pay at the store") */
+  atStore?: boolean;
 }
 
 /**
  * "Pay now (advance)" / "Pay on delivery" under the Total. The wrapper is always rendered and
  * `aria-live="polite"`, so a change of place or method reads out the new split.
  */
-export function AdvanceSummaryRows({ advance, className, labels }: AdvanceSummaryRowsProps) {
+export function AdvanceSummaryRows({ advance, className, labels, atStore }: AdvanceSummaryRowsProps) {
   const money = useMoney();
-  const w = advance ? advanceWords(advance, money) : null;
+  const w = advance ? advanceWords(advance, money, atStore ? 'store' : 'delivery') : null;
   return (
     <div className={cx('bx-advance-split', className)} aria-live="polite" data-bx="advance-split">
       {advance && w ? (
@@ -57,6 +59,8 @@ export interface UseAdvanceQuoteOptions {
   /** ask at all (the store has the advance on, it isn't on Offers, no order in flight) */
   enabled: boolean;
   debounceMs?: number;
+  /** a store pickup: the store's pickup advance (no place needed) */
+  pickup?: boolean;
 }
 
 /**
@@ -64,17 +68,17 @@ export interface UseAdvanceQuoteOptions {
  * request it replaces aborted, never a stale answer. `fresh` is false while the answer for the
  * current cart / place / coupon / phone is still out. A failure is null (plain COD).
  */
-export function useAdvanceQuote({ lines, place, phone, coupon, enabled, debounceMs = 350 }: UseAdvanceQuoteOptions): {
+export function useAdvanceQuote({ lines, place, phone, coupon, enabled, debounceMs = 350, pickup = false }: UseAdvanceQuoteOptions): {
   advance: Advance | null;
   fresh: boolean;
 } {
   const { storeId } = useBlanxer();
   const request = useMemo(
-    () => buildQuoteRequest({ lines, place, paymentMethod: 'COD', phone, coupon: coupon || '' }),
-    [lines, place, phone, coupon],
+    () => buildQuoteRequest({ lines, place, paymentMethod: 'COD', phone, coupon: coupon || '', pickup }),
+    [lines, place, phone, coupon, pickup],
   );
   const key = quoteKey(request);
-  const on = enabled && !!storeId && !!place && request.products.length > 0;
+  const on = enabled && !!storeId && (!!place || pickup) && request.products.length > 0;
   const [state, setState] = useState<{ key: string; advance: Advance | null }>({ key: '', advance: null });
   const latest = useRef(createLatest<Advance | null>());
 

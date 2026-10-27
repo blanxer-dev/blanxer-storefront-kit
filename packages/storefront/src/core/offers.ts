@@ -149,6 +149,8 @@ export interface QuoteRequest {
   delivery_charge?: number | null;
   /** legacy coupon `_id` (stores not on Offers: the advance is worked from the total after it) */
   coupon?: string;
+  /** a store pickup: priced with no delivery, and its own pickup advance (TSK-154) */
+  fulfilment?: 'delivery' | 'pickup';
 }
 
 export interface QuoteAllocation {
@@ -306,6 +308,8 @@ export interface QuoteRequestInput {
   giftChoices?: Record<string, string>;
   /** legacy coupon `_id` (stores not on Offers, advance quote only) */
   coupon?: string | null;
+  /** a store pickup (no delivery charge; the store's pickup advance) */
+  pickup?: boolean;
 }
 
 /** The quote body for a cart. Only what the shopper picked: product ids, variants, quantities. */
@@ -330,6 +334,7 @@ export const buildQuoteRequest = (input: QuoteRequestInput): QuoteRequest => {
   if (input.removedOffers?.length) req.removed_offers = [...new Set(input.removedOffers)];
   if (input.giftChoices && Object.keys(input.giftChoices).length) req.gift_choices = { ...input.giftChoices };
   if (input.coupon) req.coupon = String(input.coupon);
+  if (input.pickup) req.fulfilment = 'pickup';
   return req;
 };
 
@@ -340,6 +345,7 @@ export const quoteKey = (req: QuoteRequest): string =>
     req.code || '',
     req.place || '',
     req.payment ?? null,
+    req.fulfilment || '',
     req.phone || '',
     [...(req.removed_offers || [])].sort(),
     Object.entries(req.gift_choices || {}).sort(),

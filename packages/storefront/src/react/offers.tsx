@@ -309,6 +309,8 @@ export interface UseCartQuoteOptions {
   phone?: string;
   /** use this code instead of the shopper's saved one ('' = none) */
   code?: string | null;
+  /** a store pickup: priced with no delivery and the store's pickup advance */
+  pickup?: boolean;
   /** wait this long after the last change (default 350 ms) */
   debounceMs?: number;
   /** false: don't quote (e.g. the store isn't on Offers) */
@@ -348,8 +350,9 @@ export function useCartQuote(opts: UseCartQuoteOptions = {}): CartQuoteState {
         phone: opts.phone,
         removedOffers: offers.removedOffers,
         giftChoices: offers.giftChoices,
+        pickup: opts.pickup,
       }),
-    [lines, opts.code, offers.code, opts.place, opts.paymentMethod, opts.phone, offers.removedOffers, offers.giftChoices],
+    [lines, opts.code, offers.code, opts.place, opts.paymentMethod, opts.phone, offers.removedOffers, offers.giftChoices, opts.pickup],
   );
   const key = quoteKey(request);
   const [state, setState] = useState<{ key: string; quote: Quote | null }>({ key: '', quote: null });
