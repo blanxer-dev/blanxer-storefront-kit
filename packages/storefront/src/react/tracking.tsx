@@ -1,4 +1,5 @@
 'use client';
+import { pickupLabel } from '../core/pickup.js';
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -353,7 +354,7 @@ export function OrderTracking({ orderId, fromCheckout, changeOrderHref, classNam
             </div>
           ) : null}
           <div className="bx-total-row">
-            <dt>Delivery Charge</dt>
+            <dt>{pickupLabel(order) || 'Delivery Charge'}</dt>
             <dd>
               {offerSummary?.delivery.waived ? (
                 <>

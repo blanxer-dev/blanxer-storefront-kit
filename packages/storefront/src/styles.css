@@ -361,3 +361,14 @@ button.bx-star { cursor: pointer; }
 .bx-toast-title { margin: 0; font-weight: 600; font-size: 0.9rem; }
 .bx-toast-message { margin: 2px 0 0; font-size: 0.85rem; opacity: .95; }
 
+
+/* ---------------------------------------------------------------- store pickup (TSK-154) */
+.bx-pickup-choices { display: grid; grid-template-columns: 1fr 1fr; gap: var(--bx-gap); }
+.bx-pickup-from { font-size: 0.875rem; font-weight: 600; margin: 12px 0 8px; color: var(--bx-fg); }
+.bx-pickup-list { display: flex; flex-direction: column; gap: 8px; }
+.bx-pickup-outlet--short { opacity: 0.7; }
+.bx-pickup-recommended { margin-left: 8px; padding: 1px 6px; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; background: var(--bx-surface); border: 1px solid var(--bx-border); }
+.bx-pickup-stock { display: block; font-size: 0.75rem; color: var(--bx-success); }
+.bx-pickup-stock--short { color: var(--bx-danger); }
+.bx-pickup-hint { font-size: 0.8125rem; margin: 8px 0 0; color: var(--bx-fg); }
+@media (max-width: 480px) { .bx-pickup-choices { grid-template-columns: 1fr; } }

@@ -140,27 +140,36 @@ export const advanceBlocks = (paymentMethod: string, offer: CodOffer, online: st
 export type Money = (n: number) => string;
 
 /** The shopper-facing words for an advance (shown amounts are always the server's). */
-export const advanceWords = (advance: Advance, money: Money) => ({
-  /** second line of the COD tile (shopper's choice: the advance is an option) */
-  codLine: `${advance.required ? '' : 'or '}${money(advance.amount)} online now · rest on delivery`,
-  /** the pay modal's title and the smaller line under it (owner: same as the button) */
-  modalTitle: `Pay ${money(advance.amount)} & place order`,
-  modalNote: `${money(advance.on_delivery)} cash on delivery`,
-  /** shopper's choice: the plain COD option in the modal */
-  noAdvance: `Pay all ${money(advance.total)} on delivery instead`,
-  /** while that option is picked: the modal's title / cash line / button (the whole order in cash) */
-  noAdvanceTitle: 'Place order',
-  noAdvanceNote: `${money(advance.total)} cash on delivery`,
-  noAdvanceButton: `Place order · ${money(advance.total)} cash on delivery`,
-  /** the modal's button */
-  payButton: `Pay ${money(advance.amount)}`,
-  payNowLabel: 'Pay now (advance)',
-  onDeliveryLabel: 'Pay on delivery',
-  button: `Pay ${money(advance.amount)} & place order`,
-  underButton: `${money(advance.on_delivery)} cash on delivery`,
-  /** read out when the split changes (aria-live) */
-  live: `Pay ${money(advance.amount)} now and ${money(advance.on_delivery)} on delivery.`,
-});
+/**
+ * The shopper-facing words for an advance. `at` = where the rest is paid: 'delivery' (cash on
+ * delivery) or 'store' (a store pickup paid at the store).
+ */
+export const advanceWords = (advance: Advance, money: Money, at: 'delivery' | 'store' = 'delivery') => {
+  const store = at === 'store';
+  const cash = store ? 'at the store' : 'cash on delivery';
+  const rest = store ? 'at the store' : 'on delivery';
+  return {
+    /** second line of the COD tile (shopper's choice: the advance is an option) */
+    codLine: `${advance.required ? '' : 'or '}${money(advance.amount)} online now · rest ${rest}`,
+    /** the pay modal's title and the smaller line under it (owner: same as the button) */
+    modalTitle: `Pay ${money(advance.amount)} & place order`,
+    modalNote: `${money(advance.on_delivery)} ${cash}`,
+    /** shopper's choice: the plain COD option in the modal */
+    noAdvance: `Pay all ${money(advance.total)} ${rest} instead`,
+    /** while that option is picked: the modal's title / cash line / button (the whole order in cash) */
+    noAdvanceTitle: 'Place order',
+    noAdvanceNote: `${money(advance.total)} ${cash}`,
+    noAdvanceButton: `Place order · ${money(advance.total)} ${cash}`,
+    /** the modal's button */
+    payButton: `Pay ${money(advance.amount)}`,
+    payNowLabel: 'Pay now (advance)',
+    onDeliveryLabel: store ? 'Pay at the store' : 'Pay on delivery',
+    button: `Pay ${money(advance.amount)} & place order`,
+    underButton: `${money(advance.on_delivery)} ${cash}`,
+    /** read out when the split changes (aria-live) */
+    live: `Pay ${money(advance.amount)} now and ${money(advance.on_delivery)} ${rest}.`,
+  };
+};
 
 // ── paying an order (again) ──────────────────────────────────────────────────────────────────
 

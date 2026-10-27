@@ -217,6 +217,8 @@ export interface AdvanceMethodModalProps {
   placeLabel?: string;
   /** the whole order in cash, formatted (e.g. "Rs 2,500"): the title's cash line while the plain COD option is picked ("Place order" / "Rs 2,500 cash on delivery") */
   noAdvanceCod?: string;
+  /** what follows the bold cash amount (default "cash on delivery"; a store pickup: "at the store") */
+  cashSuffix?: string;
   busy?: boolean;
   /** an online method name, or '' for the plain COD option */
   onConfirm: (via: string) => void;
@@ -227,7 +229,7 @@ export interface AdvanceMethodModalProps {
  * methods as compact radios, one confirm
  * button. Used when placing a COD order with an advance, and for "Pay another way".
  */
-export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', noAdvanceCod, busy, onConfirm }: AdvanceMethodModalProps) {
+export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial, payLabel, noAdvanceLabel, placeLabel = 'Place order', noAdvanceCod, cashSuffix = 'cash on delivery', busy, onConfirm }: AdvanceMethodModalProps) {
   const id = useId();
   const [picked, setPicked] = useState(initial);
   // every opening starts on the given method
@@ -252,7 +254,7 @@ export function AdvanceMethodModal({ open, onClose, title, cod, methods, initial
           <span className="bx-advance-modal-title">
             <span>{text.title}</span>
             <span>
-              <strong className="bx-advance-modal-cod">{text.cod}</strong> cash on delivery
+              <strong className="bx-advance-modal-cod">{text.cod}</strong> {cashSuffix}
             </span>
           </span>
         ) : (

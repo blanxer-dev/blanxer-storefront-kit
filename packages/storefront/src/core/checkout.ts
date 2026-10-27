@@ -26,9 +26,11 @@ export const quoteCheckout = (input: {
   place: string;
   paymentMethod: string;
   coupon?: Partial<Coupon> | null;
+  /** a store pickup: no delivery charge, and paying at the store is allowed anywhere */
+  pickup?: boolean;
 }): CheckoutQuote => {
   const t = cartTotals(input.lines);
-  const d = computeDelivery(input.delivery, input.place, t.weight);
+  const d = input.pickup ? { charge: 0, cod: true } : computeDelivery(input.delivery, input.place, t.weight);
   const check = checkCouponValidity(input.coupon, {
     paymentMethod: input.paymentMethod,
     deliveryCharge: d.charge,

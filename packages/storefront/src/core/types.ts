@@ -72,6 +72,12 @@ export interface Store extends Loose {
   plugins?: StorePlugin[];
   customer_program?: Loose;
   use_advanced_inventory?: boolean;
+  /**
+   * Store pickup (backends from the TSK-154 release; absent before = no pickup): the outlets a
+   * shopper may collect from ([] = off), whether they may pay at the store, and whether a
+   * pay-at-store pickup pays part online first (the amount comes from the quote).
+   */
+  store_pickup?: { outlets: PickupOutlet[]; pay_at_store?: boolean; advance?: boolean };
   blog_categories?: Array<{ name: string; slug: string; _id?: string }>;
   compliance?: Loose;
 }
@@ -223,6 +229,8 @@ export interface OrderResponse extends Loose {
    * now with that method, `on_delivery` in cash. null / absent: plain COD or a full online order.
    */
   advance?: { amount: number; on_delivery: number; basis?: 'delivery' | 'fixed' | 'percent'; required?: boolean } | null;
+  /** a store pickup: where it is collected (backends from the TSK-154 release) */
+  fulfilment?: OrderFulfilment;
   /** `Inactive` until an online payment or advance lands; `Pending` for plain COD. */
   status?: string;
   /** what is paid online now: the advance, the whole order (with delivery) for an online method, 0 for COD */
@@ -230,6 +238,29 @@ export interface OrderResponse extends Loose {
   /** Present (and `_id` absent) when the backend accepted a test order
    * (phone `0000000000` / mailinator email) without creating it. */
   success?: boolean;
+}
+
+/** A store's pickup outlet (`check_domain` `store_pickup.outlets`). */
+export interface PickupOutlet {
+  _id: string;
+  name: string;
+  address?: string;
+  contact_number?: string;
+}
+
+/** One outlet of `POST /order/public/pickup-stock`: what it has of the cart (minus other checkouts' holds). */
+export interface PickupStockRow extends PickupOutlet {
+  in_stock: boolean;
+  short: Array<{ product_id: string; variant_id: string | null; name: string; variant_name?: string; wanted: number; available: number }>;
+}
+
+/** How an order reaches the customer (absent on older orders = delivery). */
+export interface OrderFulfilment {
+  type: 'delivery' | 'pickup';
+  /** the pickup outlet's name (order reads) */
+  outlet_name?: string;
+  /** create-order's answer: the pickup outlet */
+  outlet?: PickupOutlet;
 }
 
 /** The advance on a public order read: `due` = still to pay online, `paid` = taken. */
@@ -271,6 +302,8 @@ export interface PublicOrder extends Loose {
    * `null` when never short. Open → the track page says what happens (`stockShortNote`).
    */
   stock_short?: PublicStockShort | null;
+  /** a store pickup: `{ type: 'pickup', outlet_name }` (absent = delivery) */
+  fulfilment?: OrderFulfilment | null;
 }
 
 export interface FlashSale {

@@ -79,6 +79,8 @@ import { useCartQuote, useOffers } from './offers.js';
 import { OfferCodeField, OfferGiftPicker, OfferSummary } from './offer-ui.js';
 import { useMoney } from './money.js';
 import { AdvanceSummaryRows, useAdvanceQuote } from './advance-ui.js';
+import { PickupChoice, usePickupStock } from './pickup-ui.js';
+import { pickupBlocks, pickupMethods, pickupOutletsOf, pickupPaymentOf, type Fulfilment } from '../core/pickup.js';
 import { AdvanceMethodModal, PaymentDueBox, usePayOrder } from './pay-order.js';
 import { StockNotice, StockNoticeModal, useCartStockCaps, useOrderChoices } from './stock-ui.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
@@ -156,9 +158,11 @@ export interface CheckoutProps {
   paymentMethodIcons?: Partial<Record<PaymentMethodName, ReactNode>>;
   /** Called after the order is created (before any payment redirect). */
   onOrderPlaced?: (order: OrderResponse, paymentMethod: string) => void;
+  /** The "Pay at store" tile's icon on a store pickup (the COD icon is for delivery). */
+  payAtStoreIcon?: ReactNode;
 }
 
-export function Checkout({ delivery: deliveryProp, labels, className, header, footer, paymentMethodIcons, onOrderPlaced }: CheckoutProps) {
+export function Checkout({ delivery: deliveryProp, labels, className, header, footer, paymentMethodIcons, onOrderPlaced, payAtStoreIcon }: CheckoutProps) {
   const { store, storeId, notify } = useBlanxer();
   const cart = useCart();
   const router = useRouter();
@@ -223,6 +227,17 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     if (placeItems.length) setValues((v) => ({ ...v, customer_address_city: placeItems[0]!.value }));
   }, [placeItems]);
 
+  // Store pickup (TSK-154): offered only when check_domain lists pickup outlets
+  const pickupOutlets = useMemo(() => pickupOutletsOf(store), [store]);
+  const pickupPay = useMemo(() => pickupPaymentOf(store), [store]);
+  const [fulfilment, setFulfilment] = useState<Fulfilment>('delivery');
+  const [pickupOutlet, setPickupOutlet] = useState('');
+  const isPickup = fulfilment === 'pickup' && pickupOutlets.length > 0;
+  const pickupStockState = usePickupStock(isPickup && !orderPlaced, lines);
+  const pickupBlock = pickupBlocks(isPickup ? 'pickup' : 'delivery', pickupOutlet, pickupStockState.rows);
+  const pickupName = pickupOutlets.find((o) => o._id === pickupOutlet)?.name || '';
+  const restAt: 'delivery' | 'store' = isPickup ? 'store' : 'delivery';
+
   const quote = quoteCheckout({
     store,
     lines,
@@ -230,6 +245,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     place: values.customer_address_city,
     paymentMethod,
     coupon,
+    pickup: isPickup,
   });
   const place = values.customer_address_city;
 
@@ -240,6 +256,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     paymentMethod,
     phone: values.customer_phone_number,
     enabled: offersOn && !orderPlaced,
+    pickup: isPickup,
   });
   const offerQuote = offersOn ? cq.quote : null;
   const customization = quote.customization;
@@ -249,13 +266,15 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
 
   // Advance payment. Stores on Offers: the quote carries it (always the COD advance, whatever
   // method is picked). Other stores: asked only when the store has the advance switched on.
-  const advanceOn = advancePaymentOn(store);
+  // a pickup asks the store's pickup advance, never the delivery one
+  const advanceOn = isPickup ? pickupPay.advance : advancePaymentOn(store);
   const plainAdvance = useAdvanceQuote({
     lines,
     place,
     phone: values.customer_phone_number,
     coupon: coupon?._id || '',
     enabled: advanceOn && offers.ready && !offersOn && !orderPlaced,
+    pickup: isPickup,
   });
   const advance: Advance | null = offersOn
     ? toAdvance(cq.quote?.advance)
@@ -266,13 +285,15 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const advanceFresh = !advanceOn || (offersOn ? cq.fresh || (!cq.loading && !!cq.error) : plainAdvance.fresh);
   const offer = codOffer(advance);
   // An advance that is the whole order and required: no cash on delivery here.
-  const methods = offer.mode === 'hidden' ? quote.paymentMethods.filter((m) => m.name !== 'COD') : quote.paymentMethods;
+  const shownMethods = offer.mode === 'hidden' ? quote.paymentMethods.filter((m) => m.name !== 'COD') : quote.paymentMethods;
+  // a pickup: cash on delivery reads "Pay at store", or goes when pickups are paid online only
+  const methods = isPickup ? pickupMethods(shownMethods, pickupPay.pay_at_store) : shownMethods;
   const online = methods.filter((m) => m.name !== 'COD').map((m) => m.name as string);
   // COD where the advance applies: the summary splits and the button asks for the advance;
   // the method that pays it is picked only when the order is placed (`advanceFlow`)
   const active = activeAdvance(paymentMethod, offer);
-  const words = offer.mode === 'advance' ? advanceWords(offer.advance, money) : null;
-  const blocked = advanceBlocks(paymentMethod, offer, online) || (paymentMethod === 'COD' && !advanceFresh);
+  const words = offer.mode === 'advance' ? advanceWords(offer.advance, money, restAt) : null;
+  const blocked = advanceBlocks(paymentMethod, offer, online) || (paymentMethod === 'COD' && !advanceFresh) || !!pickupBlock;
 
   // A payment that didn't finish, for the cart as it is now: pay it again on the same order. The
   // stored copy is read from the server first (Place order waits): paid meanwhile → forgotten,
@@ -626,6 +647,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
               }
           : undefined,
         meta: buildOrderMeta(),
+        pickupOutlet: isPickup ? pickupOutlet : null,
         advance: adv,
         advanceVia: via,
       });
@@ -818,9 +840,22 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
             </section>
           ) : null}
 
+          {pickupOutlets.length ? (
+            <PickupChoice
+              outlets={pickupOutlets}
+              fulfilment={isPickup ? 'pickup' : 'delivery'}
+              onFulfilment={setFulfilment}
+              picked={pickupOutlet}
+              onPick={setPickupOutlet}
+              rows={pickupStockState.rows}
+              recommended={pickupStockState.recommended}
+              loading={pickupStockState.loading}
+            />
+          ) : null}
+
           {!receiverInfo ? (
             <section className="bx-section">
-              <h2 className="bx-section-title">{l.addressSection}</h2>
+              <h2 className="bx-section-title">{isPickup ? 'Your Address' : l.addressSection}</h2>
               {cityField}
               {deliveryNote}
               {addressFields}
@@ -834,11 +869,15 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
                 {methods.map((m) => (
                   <label key={m.name} className={cx('bx-payment-method', paymentMethod === m.name && 'bx-payment-method--active')} data-method={m.name}>
                     <input type="radio" name="bx-payment-method" value={m.name} checked={paymentMethod === m.name} onChange={() => choosePaymentMethod(m.name)} />
-                    {paymentMethodIcons?.[m.name] ? <span className="bx-payment-icon">{paymentMethodIcons[m.name]}</span> : null}
-                    {m.name === 'COD' && words ? (
+                    {m.name === 'COD' && isPickup ? (
+                      payAtStoreIcon ? <span className="bx-payment-icon">{payAtStoreIcon}</span> : null
+                    ) : paymentMethodIcons?.[m.name] ? (
+                      <span className="bx-payment-icon">{paymentMethodIcons[m.name]}</span>
+                    ) : null}
+                    {m.name === 'COD' && (words || isPickup) ? (
                       <span className="bx-payment-text">
                         <span className="bx-payment-name">{m.display_name}</span>
-                        <span className="bx-advance-cod-line">{words.codLine}</span>
+                        <span className="bx-advance-cod-line">{words ? words.codLine : 'Pay when you collect your order'}</span>
                       </span>
                     ) : (
                       <span className="bx-payment-name">{m.display_name}</span>
@@ -849,6 +888,9 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
             </section>
           ) : delivery ? (
             <p className="bx-muted">No payment method is available for this place.</p>
+          ) : null}
+          {isPickup && !pickupPay.pay_at_store ? (
+            <p className="bx-muted">Pickup orders here are paid online.</p>
           ) : null}
         </div>
 
@@ -862,9 +904,15 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
               quote={offerQuote}
               customization={customization}
               showDelivery
-              place={values.customer_address_city}
+              place={isPickup ? undefined : values.customer_address_city}
               className={cx(!cq.fresh && 'bx-offer-summary--updating')}
-              labels={{ subtotal: l.subtotal, total: l.total, free: l.free, saving: (a) => `You're saving ${a}` }}
+              labels={{
+                subtotal: l.subtotal,
+                total: l.total,
+                free: l.free,
+                saving: (a) => `You're saving ${a}`,
+                ...(isPickup ? { delivery: `Store pickup${pickupName ? ` · ${pickupName}` : ''}`, onDelivery: 'Pay at the store' } : {}),
+              }}
               advance={active}
             />
           ) : (
@@ -883,7 +931,13 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
             ) : null}
             <div className="bx-total-row">
               <dt>
-                {l.delivery} {quote.weight > 0 ? <span className="bx-muted">[{quote.weight} KG]</span> : null}
+                {isPickup ? (
+                  `Store pickup${pickupName ? ` · ${pickupName}` : ''}`
+                ) : (
+                  <>
+                    {l.delivery} {quote.weight > 0 ? <span className="bx-muted">[{quote.weight} KG]</span> : null}
+                  </>
+                )}
               </dt>
               <dd>{quote.deliveryCharge === 0 ? <span className="bx-free">{l.free}</span> : money(quote.deliveryCharge)}</dd>
             </div>
@@ -901,7 +955,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
             </div>
           </dl>
           )}
-          {!offerQuote ? <AdvanceSummaryRows advance={active} /> : null}
+          {!offerQuote ? <AdvanceSummaryRows advance={active} atStore={isPickup} /> : null}
           {store?.checkout?.extras?.checkout_note ? <p className="bx-checkout-note">{store.checkout.extras.checkout_note}</p> : null}
 
           {store?.plan && offers.ready && !offersOn ? (
@@ -997,6 +1051,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           noAdvanceLabel={offer.optional ? words.noAdvance : undefined}
           placeLabel={words.noAdvanceButton}
           noAdvanceCod={money(offer.advance.total)}
+          cashSuffix={isPickup ? 'at the store' : undefined}
           busy={submitting}
           onConfirm={confirmAdvance}
         />

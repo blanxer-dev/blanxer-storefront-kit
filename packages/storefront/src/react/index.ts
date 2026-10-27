@@ -35,6 +35,8 @@ export type { FlashSaleStripProps } from './flash-sale.js';
 export { StockAlertForm } from './stock-alert.js';
 export type { StockAlertFormProps } from './stock-alert.js';
 export { AdvanceSummaryRows, useAdvanceQuote } from './advance-ui.js';
+export { PickupChoice, usePickupStock } from './pickup-ui.js';
+export type { PickupChoiceProps } from './pickup-ui.js';
 export type { AdvanceSummaryRowsProps, UseAdvanceQuoteOptions } from './advance-ui.js';
 export { usePayOrder, PaymentDueBox, AdvanceMethodModal, PAYMENT_ERRORS } from './pay-order.js';
 export type { UsePayOrderOptions, PaymentDueBoxProps, AdvanceMethodModalProps } from './pay-order.js';
