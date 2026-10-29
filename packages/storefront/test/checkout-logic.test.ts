@@ -24,6 +24,8 @@ import {
   type DeliveryTable,
   type Store,
 } from '../src/core/index.js';
+import { isOutOfStock } from '../src/core/variants.js';
+import { productJsonLd } from '../src/seo/index.js';
 
 const delivery: DeliveryTable = {
   defaults: [100, 150, 200, 250, 300, 400],
@@ -353,5 +355,21 @@ describe('toClientStore', () => {
       { name: 'fb_pixel', details: '123' },
       { name: 'meta_capi', details: true },
     ]);
+  });
+});
+
+describe('continue selling on an advanced-inventory store (gaps 2026-10-28)', () => {
+  const keeps = { _id: 'p1', name: 'Bag', slug: 'bag', price: 100, quantity: 0, continue_selling: true } as any;
+
+  it('isOutOfStock: stock is the limit on an advanced store, continue selling only on a simple one', () => {
+    expect(isOutOfStock(keeps, undefined, 1, false)).toBe(false);
+    expect(isOutOfStock(keeps, undefined, 1, true)).toBe(true);
+  });
+
+  it('productJsonLd says OutOfStock for a continue-selling product with no stock on an advanced store', () => {
+    const avail = (store: any) => (productJsonLd(keeps, store, { origin: 'https://shop.test' }) as any).offers.availability;
+    expect(avail({ use_advanced_inventory: false })).toBe('https://schema.org/InStock');
+    expect(avail({ use_advanced_inventory: true })).toBe('https://schema.org/OutOfStock');
+    expect(productJsonLd({ ...keeps, quantity: 2 }, { use_advanced_inventory: true }, {}).offers).toMatchObject({ availability: 'https://schema.org/InStock' });
   });
 });
