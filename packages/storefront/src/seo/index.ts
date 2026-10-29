@@ -185,8 +185,10 @@ export const noIndexMetadata = (title: string): Metadata => ({ title, robots: { 
 
 const SCHEMA = 'https://schema.org';
 
-const inStock = (p: Product) =>
-  !!p.continue_selling ||
+// "Continue selling" never applies on an advanced-inventory store (owner, 2026-10-28): the
+// stock is the limit there, as `isOutOfStock` already says.
+const inStock = (p: Product, store?: Partial<Store>) =>
+  (!!p.continue_selling && !store?.use_advanced_inventory) ||
   Number(p.quantity) > 0 ||
   (p.variants || []).some((v) => Number(v?.quantity) > 0);
 
@@ -209,7 +211,7 @@ export function productJsonLd(product: Product, store: Partial<Store>, opts: Ori
       url,
       ...(price != null ? { price: `${price}` } : {}),
       priceCurrency: 'NPR',
-      availability: inStock(product) ? `${SCHEMA}/InStock` : `${SCHEMA}/OutOfStock`,
+      availability: inStock(product, store) ? `${SCHEMA}/InStock` : `${SCHEMA}/OutOfStock`,
       itemCondition: `${SCHEMA}/NewCondition`,
       seller: { '@type': 'Organization', name, url: `${origin}/` },
     },
