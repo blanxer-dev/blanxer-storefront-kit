@@ -1,15 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Website traffic sources
-
-- **`/client`:** `pingAnalytics` now sends where the visit came from (`visitDetails()`: referrer, host, landing path, `utm_source/medium/campaign`, click id), so the dashboard's Analytics → Traffic can show sources, landing pages and campaigns for custom sites too. An older backend ignores the body.
-
-### Product structured data
-
-- **`/seo`:** `productJsonLd` no longer reports a "continue selling" product with no stock as `InStock` on an advanced-inventory store (owner, 2026-10-28: continue selling never applies there). Simple stores are unchanged. The bundle offer block and `isOutOfStock` already treated advanced stores this way.
-
 ## 0.4.0
 
 ### Store pickup
@@ -24,6 +14,14 @@ Needs the Blanxer backend from the store-pickup release (TSK-154). Older backend
 - **`/client`:** `pickupStock(storeId, lines)` (never throws except an abort; a failed call or a store without pickup is `{ outlets: [], recommended: null }`).
 - **`/react`:** `PickupChoice`, `usePickupStock`; `useCartQuote({ pickup })`, `useAdvanceQuote({ pickup })`, `AdvanceSummaryRows atStore`, `AdvanceMethodModal cashSuffix`.
 - **Styles:** `bx-pickup*`.
+
+### Website traffic sources
+
+- **`/client`:** `pingAnalytics` now sends where the visit came from (`visitDetails()`: referrer, host, landing path, `utm_source/medium/campaign`, click id), so the dashboard's Analytics → Traffic can show sources, landing pages and campaigns for custom sites too. An older backend ignores the body.
+
+### Product structured data
+
+- **`/seo`:** `productJsonLd` no longer reports a "continue selling" product with no stock as `InStock` on an advanced-inventory store (owner, 2026-10-28: continue selling never applies there). Simple stores are unchanged. The bundle offer block and `isOutOfStock` already treated advanced stores this way.
 
 ## 0.3.1
 
