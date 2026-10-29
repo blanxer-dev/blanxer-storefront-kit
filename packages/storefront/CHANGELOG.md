@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Website traffic sources
+
+- **`/client`:** `pingAnalytics` now sends where the visit came from (`visitDetails()`: referrer, host, landing path, `utm_source/medium/campaign`, click id), so the dashboard's Analytics → Traffic can show sources, landing pages and campaigns for custom sites too. An older backend ignores the body.
+
 ## 0.4.0
 
 ### Store pickup

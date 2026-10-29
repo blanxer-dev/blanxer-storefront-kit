@@ -531,12 +531,34 @@ export async function uploadCustomFieldImage(
   return res?.file?.file_url || '';
 }
 
+/**
+ * Where this visit came from: the referring page, this site's host, the landing path and the
+ * campaign tags (no shopper data). Shown in the dashboard's Analytics → Traffic.
+ */
+export function visitDetails(): Record<string, string> {
+  try {
+    const url = new URL(window.location.href);
+    const q = url.searchParams;
+    return {
+      referrer: document.referrer || '',
+      host: url.hostname,
+      path: url.pathname,
+      utm_source: q.get('utm_source') || '',
+      utm_medium: q.get('utm_medium') || '',
+      utm_campaign: q.get('utm_campaign') || '',
+      click_id: ['gclid', 'fbclid', 'ttclid', 'msclkid'].find((k) => q.has(k)) || '',
+    };
+  } catch {
+    return {};
+  }
+}
+
 /** Session ping used for store analytics (once per browser session, as the storefront does). */
 export function pingAnalytics(storeId: string): void {
   try {
     if (sessionStorage.getItem(STORAGE_KEYS.ping)) return;
     sessionStorage.setItem(STORAGE_KEYS.ping, 'yes');
-    call('POST', `/analytics/ping/${storeId}`).catch(() => {});
+    call('POST', `/analytics/ping/${storeId}`, visitDetails()).catch(() => {});
   } catch {
     /* storage blocked */
   }
