@@ -1,6 +1,7 @@
 import { advanceOrderFields, type Advance } from './advance.js';
 import { isAddedLine, offerOrderFields } from './offers.js';
 import { pickupOrderFields } from './pickup.js';
+import { planOrderFields } from './plan.js';
 import type { CartItem, Store } from './types.js';
 
 /** The checkout form values (same keys the storefront form uses). */
@@ -77,13 +78,15 @@ export interface BuildOrderInput {
   advanceVia?: string;
   /** a store pickup: the pickup outlet's `_id` (adds `fulfilment: 'pickup'` + `pickup_outlet`) */
   pickupOutlet?: string | null;
+  /** a pooled store: the checkout plan the shopper saw (`checkout_plan_id`; the quoted delivery is final) */
+  checkoutPlanId?: string | null;
 }
 
 /**
  * `POST /order/:store_id` body, field for field as the Blanxer storefront
  * (`src/features/checkout/index.tsx` on main cabd695) sends it.
  */
-export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, couponId, offers, meta, advance, advanceVia, pickupOutlet }: BuildOrderInput) => {
+export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, couponId, offers, meta, advance, advanceVia, pickupOutlet, checkoutPlanId }: BuildOrderInput) => {
   const payload: Record<string, any> = {
     products: lines.filter((el) => !isAddedLine(el)).map((el) => ({
       product: el.product,
@@ -116,6 +119,7 @@ export const buildOrderPayload = ({ store, lines, values, paymentMethod, url, co
     ...(offers ? offerOrderFields(offers) : {}),
     ...advanceOrderFields(paymentMethod === 'COD' ? advance ?? null : null, advanceVia || ''),
     ...pickupOrderFields(pickupOutlet ? 'pickup' : 'delivery', pickupOutlet),
+    ...planOrderFields(checkoutPlanId),
   };
   // JSON.stringify drops undefined; do it here too so the object equals what goes on the wire.
   for (const k of Object.keys(payload)) if (payload[k] === undefined) delete payload[k];

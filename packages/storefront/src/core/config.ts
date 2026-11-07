@@ -29,4 +29,6 @@ export const STORAGE_KEYS = {
   stockWait: 'checkout_stock_wait',
   /** The shopper's code / offer picks kept with the waiting order (`{ order_id, offers?, promo? }`). */
   orderChoices: 'checkout_order_choices',
+  /** A split checkout / plan that changed on create, for the order page (`PlacedCheckoutNote`). */
+  placedCheckout: 'checkout_placed_group',
 } as const;

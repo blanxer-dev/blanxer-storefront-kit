@@ -94,6 +94,8 @@ export const toClientStore = (store: Store): Store => {
       back_in_stock: { enabled: !!store.customer_program?.back_in_stock?.enabled },
     },
     use_advanced_inventory: !!store.use_advanced_inventory,
+    // selling from several stores (multi-outlet backends; older backends send none and nothing is added)
+    ...(store.online_fulfilment ? { online_fulfilment: store.online_fulfilment } : {}),
     blog_categories: store.blog_categories || [],
     navigation: store.navigation || {},
     footer: store.footer || {},
