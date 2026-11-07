@@ -944,7 +944,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           <CartLines selectable editable quote={offerQuote} caps={stock.caps} />
           <OfferGiftPicker quote={offerQuote} />
           {offersOn && lines.length ? <OfferCodeField request={cq.request} quote={offerQuote} error={codeError} /> : null}
-          {plan && !isPickup ? <PlanParcels plan={plan} labels={{ free: l.free }} /> : null}
+          {plan && !isPickup ? <PlanParcels plan={plan} /> : null}
           {offerQuote ? (
             <OfferSummary
               quote={offerQuote}
