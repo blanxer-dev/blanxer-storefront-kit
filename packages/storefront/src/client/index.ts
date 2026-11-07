@@ -16,6 +16,7 @@ import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type A
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
 import { capsFromCheck, noCaps, stockCheckBody, stockWaitLeft, toStockRefusal, type CapLine, type StockCaps, type WaitingProof } from '../core/stock.js';
 import { pickupStockBody } from '../core/pickup.js';
+import { NO_STORE_AVAILABILITY, toCheckoutPlan, toStoreAvailability, type CheckoutPlan, type CheckoutPlanRequest, type StoreAvailability } from '../core/plan.js';
 import type { PickupStockRow } from '../core/types.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
@@ -65,9 +66,40 @@ export const placeOrder = (storeId: string, payload: Record<string, any>): Promi
 export const getOrder = (storeId: string, orderId: string): Promise<PublicOrder> =>
   call('GET', `/order/public/${storeId}/id/${enc(orderId)}`);
 
-/** Cancel (only Pending/Processing orders, store setting `allow_customer_cancellation`). */
-export const cancelOrder = (body: { store_id: string; order_id: string; phone_number: string }): Promise<any> =>
+/**
+ * Cancel (only Pending/Processing orders, store setting `allow_customer_cancellation`). A split
+ * checkout (pooled stores): `scope: 'group'` cancels every parcel, `'order'` (the default) only
+ * this one; an unpaid online checkout always cancels whole.
+ */
+export const cancelOrder = (body: { store_id: string; order_id: string; phone_number: string; scope?: 'order' | 'group' }): Promise<any> =>
   call('POST', `/order/public/cancel`, body);
+
+// ---------------------------------------------------------------- selling from several stores
+
+/**
+ * The server's checkout plan (`POST /order/public/checkout-plan`, contract §4.3): the parcels,
+ * the store each ships from, the delivery per location, the checkout's advance and total. A
+ * pooled store (`usesCheckoutPlan(store)`) must price checkout with it. Build the body with
+ * `checkoutPlanBody`. Throws the API error (a `stock_error` when even the stores together can't
+ * fill a line, an unknown place); resolves null when the answer isn't a plan.
+ */
+export const checkoutPlan = async (body: CheckoutPlanRequest, init?: RequestInit): Promise<CheckoutPlan | null> =>
+  toCheckoutPlan(await call<any>('POST', `/order/public/checkout-plan`, body, init));
+
+/**
+ * Which of the store's shops have a product, as bands (`in_stock` / `few`), never counts. Ask only
+ * when `showsStores(store)`. Never throws (except an abort): an older backend, a 404 or a failed
+ * call is `{ enabled: false, stores: [] }`.
+ */
+export const storeAvailability = async (storeId: string, productId: string, init?: RequestInit): Promise<StoreAvailability> => {
+  if (!storeId || !productId) return NO_STORE_AVAILABILITY;
+  try {
+    return toStoreAvailability(await call<any>('GET', `/order/public/store-availability/${enc(storeId)}/${enc(productId)}`, undefined, init));
+  } catch (e) {
+    if (isAbort(e)) throw e;
+    return NO_STORE_AVAILABILITY;
+  }
+};
 
 /** Review one product of a delivered order. */
 export const submitReview = (body: {
@@ -357,6 +389,13 @@ export const loadPendingOrder = async (storeId?: string): Promise<{ pending: Pen
 
 // ---------------------------------------------------------------- payments
 
+/** One order's share of a split checkout's single payment (payment init `orders[]`). */
+export interface GroupPaymentShare {
+  _id: string;
+  order_number: string | number;
+  amount: number;
+}
+
 export type PaymentStart =
   | { type: 'none' }
   | { type: 'redirect'; url: string }
@@ -374,6 +413,9 @@ export type PaymentStart =
       /** QR inits on newer backends: for "Advance for order #1234 · Rs 2,350 on delivery" */
       order_number?: number | string;
       advance?: { amount: number; on_delivery: number } | null;
+      /** a split checkout (pooled stores): the one payment covers every order, each with its share */
+      checkout_group?: string;
+      orders?: GroupPaymentShare[];
       [k: string]: any;
     }
   | {
@@ -388,6 +430,9 @@ export type PaymentStart =
       hold_expires_at?: string;
       order_number?: number | string;
       advance?: { amount: number; on_delivery: number } | null;
+      /** a split checkout (pooled stores): the one payment covers every order, each with its share */
+      checkout_group?: string;
+      orders?: GroupPaymentShare[];
       banks: Array<{ bankName: string; bankCode: string; bankIcon: string; packageName: string; intentScheme: string }>;
       [k: string]: any;
     };

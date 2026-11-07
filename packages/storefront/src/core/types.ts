@@ -4,6 +4,7 @@
 import type { AdvancePaymentSetting } from './advance.js';
 import type { OrderOffers } from './offers.js';
 import type { PublicStockShort } from './stock.js';
+import type { CheckoutGroup, CheckoutOrderRow, LinkedOrder, OnlineFulfilment } from './plan.js';
 
 export type Loose = { [key: string]: any };
 
@@ -78,6 +79,11 @@ export interface Store extends Loose {
    * pay-at-store pickup pays part online first (the amount comes from the quote).
    */
   store_pickup?: { outlets: PickupOutlet[]; pay_at_store?: boolean; advance?: boolean };
+  /**
+   * Selling online from several stores (backends from the multi-outlet release; absent before =
+   * not pooled). `checkout_plan: true` = price checkout with the server's checkout plan.
+   */
+  online_fulfilment?: OnlineFulfilment;
   blog_categories?: Array<{ name: string; slug: string; _id?: string }>;
   compliance?: Loose;
 }
@@ -235,6 +241,16 @@ export interface OrderResponse extends Loose {
   status?: string;
   /** what is paid online now: the advance, the whole order (with delivery) for an online method, 0 for COD */
   amount_to_pay?: number;
+  /**
+   * A pooled store's checkout that arrives in several parcels: one order per store. The top-level
+   * fields describe the whole checkout (`_id` / `order_number` = parcel 1, `amount_to_pay` = the
+   * one payment). null / absent when not split.
+   */
+  checkout_group?: CheckoutGroup | null;
+  /** every order the checkout made, by parcel (pooled stores) */
+  orders?: CheckoutOrderRow[];
+  /** the parcels changed since the plan (a race took the last unit at one store); the quoted delivery stands */
+  plan_changed?: boolean;
   /** Present (and `_id` absent) when the backend accepted a test order
    * (phone `0000000000` / mailinator email) without creating it. */
   success?: boolean;
@@ -304,6 +320,10 @@ export interface PublicOrder extends Loose {
   stock_short?: PublicStockShort | null;
   /** a store pickup: `{ type: 'pickup', outlet_name }` (absent = delivery) */
   fulfilment?: OrderFulfilment | null;
+  /** a split checkout (pooled stores): this order's place in it; null / absent otherwise */
+  checkout_group?: CheckoutGroup | null;
+  /** the other orders of the same checkout ([] when not split) */
+  linked_orders?: LinkedOrder[];
 }
 
 export interface FlashSale {

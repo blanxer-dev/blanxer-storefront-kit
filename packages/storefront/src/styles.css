@@ -372,3 +372,16 @@ button.bx-star { cursor: pointer; }
 .bx-pickup-stock--short { color: var(--bx-danger); }
 .bx-pickup-hint { font-size: 0.8125rem; margin: 8px 0 0; color: var(--bx-fg); }
 @media (max-width: 480px) { .bx-pickup-choices { grid-template-columns: 1fr; } }
+
+/* ---------------------------------------------------------------- selling from several stores (pooled) */
+.bx-plan-parcels { margin: 12px 0; padding: 12px 14px; border: 1px solid var(--bx-border); border-radius: var(--bx-radius); background: var(--bx-surface); font-size: 0.875rem; }
+.bx-plan-title { margin: 0 0 8px; }
+.bx-plan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.bx-plan-parcel p { margin: 0; }
+.bx-plan-from { font-weight: 600; color: var(--bx-fg); }
+.bx-plan-items { font-size: 0.8125rem; }
+.bx-plan-delivery { margin: 8px 0 0; font-size: 0.8125rem; }
+.bx-plan-notice { margin: 12px 0; }
+.bx-checkout-parcels .bx-plan-notice { margin: 0 0 12px; }
+.bx-store-availability { margin: 4px 0 0; font-size: 0.875rem; color: var(--bx-fg); }
+.bx-cancel-scope label { gap: 8px; align-items: center; font-size: 0.875rem; }

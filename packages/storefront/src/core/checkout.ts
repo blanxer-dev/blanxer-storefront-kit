@@ -2,6 +2,7 @@ import { cartTotals } from './cart.js';
 import { checkCouponValidity, couponDiscount, isShippingCoupon } from './coupon.js';
 import { computeDelivery } from './delivery.js';
 import { paymentMethodsFor } from './payments.js';
+import { planDelivery, type CheckoutPlan } from './plan.js';
 import type { CartItem, Coupon, DeliveryTable, PaymentMethod, Store } from './types.js';
 
 export interface CheckoutQuote {
@@ -28,9 +29,15 @@ export const quoteCheckout = (input: {
   coupon?: Partial<Coupon> | null;
   /** a store pickup: no delivery charge, and paying at the store is allowed anywhere */
   pickup?: boolean;
+  /**
+   * A pooled store (`usesCheckoutPlan(store)`): the server's checkout plan. Its delivery (the sum
+   * of each location's charge), COD rule and total replace the delivery table's. Absent / null =
+   * today's calculation, unchanged.
+   */
+  plan?: CheckoutPlan | null;
 }): CheckoutQuote => {
   const t = cartTotals(input.lines);
-  const d = input.pickup ? { charge: 0, cod: true } : computeDelivery(input.delivery, input.place, t.weight);
+  const d = input.plan ? planDelivery(input.plan) : input.pickup ? { charge: 0, cod: true } : computeDelivery(input.delivery, input.place, t.weight);
   const check = checkCouponValidity(input.coupon, {
     paymentMethod: input.paymentMethod,
     deliveryCharge: d.charge,
@@ -38,7 +45,7 @@ export const quoteCheckout = (input: {
     place: input.place,
   });
   const discount = couponDiscount(input.coupon, d.charge);
-  const payable = check.success ? t.total + d.charge - discount : t.total + d.charge;
+  const payable = input.plan ? input.plan.payable.total : check.success ? t.total + d.charge - discount : t.total + d.charge;
   return {
     subtotal: t.subtotal,
     customization: t.customization,

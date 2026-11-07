@@ -35,6 +35,8 @@ import { useMoney } from './money.js';
 import { useCart } from './cart.js';
 import { FlashSaleStrip } from './flash-sale.js';
 import { StockAlertForm } from './stock-alert.js';
+import { showsStores } from '../core/plan.js';
+import { StoreAvailabilityLine } from './plan-ui.js';
 import { Button, Field, SelectInput, TextArea, TextInput, cx } from './ui.js';
 
 export interface ProductSelection {
@@ -518,6 +520,11 @@ export interface AddToCartProps {
   className?: string;
   /** Rendered between the options and the buttons. */
   children?: ReactNode;
+  /**
+   * Stores selling from several shops with "show stores" on: "Available at Pokhara, Butwal" for
+   * the picked variant (bands only). Default true; nothing shows (and nothing is asked) elsewhere.
+   */
+  showStores?: boolean;
 }
 
 /** Price + flash-sale strip + variants + custom fields + quantity + add/checkout + back-in-stock. */
@@ -535,6 +542,7 @@ export function AddToCart({
   onAdded,
   className,
   children,
+  showStores = true,
 }: AddToCartProps) {
   const internal = useProductSelection(product);
   const s = external || internal;
@@ -582,6 +590,7 @@ export function AddToCart({
       {s.stock != null ? (
         <p className={cx('bx-stock', s.lowStock && 'bx-stock--low')}>{s.stock > 0 ? `${s.stock} in stock` : 'Out of stock'}</p>
       ) : null}
+      {showStores && showsStores(store) ? <StoreAvailabilityLine productId={product._id} variantId={s.variantId} /> : null}
       {children}
       <div className="bx-buy-row">
         {showQuantity ? <QuantityPicker selection={s} /> : null}
