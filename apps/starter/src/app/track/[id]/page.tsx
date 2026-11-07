@@ -3,7 +3,10 @@ import { noIndexMetadata } from '@blanxer-dev/storefront/seo';
 
 export const metadata = noIndexMetadata('Track your order');
 
-/** Required route: COD and paid QR orders land here; order SMS and emails link here. Cancel and review by phone number, no login. */
+/**
+ * Required route: COD and paid QR orders land here; order SMS and emails link here. Cancel and
+ * review by phone number, no login. A checkout that arrives in several parcels lists every order.
+ */
 export default async function TrackPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string }> }) {
   const [{ id }, { from }] = await Promise.all([params, searchParams]);
   return (

@@ -40,15 +40,15 @@ OpenNext copies `.env` into the Worker, so the deployed site reads the same valu
 |---|---|---|
 | `/` | `src/app/page.tsx` | hero, categories, new arrivals, sale |
 | `/products` | `src/app/products/page.tsx` | paged, sortable |
-| `/product/[slug]` | `src/app/product/[slug]/page.tsx` | gallery + `<AddToCart>` (variants, custom fields, flash sale, back-in-stock), offer badges + `<ProductOffers>`, JSON-LD |
+| `/product/[slug]` | `src/app/product/[slug]/page.tsx` | gallery + `<AddToCart>` (variants, custom fields, flash sale, back-in-stock; "Available at Pokhara, Butwal" on stores that show their shops), offer badges + `<ProductOffers>`, JSON-LD |
 | `/collections/[slug]` | `src/app/collections/[slug]/page.tsx` | includes `new-arrivals` |
 | `/brand/[slug]`, `/brands` | `src/app/brand/…`, `src/app/brands/…` | |
 | `/search?q=`, `/sale` | `src/app/search/…`, `src/app/sale/…` | |
 | `/cart` | `src/app/cart/page.tsx` | `<CartView>` (stores on Offers: progress, gift lines, code, totals from the server's quote) |
 | `/offers` | `src/app/offers/page.tsx` | stores on Offers with the Offers page on (404 otherwise) |
-| **`/checkout`** | `src/app/checkout/page.tsx` | `<Checkout>`: required, keep it |
+| **`/checkout`** | `src/app/checkout/page.tsx` | `<Checkout>`: required, keep it. Stores selling from several shops: priced by the server's checkout plan, "Arrives in 2 parcels" with each shop's delivery |
 | **`/payment/success`**, **`/payment/failed`** | `src/app/payment/…` | required: gateways return here |
-| **`/track/[id]`** | `src/app/track/[id]/page.tsx` | required: order SMS/emails link here; cancel + review |
+| **`/track/[id]`** | `src/app/track/[id]/page.tsx` | required: order SMS/emails link here; cancel + review; a checkout that arrives in several parcels lists every order number |
 | `/forms/[slug]` | `src/app/forms/[slug]/page.tsx` | Blanxer forms |
 | `/blogs`, `/blog/[slug]` | `src/app/blogs/…`, `src/app/blog/…` | |
 | `/sitemap.xml`, `/sitemap-catalog.xml`, `/robots.txt` | route handlers | the catalog sitemap is built by Blanxer; don't build your own |
