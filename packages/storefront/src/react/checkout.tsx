@@ -20,6 +20,12 @@
  * placed: the notice says what changed). A create-order or payment start refused for stock shows
  * the server's words with "Change my order" (and "Try again" for stock held in other checkouts),
  * never a generic error; a payment refused as sold out is never offered again.
+ *
+ * Selling from several stores (pooled stores, `check_domain` `online_fulfilment.checkout_plan`):
+ * the delivery, the advance and the total come from the server's checkout plan, the summary says
+ * "Arrives in 2 parcels" with what ships from which store and the delivery per location, and the
+ * order carries the plan's id. A plan that went stale on create (409) shows the new total and
+ * waits for the shopper to place again. Every other store is priced exactly as before.
  */
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
@@ -83,6 +89,8 @@ import { PickupChoice, usePickupStock } from './pickup-ui.js';
 import { pickupBlocks, pickupMethods, pickupOutletsOf, pickupPaymentOf, type Fulfilment } from '../core/pickup.js';
 import { AdvanceMethodModal, PaymentDueBox, usePayOrder } from './pay-order.js';
 import { StockNotice, StockNoticeModal, useCartStockCaps, useOrderChoices } from './stock-ui.js';
+import { planChanges, placedCheckoutNote, staleCheckoutPlan, usesCheckoutPlan, withPlan } from '../core/plan.js';
+import { PlanNotice, PlanParcels, savePlacedCheckout, useCheckoutPlan } from './plan-ui.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
 
 export interface CheckoutLabels {
@@ -238,6 +246,23 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   const pickupName = pickupOutlets.find((o) => o._id === pickupOutlet)?.name || '';
   const restAt: 'delivery' | 'store' = isPickup ? 'store' : 'delivery';
 
+  // Pooled stores: the server's checkout plan prices the delivery per location (never the table)
+  const pooled = usesCheckoutPlan(store);
+  const planState = useCheckoutPlan({
+    // a pickup is planned once its store is picked
+    enabled: pooled && !orderPlaced && (!isPickup || !!pickupOutlet),
+    lines,
+    place: values.customer_address_city,
+    paymentMethod,
+    pickupOutlet: isPickup ? pickupOutlet || null : null,
+    offers: offersOn ? { code: offers.code, removedOffers: offers.removedOffers, giftChoices: offers.giftChoices } : null,
+    coupon: !offersOn && coupon?._id ? coupon._id : '',
+    phone: values.customer_phone_number,
+  });
+  // a failed plan call: today's display (the server plans the order itself on create)
+  const plan = pooled && !planState.error ? planState.plan : null;
+  const [planNotice, setPlanNotice] = useState<{ message: string; changes: string[] } | null>(null);
+
   const quote = quoteCheckout({
     store,
     lines,
@@ -246,6 +271,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     paymentMethod,
     coupon,
     pickup: isPickup,
+    ...(plan ? { plan } : {}),
   });
   const place = values.customer_address_city;
 
@@ -258,7 +284,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     enabled: offersOn && !orderPlaced,
     pickup: isPickup,
   });
-  const offerQuote = offersOn ? cq.quote : null;
+  // a pooled store: the quote's delivery, advance and total are the plan's (no plan = the quote as it is)
+  const offerQuote = offersOn ? withPlan(cq.quote, plan) : null;
   const customization = quote.customization;
   // the server's payable (customization included); older backends: add customization here
   const payable = offerQuote ? (quotePayable(offerQuote) ?? offerQuote.totals.total + customization) : quote.payable;
@@ -273,16 +300,18 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     place,
     phone: values.customer_phone_number,
     coupon: coupon?._id || '',
-    enabled: advanceOn && offers.ready && !offersOn && !orderPlaced,
+    enabled: advanceOn && offers.ready && !offersOn && !orderPlaced && !plan,
     pickup: isPickup,
   });
   const advance: Advance | null = offersOn
-    ? toAdvance(cq.quote?.advance)
+    ? toAdvance(offerQuote?.advance)
     : advanceOn
-      ? plainAdvance.advance
+      ? plan
+        ? toAdvance(plan.advance)
+        : plainAdvance.advance
       : null;
   // the answer for this cart / place / code hasn't come yet (only waited for on advance stores)
-  const advanceFresh = !advanceOn || (offersOn ? cq.fresh || (!cq.loading && !!cq.error) : plainAdvance.fresh);
+  const advanceFresh = !advanceOn || (offersOn ? cq.fresh || (!cq.loading && !!cq.error) : plan ? planState.fresh : plainAdvance.fresh);
   const offer = codOffer(advance);
   // An advance that is the whole order and required: no cash on delivery here.
   const shownMethods = offer.mode === 'hidden' ? quote.paymentMethods.filter((m) => m.name !== 'COD') : quote.paymentMethods;
@@ -293,7 +322,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
   // the method that pays it is picked only when the order is placed (`advanceFlow`)
   const active = activeAdvance(paymentMethod, offer);
   const words = offer.mode === 'advance' ? advanceWords(offer.advance, money, restAt) : null;
-  const blocked = advanceBlocks(paymentMethod, offer, online) || (paymentMethod === 'COD' && !advanceFresh) || !!pickupBlock;
+  const blocked =
+    advanceBlocks(paymentMethod, offer, online) || (paymentMethod === 'COD' && !advanceFresh) || !!pickupBlock || (pooled && planState.waiting);
 
   // A payment that didn't finish, for the cart as it is now: pay it again on the same order. The
   // stored copy is read from the server first (Place order waits): paid meanwhile → forgotten,
@@ -612,6 +642,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
     placingRef.current = true;
     setSubmitting(true);
     setStockChanged(null);
+    setPlanNotice(null);
     try {
       // the stock again, right before placing: a cart above the server's caps is changed, not placed
       const caps = await stock.check();
@@ -648,6 +679,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           : undefined,
         meta: buildOrderMeta(),
         pickupOutlet: isPickup ? pickupOutlet : null,
+        // the plan the shopper saw (its delivery is final); none = the server plans the order itself
+        checkoutPlanId: plan && planState.fresh ? plan.plan_id : null,
         advance: adv,
         advanceVia: via,
       });
@@ -666,6 +699,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       const resAdvance = method === 'COD' ? orderAdvance(res) : null;
       const payWith = method === 'COD' ? (resAdvance ? via || online[0] || '' : '') : method;
       if (paymentFlow(payWith) === 'none') setOrderPlaced(true);
+      // a split checkout / parcels that changed on create: the order page lists every order
+      if (pooled) savePlacedCheckout(placedCheckoutNote(res));
       onOrderPlaced?.(res, method);
       // The backend's Purchase payload (same id + value as its server event);
       // built locally only against an older backend.
@@ -712,6 +747,16 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       const outcome = await pay.start(payWith, res._id, res.hold_seconds);
       if (outcome !== 'left') setSubmitting(false);
     } catch (err) {
+      // the plan went stale (409 CHECKOUT_PLAN_STALE): the fresh plan and the new total are shown;
+      // the shopper places again (never at a new price on their behalf)
+      const stale = staleCheckoutPlan(err);
+      if (stale) {
+        if (stale.plan) planState.replace(stale.plan);
+        else planState.refresh();
+        setPlanNotice({ message: stale.message, changes: planChanges(plan, stale.plan, money) });
+        setSubmitting(false);
+        return;
+      }
       // not enough stock (OUT_OF_STOCK / STOCK_HELD): the server's words, no order was made
       const refusal = toStockRefusal(err);
       if (refusal) {
@@ -899,6 +944,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
           <CartLines selectable editable quote={offerQuote} caps={stock.caps} />
           <OfferGiftPicker quote={offerQuote} />
           {offersOn && lines.length ? <OfferCodeField request={cq.request} quote={offerQuote} error={codeError} /> : null}
+          {plan && !isPickup ? <PlanParcels plan={plan} labels={{ free: l.free }} /> : null}
           {offerQuote ? (
             <OfferSummary
               quote={offerQuote}
@@ -991,6 +1037,7 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
 
           {testOrder ? <p className="bx-notice">Test order accepted — no order was created for this test phone/email.</p> : null}
           {stockChanged ? <StockNotice refusal={stockChanged} onDismiss={() => setStockChanged(null)} /> : null}
+          {planNotice ? <PlanNotice message={planNotice.message} changes={planNotice.changes} onDismiss={() => setPlanNotice(null)} /> : null}
 
           {waiting && !pay.open && !submitting ? (
             <PaymentDueBox

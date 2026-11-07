@@ -17,6 +17,8 @@ import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
 import { PaymentDueBox, usePayOrder } from './pay-order.js';
 import { StockNotice } from './stock-ui.js';
+import { checkoutGroupOf } from '../core/plan.js';
+import { CheckoutParcels } from './plan-ui.js';
 import { Button, Modal, TextArea, TextInput, cx } from './ui.js';
 
 /** Group lines of the same product for the review list (variants joined). */
@@ -120,9 +122,13 @@ function CancelModal({ open, onClose, order, onDone }: { open: boolean; onClose:
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  // a split checkout (pooled stores): this parcel only, or every parcel of the checkout
+  const group = checkoutGroupOf(order);
+  const [scope, setScope] = useState<'order' | 'group'>('order');
   const close = () => {
     setPhone('');
     setError('');
+    setScope('order');
     onClose();
   };
   const submit = async (e: FormEvent) => {
@@ -131,7 +137,7 @@ function CancelModal({ open, onClose, order, onDone }: { open: boolean; onClose:
     if (v) return setError(v);
     setLoading(true);
     try {
-      const res = await cancelOrder({ store_id: storeId, order_id: order?._id, phone_number: phone });
+      const res = await cancelOrder({ store_id: storeId, order_id: order?._id, phone_number: phone, ...(group ? { scope } : {}) });
       notify({ type: 'success', title: 'Success', message: res?.message || 'Order cancelled' });
       close();
       onDone();
@@ -144,6 +150,16 @@ function CancelModal({ open, onClose, order, onDone }: { open: boolean; onClose:
     <Modal open={open} onClose={close} title="Cancel Order">
       <form onSubmit={submit} className="bx-stack">
         <p className="bx-muted">Are you sure you want to cancel this order? This action cannot be undone.</p>
+        {group ? (
+          <div className="bx-stack bx-cancel-scope" role="radiogroup" aria-label="What to cancel">
+            <label className="bx-row">
+              <input type="radio" name="bx-cancel-scope" checked={scope === 'order'} onChange={() => setScope('order')} /> Only this parcel (#{order?.order_number})
+            </label>
+            <label className="bx-row">
+              <input type="radio" name="bx-cancel-scope" checked={scope === 'group'} onChange={() => setScope('group')} /> All {group.count} parcels of this checkout
+            </label>
+          </div>
+        ) : null}
         <TextInput label="Phone number (used to create order)" type="tel" required placeholder={maskedPhone(order?.customer_phone_number)} value={phone} onChange={(e) => setPhone(e.target.value)} error={error} />
         <div className="bx-row">
           <Button variant="secondary" onClick={close}>
@@ -290,6 +306,8 @@ export function OrderTracking({ orderId, fromCheckout, changeOrderHref, classNam
           </dd>
         </div>
       </dl>
+
+      <CheckoutParcels order={order} fromCheckout={fromCheckout} />
 
       <section className="bx-track-card">
         <h2 className="bx-section-title">Order Summary</h2>

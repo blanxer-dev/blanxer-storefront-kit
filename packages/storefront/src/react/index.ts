@@ -56,3 +56,14 @@ export { Money, useMoney } from './money.js';
 export { BlanxerImage } from './image.js';
 export { StockNotice, StockNoticeModal, useStockCaps, useCartStockCaps, useOrderChoices } from './stock-ui.js';
 export type { StockNoticeProps, UseStockCapsOptions, UseCartStockCapsOptions } from './stock-ui.js';
+export {
+  useCheckoutPlan,
+  PlanParcels,
+  PlanNotice,
+  CheckoutParcels,
+  StoreAvailabilityLine,
+  useStoreAvailability,
+  readPlacedCheckout,
+  savePlacedCheckout,
+} from './plan-ui.js';
+export type { UseCheckoutPlanOptions, CheckoutPlanState, PlanParcelsProps, StoreAvailabilityProps } from './plan-ui.js';
