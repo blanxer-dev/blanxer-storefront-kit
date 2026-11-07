@@ -17,7 +17,7 @@ import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
 import { PaymentDueBox, usePayOrder } from './pay-order.js';
 import { StockNotice } from './stock-ui.js';
-import { checkoutGroupOf } from '../core/plan.js';
+import { checkoutGroupOf, groupCancelResult } from '../core/plan.js';
 import { CheckoutParcels } from './plan-ui.js';
 import { Button, Modal, TextArea, TextInput, cx } from './ui.js';
 
@@ -138,7 +138,14 @@ function CancelModal({ open, onClose, order, onDone }: { open: boolean; onClose:
     setLoading(true);
     try {
       const res = await cancelOrder({ store_id: storeId, order_id: order?._id, phone_number: phone, ...(group ? { scope } : {}) });
-      notify({ type: 'success', title: 'Success', message: res?.message || 'Order cancelled' });
+      // all parcels: say which were cancelled and which weren't (already sent), from group_results
+      const result = groupCancelResult(res);
+      const done = result.cancelled.length ? `${result.cancelled.join(', ')} cancelled.` : '';
+      notify({
+        type: result.skipped.length ? 'info' : 'success',
+        title: result.skipped.length ? 'Some parcels were not cancelled' : 'Success',
+        message: [res?.message || (done ? '' : 'Order cancelled'), done, ...result.skipped].filter(Boolean).join(' '),
+      });
       close();
       onDone();
     } catch (err) {

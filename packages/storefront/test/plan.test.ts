@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BlanxerApiError,
   availableAtText,
@@ -7,6 +7,9 @@ import {
   checkoutOrders,
   checkoutPlanBody,
   checkoutPlanKey,
+  gatewayFormFields,
+  groupCancelResult,
+  nothingDueOnline,
   deliveryByLocation,
   groupOrderRows,
   initialCheckoutValues,
@@ -380,5 +383,42 @@ describe('stores that have it (bands only)', () => {
     expect(toStoreAvailability({ enabled: false, stores: [] })).toEqual({ enabled: false, stores: [] });
     expect(toStoreAvailability(null).enabled).toBe(false);
     expect(storesWith(null, 'v9')).toEqual([]);
+  });
+});
+
+describe('paying and cancelling a split checkout (backend #382)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('the eSewa form never gets checkout_group / orders', async () => {
+    const init = { action_url: 'https://esewa.test/form', amount: '150', signature: 's', checkout_group: 'g1', orders: [{ _id: 'o1', order_number: '1043', amount: 150 }] };
+    expect(gatewayFormFields(init)).toEqual({ action: 'https://esewa.test/form', fields: { amount: '150', signature: 's' } });
+    // a plain init (every other store): every field but action_url, as before
+    expect(gatewayFormFields({ action_url: 'a', amount: '1', hold_seconds: 60 })).toEqual({ action: 'a', fields: { amount: '1', hold_seconds: 60 } });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(init), { status: 200 })));
+    vi.resetModules();
+    const c = await import('../src/client/index.js');
+    c.configureClient({ apiBase: 'https://api.test' });
+    const start = await c.startPayment('Esewa', { store: 's1', order: 'o1', url: 'https://shop.test' });
+    expect(start).toEqual({ type: 'form', action: 'https://esewa.test/form', fields: { amount: '150', signature: 's' } });
+  });
+
+  it('nothing due online: no payment is started', () => {
+    expect(nothingDueOnline({ _id: 'o1', amount_to_pay: 0, checkout_group: { id: 'g', count: 2 } })).toBe(true);
+    expect(nothingDueOnline({ _id: 'o1', amount_to_pay: 150 })).toBe(false);
+    // an older backend without amount_to_pay: pay as before
+    expect(nothingDueOnline({ _id: 'o1' })).toBe(false);
+  });
+
+  it('cancel all parcels reads group_results', () => {
+    const res = {
+      success: true,
+      message: 'Cancelled',
+      group_results: [
+        { order_id: 'o1', order_number: '1043', ok: true },
+        { order_id: 'o2', order_number: '1044', ok: false, skipped_reason: 'sent', message: 'Already handed to the courier' },
+      ],
+    };
+    expect(groupCancelResult(res)).toEqual({ cancelled: ['Order #1043'], skipped: ["Order #1044 wasn't cancelled: Already handed to the courier."] });
+    expect(groupCancelResult({ success: true, message: 'Order cancelled' })).toEqual({ cancelled: [], skipped: [] });
   });
 });

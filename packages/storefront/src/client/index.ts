@@ -16,7 +16,7 @@ import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type A
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
 import { capsFromCheck, noCaps, stockCheckBody, stockWaitLeft, toStockRefusal, type CapLine, type StockCaps, type WaitingProof } from '../core/stock.js';
 import { pickupStockBody } from '../core/pickup.js';
-import { NO_STORE_AVAILABILITY, toCheckoutPlan, toStoreAvailability, type CheckoutPlan, type CheckoutPlanRequest, type StoreAvailability } from '../core/plan.js';
+import { NO_STORE_AVAILABILITY, gatewayFormFields, toCheckoutPlan, toStoreAvailability, type CheckoutPlan, type CheckoutPlanRequest, type StoreAvailability } from '../core/plan.js';
 import type { PickupStockRow } from '../core/types.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
@@ -484,8 +484,9 @@ export async function startPayment(
   }
 
   if (flow === 'form') {
-    const { action_url, ...fields } = res || {};
-    return { type: 'form', action: action_url || '', fields };
+    // a split checkout's `checkout_group` / `orders[]` never go to the gateway
+    const { action, fields } = gatewayFormFields(res);
+    return { type: 'form', action, fields };
   }
   if (flow === 'redirect') {
     const to = method === 'Khalti' ? res?.payment_url : res?.url;

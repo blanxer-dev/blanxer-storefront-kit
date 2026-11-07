@@ -477,6 +477,57 @@ export const placedCheckoutNote = (res: unknown): PlacedCheckoutNote | null => {
 export const PLAN_CHANGED_NOTE =
   'An item sold out at one of our stores while you were checking out, so your order ships from a different store. You pay the delivery you were quoted.';
 
+// ---------------------------------------------------------------- paying and cancelling a group
+
+/** Keys a payment init adds for a split checkout; never part of a gateway's form. */
+export const GATEWAY_GROUP_KEYS = ['checkout_group', 'orders'] as const;
+
+/**
+ * The fields of a form gateway (eSewa, NPX) from its init answer: everything but `action_url` and
+ * the split-checkout keys (`checkout_group`, `orders[]`), which the gateway must never get.
+ */
+export const gatewayFormFields = (res: any): { action: string; fields: Record<string, any> } => {
+  const { action_url, ...rest } = res || {};
+  for (const k of GATEWAY_GROUP_KEYS) delete (rest as any)[k];
+  return { action: str(action_url), fields: rest };
+};
+
+/**
+ * A pooled checkout placed with an online method but nothing left to pay online (the server
+ * answers `amount_to_pay: 0` and refuses a payment init): start no payment, it is placed.
+ */
+export const nothingDueOnline = (res: unknown): boolean => {
+  const n = (res as any)?.amount_to_pay;
+  return typeof n === 'number' && Number.isFinite(n) && n <= 0;
+};
+
+export interface GroupCancelRow {
+  order_id: string;
+  order_number: string | number;
+  ok: boolean;
+  skipped_reason?: string;
+  message?: string;
+}
+
+/**
+ * The answer of a public "cancel all parcels" (`group_results[]`): the orders cancelled and, in
+ * words, those that weren't ("Order #1044 wasn't cancelled: already sent"). A plain answer (one
+ * order, an older backend) has none.
+ */
+export const groupCancelResult = (res: any): { cancelled: string[]; skipped: string[] } => {
+  const rows: GroupCancelRow[] = Array.isArray(res?.group_results) ? res.group_results : [];
+  const label = (r: GroupCancelRow) => `Order #${r.order_number ?? r.order_id}`;
+  return {
+    cancelled: rows.filter((r) => r?.ok).map(label),
+    skipped: rows
+      .filter((r) => r && !r.ok)
+      .map((r) => {
+        const why = str(r.message || r.skipped_reason).trim();
+        return `${label(r)} wasn't cancelled${why ? `: ${why}` : ''}.`;
+      }),
+  };
+};
+
 // ---------------------------------------------------------------- stores that have it
 
 export type AvailabilityBand = 'in_stock' | 'few';

@@ -89,7 +89,7 @@ import { PickupChoice, usePickupStock } from './pickup-ui.js';
 import { pickupBlocks, pickupMethods, pickupOutletsOf, pickupPaymentOf, type Fulfilment } from '../core/pickup.js';
 import { AdvanceMethodModal, PaymentDueBox, usePayOrder } from './pay-order.js';
 import { StockNotice, StockNoticeModal, useCartStockCaps, useOrderChoices } from './stock-ui.js';
-import { planChanges, placedCheckoutNote, staleCheckoutPlan, usesCheckoutPlan, withPlan } from '../core/plan.js';
+import { nothingDueOnline, planChanges, placedCheckoutNote, staleCheckoutPlan, usesCheckoutPlan, withPlan } from '../core/plan.js';
 import { PlanNotice, PlanParcels, savePlacedCheckout, useCheckoutPlan } from './plan-ui.js';
 import { Button, SelectInput, TextInput, cx } from './ui.js';
 
@@ -697,7 +697,9 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
       // An advance order is paid online first, with the method picked for the advance; the
       // server decides (no `advance` on the answer = plain COD, as on older backends).
       const resAdvance = method === 'COD' ? orderAdvance(res) : null;
-      const payWith = method === 'COD' ? (resAdvance ? via || online[0] || '' : '') : method;
+      const asked = method === 'COD' ? (resAdvance ? via || online[0] || '' : '') : method;
+      // a pooled checkout with nothing left to pay online: the server starts no payment, it is placed
+      const payWith = pooled && asked && nothingDueOnline(res) ? '' : asked;
       if (paymentFlow(payWith) === 'none') setOrderPlaced(true);
       // a split checkout / parcels that changed on create: the order page lists every order
       if (pooled) savePlacedCheckout(placedCheckoutNote(res));
