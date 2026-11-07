@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.0
+
+### Selling from several stores (pooled stores)
+
+Needs the Blanxer backend from the multi-outlet release. Older backends send no `online_fulfilment`, and every store that doesn't sell from several stores (`online_fulfilment.checkout_plan: false`) works exactly as in 0.4.0: same delivery calculation, same order body, no new calls.
+
+- **Checkout (pooled stores):** priced by the server's checkout plan (`POST /order/public/checkout-plan`) instead of the delivery table: the delivery (one charge per location the items ship from), cash-on-delivery rule, advance (one for the whole checkout) and total. Stores on Offers keep the quote's goods and offers. Place order waits for the plan of the current cart; a failed plan call shows today's numbers (the server plans the order itself).
+- **Parcels:** two or more parcels add "Arrives in 2 parcels" to the summary, with each parcel's store, what is in it and its delivery, and "Delivery: Pokhara Rs 150 · Butwal free". One parcel looks as before. The payment methods are unchanged.
+- **The quoted charge is final:** the order sends `checkout_plan_id`. A 409 `CHECKOUT_PLAN_STALE` shows the fresh plan, the server's words and what changed, and waits for the shopper to place again.
+- **Order page:** a split checkout lists every order with the store it ships from and its status, and says when the parcels changed on create; cancel asks "Only this parcel" or "All N parcels".
+- **Product page:** `AddToCart` shows "Available at Pokhara, Butwal (few left)" when the store turns on showing stores (bands only; `showStores` prop).
+- **`/core`:** `plan.ts` (`onlineFulfilmentOf`, `usesCheckoutPlan`, `showsStores`, `checkoutPlanBody`, `checkoutPlanKey`, `toCheckoutPlan`, `planDelivery`, `withPlan`, `parcelRows`, `parcelsTitle`, `deliveryByLocation`, `planLineName`, `planOrderFields`, `staleCheckoutPlan`, `planChanges`, `checkoutGroupOf`, `checkoutOrders`, `orderNumbersText`, `groupOrderRows`, `placedCheckoutNote`, `PLAN_CHANGED_NOTE`, `toStoreAvailability`, `storesWith`, `availableAtText`); `quoteCheckout({ plan })`; `buildOrderPayload({ checkoutPlanId })`; `toClientStore` passes `online_fulfilment`. Types `OnlineFulfilment`, `CheckoutPlan`, `CheckoutPlanRequest`, `PlanParcel`, `PlanLine`, `ParcelRow`, `CheckoutGroup`, `CheckoutOrderRow`, `LinkedOrder`, `GroupOrderRow`, `PlacedCheckoutNote`, `StoreAvailability`; `Store.online_fulfilment`; `OrderResponse.checkout_group / orders / plan_changed`; `PublicOrder.checkout_group / linked_orders`; `STORAGE_KEYS.placedCheckout`.
+- **`/client`:** `checkoutPlan(body)`, `storeAvailability(storeId, productId)` (never throws except an abort), `cancelOrder({ scope })`; payment starts type `checkout_group` / `orders` (`GroupPaymentShare`).
+- **`/react`:** `useCheckoutPlan`, `PlanParcels`, `PlanNotice`, `CheckoutParcels`, `StoreAvailabilityLine`, `useStoreAvailability`, `readPlacedCheckout`, `savePlacedCheckout`; `AddToCart showStores`.
+- **Styles:** `bx-plan-*`, `bx-checkout-parcels`, `bx-store-availability`, `bx-cancel-scope`.
+
 ## 0.4.0
 
 ### Store pickup
