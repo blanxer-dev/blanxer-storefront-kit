@@ -62,6 +62,7 @@ export {
   PlanNotice,
   CheckoutParcels,
   StoreAvailabilityLine,
+  StoreListModal,
   useStoreAvailability,
   readPlacedCheckout,
   savePlacedCheckout,

@@ -22,6 +22,9 @@ import {
   quoteCheckout,
   staleCheckoutPlan,
   storesWith,
+  storesLine,
+  storeRows,
+  filterStoreRows,
   toCheckoutPlan,
   toClientStore,
   toStoreAvailability,
@@ -420,5 +423,60 @@ describe('paying and cancelling a split checkout (backend #382)', () => {
     };
     expect(groupCancelResult(res)).toEqual({ cancelled: ['Order #1043'], skipped: ["Order #1044 wasn't cancelled: Already handed to the courier."] });
     expect(groupCancelResult({ success: true, message: 'Order cancelled' })).toEqual({ cancelled: [], skipped: [] });
+  });
+});
+
+describe('the "Available at" line for many stores (owner, 2026-11-08)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const store = (name: string, band: 'in_stock' | 'few' = 'in_stock', pickup = false) => ({ _id: name, name, city: `${name} city`, band, pickup });
+  const names = ['Chitwan', 'Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'Butwal', 'Biratnagar', 'Dharan', 'Dang', 'Jhapa', 'Surkhet', 'Kailali', 'Palpa'];
+
+  it('every store: "Available at all N stores", with the list', () => {
+    expect(storesLine(names.map((n) => store(n)), 13)).toEqual({ kind: 'all', text: 'Available at all 13 stores', more: 0, canOpen: true });
+  });
+
+  it('3 or fewer: named as before', () => {
+    expect(storesLine([store('Pokhara'), store('Butwal', 'few')], 13)).toEqual({ kind: 'list', text: 'Available at Pokhara, Butwal (few left)', more: 0, canOpen: false });
+    // an older backend without pool_count: never "all", still named
+    expect(storesLine([store('Pokhara')], undefined).kind).toBe('list');
+  });
+
+  it('more than 3: the first 2 + "+N more", and the list opens', () => {
+    const nine = names.slice(0, 9).map((n, i) => store(n, i === 1 ? 'few' : 'in_stock'));
+    expect(storesLine(nine, 13)).toEqual({ kind: 'more', text: 'Available at Chitwan, Kathmandu (few left) +7 more', more: 7, canOpen: true });
+  });
+
+  it('none: nothing (the page says Out of stock as today)', () => {
+    expect(storesLine([], 13)).toEqual({ kind: 'none', text: '', more: 0, canOpen: false });
+  });
+
+  it('the list rows: name, city, a band in words, the Pickup tag; the search filters by name or city', () => {
+    const rows = storeRows([store('Pokhara', 'few', true), store('Butwal')]);
+    expect(rows).toEqual([
+      { _id: 'Pokhara', name: 'Pokhara', city: 'Pokhara city', stock: 'Few left', pickup: true },
+      { _id: 'Butwal', name: 'Butwal', city: 'Butwal city', stock: 'In stock', pickup: false },
+    ]);
+    expect(JSON.stringify(rows)).not.toMatch(/\d+ (left|in stock)/i);
+    expect(filterStoreRows(rows, 'butw').map((r) => r.name)).toEqual(['Butwal']);
+    expect(filterStoreRows(rows, 'POKHARA CITY').map((r) => r.name)).toEqual(['Pokhara']);
+    expect(filterStoreRows(rows, '  ')).toHaveLength(2);
+  });
+
+  it('the answer keeps order and pool_count; the shopper\'s city is sent as ?place', async () => {
+    const a = toStoreAvailability({ enabled: true, order: 'route', pool_count: 13, stores: [{ _id: 'x', name: 'Chitwan', city: 'Chitwan', pickup: false, variants: [{ variant: '', band: 'few' }] }] });
+    expect(a.order).toBe('route');
+    expect(a.pool_count).toBe(13);
+    expect(storesWith(a, '')[0]).toEqual({ _id: 'x', name: 'Chitwan', city: 'Chitwan', band: 'few', pickup: false });
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ enabled: true, stores: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    vi.resetModules();
+    const c = await import('../src/client/index.js');
+    c.configureClient({ apiBase: 'https://api.test' });
+    await c.storeAvailability('s1', 'p1', undefined, 'Kathmandu Inside Ring Road');
+    await c.storeAvailability('s1', 'p1');
+    expect((fetch.mock.calls as any[]).map((x) => x[0])).toEqual([
+      'https://api.test/order/public/store-availability/s1/p1?place=Kathmandu%20Inside%20Ring%20Road',
+      'https://api.test/order/public/store-availability/s1/p1',
+    ]);
   });
 });

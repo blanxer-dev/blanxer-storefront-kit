@@ -10,7 +10,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { createLatest } from '../core/offers.js';
 import {
-  availableAtText,
   checkoutPlanBody,
   checkoutPlanKey,
   deliveryByLocation,
@@ -18,18 +17,23 @@ import {
   parcelRows,
   parcelsTitle,
   PLAN_CHANGED_NOTE,
+  filterStoreRows,
+  SEARCH_FROM,
   showsStores,
+  storeRows,
+  storesLine,
   storesWith,
   type CheckoutPlan,
   type CheckoutPlanInput,
   type PlacedCheckoutNote,
   type StoreAvailability,
+  type StoreHas,
 } from '../core/plan.js';
 import { STORAGE_KEYS } from '../core/config.js';
-import { checkoutPlan, storeAvailability } from '../client/index.js';
+import { checkoutPlan, shopperCity, storeAvailability } from '../client/index.js';
 import { useBlanxer } from './context.js';
 import { useMoney } from './money.js';
-import { Button, cx } from './ui.js';
+import { Button, Modal, cx } from './ui.js';
 
 export interface UseCheckoutPlanOptions extends Omit<CheckoutPlanInput, 'storeId'> {
   /** ask at all: a pooled store with lines, a place (or a pickup) and no order in flight */
@@ -238,8 +242,11 @@ export function CheckoutParcels({ order, fromCheckout, className }: { order: any
 const availabilityCache = new Map<string, { at: number; value: StoreAvailability }>();
 const AVAILABILITY_TTL = 60_000;
 
-/** Which shops have this product (bands only), only when the store shows them. */
-export function useStoreAvailability(productId: string | null | undefined): StoreAvailability | null {
+/**
+ * Which shops have this product (bands only), only when the store shows them. In the routing
+ * order of the city the shopper chose at checkout (`shopperCity()`, or `place`), else pool order.
+ */
+export function useStoreAvailability(productId: string | null | undefined, place?: string | null): StoreAvailability | null {
   const { store, storeId } = useBlanxer();
   const on = showsStores(store) && !!storeId && !!productId;
   const [value, setValue] = useState<StoreAvailability | null>(null);
@@ -248,14 +255,15 @@ export function useStoreAvailability(productId: string | null | undefined): Stor
       setValue(null);
       return;
     }
-    const cacheKey = `${storeId}:${productId}`;
+    const city = place ?? shopperCity();
+    const cacheKey = `${storeId}:${productId}:${city}`;
     const hit = availabilityCache.get(cacheKey);
     if (hit && Date.now() - hit.at < AVAILABILITY_TTL) {
       setValue(hit.value);
       return;
     }
     const c = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    storeAvailability(storeId, productId, c ? { signal: c.signal } : undefined)
+    storeAvailability(storeId, productId, c ? { signal: c.signal } : undefined, city || null)
       .then((v) => {
         availabilityCache.set(cacheKey, { at: Date.now(), value: v });
         setValue(v);
@@ -264,7 +272,7 @@ export function useStoreAvailability(productId: string | null | undefined): Stor
         /* aborted */
       });
     return () => c?.abort();
-  }, [on, storeId, productId]);
+  }, [on, storeId, productId, place]);
   return on ? value : null;
 }
 
@@ -272,20 +280,78 @@ export interface StoreAvailabilityProps {
   productId: string;
   /** the picked variant ('' = the product without variants, or any variant) */
   variantId?: string | null;
+  /** the shopper's city (else the one chosen at checkout): its routing order */
+  place?: string | null;
   className?: string;
 }
 
-/** "Available at Pokhara, Butwal (few left)" on the product page (stores with `show_stores` on). */
-export function StoreAvailabilityLine({ productId, variantId, className }: StoreAvailabilityProps) {
-  const avail = useStoreAvailability(productId);
+/**
+ * The one line under the price on stores that show their shops: "Available at all 13 stores",
+ * "Available at Pokhara, Butwal (few left)", or "Available at Chitwan, Kathmandu +11 more · See
+ * stores", for the picked variant. "See stores" opens the list (a modal; a bottom sheet on phones).
+ * Nothing when no store has it (the page says "Out of stock").
+ */
+export function StoreAvailabilityLine({ productId, variantId, place, className }: StoreAvailabilityProps) {
+  const avail = useStoreAvailability(productId, place);
   const stores = storesWith(avail, variantId);
-  const text = availableAtText(stores);
-  if (!text) return null;
-  const pickup = stores.some((s) => s.pickup);
+  const line = storesLine(stores, avail?.pool_count);
+  const [open, setOpen] = useState(false);
+  if (line.kind === 'none') return null;
+  const pickup = line.kind === 'list' && stores.some((s) => s.pickup);
   return (
-    <p className={cx('bx-store-availability', className)} data-bx="store-availability">
-      {text}
-      {pickup ? <span className="bx-muted"> · pick up in store at checkout</span> : null}
-    </p>
+    <>
+      <p className={cx('bx-store-availability', className)} data-bx="store-availability" data-kind={line.kind}>
+        {line.text}
+        {pickup ? <span className="bx-muted"> · pick up in store at checkout</span> : null}
+        {line.canOpen ? (
+          <>
+            {' · '}
+            <button type="button" className="bx-store-availability-see" onClick={() => setOpen(true)}>
+              See stores
+            </button>
+          </>
+        ) : null}
+      </p>
+      <StoreListModal open={open} onClose={() => setOpen(false)} stores={stores} />
+    </>
+  );
+}
+
+/** "See stores": every store that has the picked variant, its city and band, a Pickup tag; a search box above 8 stores. */
+export function StoreListModal({ open, onClose, stores, title = 'Stores with this item' }: { open: boolean; onClose: () => void; stores: StoreHas[]; title?: string }) {
+  const [q, setQ] = useState('');
+  useEffect(() => {
+    if (!open) setQ('');
+  }, [open]);
+  const rows = storeRows(stores);
+  const shown = filterStoreRows(rows, q);
+  return (
+    <Modal open={open} onClose={onClose} title={title} dismissible sheet className="bx-stores-modal">
+      {rows.length > SEARCH_FROM ? (
+        <input
+          type="search"
+          className="bx-input bx-stores-search"
+          placeholder="Search a store or city"
+          aria-label="Search a store or city"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      ) : null}
+      <ul className="bx-stores-list" data-bx="store-list">
+        {shown.map((r) => (
+          <li key={r._id} className="bx-stores-row">
+            <div>
+              <p className="bx-strong">{r.name}</p>
+              {r.city ? <p className="bx-muted">{r.city}</p> : null}
+            </div>
+            <div className="bx-stores-tags">
+              {r.pickup ? <span className="bx-stores-tag bx-stores-tag--pickup">Pickup</span> : null}
+              <span className={cx('bx-stores-tag', r.stock === 'Few left' ? 'bx-stores-tag--few' : 'bx-stores-tag--in')}>{r.stock}</span>
+            </div>
+          </li>
+        ))}
+        {!shown.length ? <li className="bx-muted bx-stores-empty">No store matches “{q}”.</li> : null}
+      </ul>
+    </Modal>
   );
 }

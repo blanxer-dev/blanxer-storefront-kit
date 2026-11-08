@@ -70,6 +70,7 @@ import {
   placeOrder,
   readPendingOrder,
   releaseHold,
+  rememberShopperCity,
   rememberCheckoutUser,
   savePendingOrder,
   savePendingPurchase,
@@ -654,6 +655,8 @@ export function Checkout({ delivery: deliveryProp, labels, className, header, fo
         return;
       }
       // matching data for Meta (this browser session only)
+      // a pooled store: the city the shopper chose orders "Available at" on product pages
+      if (pooled) rememberShopperCity(values.customer_address_city);
       rememberCheckoutUser({
         email: values.customer_email,
         phone: values.customer_phone_number,

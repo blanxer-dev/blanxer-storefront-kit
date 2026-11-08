@@ -535,6 +535,10 @@ export type AvailabilityBand = 'in_stock' | 'few';
 /** `GET /order/public/store-availability/:store_id/:product_id` (only when `show_stores`). */
 export interface StoreAvailability {
   enabled: boolean;
+  /** 'route' = in the routing order of the `place` asked; 'pool' = the store's pool order */
+  order?: 'route' | 'pool';
+  /** active stores in the pool (for "Available at all 12 stores"); absent on older backends */
+  pool_count?: number;
   stores: Array<{
     _id: string;
     name: string;
@@ -552,6 +556,8 @@ export const toStoreAvailability = (raw: any): StoreAvailability => {
   if (!raw || typeof raw !== 'object' || raw.enabled !== true || !Array.isArray(raw.stores)) return NO_STORE_AVAILABILITY;
   return {
     enabled: true,
+    ...(raw.order === 'route' || raw.order === 'pool' ? { order: raw.order } : {}),
+    ...(Number(raw.pool_count) > 0 ? { pool_count: Math.floor(Number(raw.pool_count)) } : {}),
     stores: raw.stores
       .filter((s: any) => s && s._id && s.name)
       .map((s: any) => ({
@@ -569,6 +575,7 @@ export const toStoreAvailability = (raw: any): StoreAvailability => {
 export interface StoreHas {
   _id: string;
   name: string;
+  city: string;
   band: AvailabilityBand;
   pickup: boolean;
 }
@@ -584,7 +591,7 @@ export const storesWith = (avail: StoreAvailability | null | undefined, variantI
   for (const s of avail.stores) {
     const hits = s.variants.filter((x) => (v ? x.variant === v : true));
     if (!hits.length) continue;
-    out.push({ _id: s._id, name: s.name, pickup: s.pickup, band: hits.some((x) => x.band === 'in_stock') ? 'in_stock' : 'few' });
+    out.push({ _id: s._id, name: s.name, city: s.city || '', pickup: s.pickup, band: hits.some((x) => x.band === 'in_stock') ? 'in_stock' : 'few' });
   }
   return out;
 };
@@ -594,3 +601,58 @@ export const availableAtText = (stores: StoreHas[]): string => {
   if (!stores.length) return '';
   return `Available at ${stores.map((s) => `${s.name}${s.band === 'few' ? ' (few left)' : ''}`).join(', ')}`;
 };
+
+/** Stores named on the line before it collapses to "+N more"; the list gets a search box above this many. */
+export const NAMES_UP_TO = 3;
+export const SEARCH_FROM = 8;
+
+const storeLabel = (s: StoreHas) => `${s.name}${s.band === 'few' ? ' (few left)' : ''}`;
+
+export interface StoresLine {
+  /** all = every store; list = up to 3 named; more = 2 named + "+N more · See stores"; none = nothing to say */
+  kind: 'all' | 'list' | 'more' | 'none';
+  text: string;
+  /** how many more than the names shown (kind 'more') */
+  more: number;
+  /** the stores have a list to open ("See stores") */
+  canOpen: boolean;
+}
+
+/**
+ * The one line under the price (owner, 2026-11-08: 12–15 branches made the full list too long):
+ * every store → "Available at all 13 stores"; 3 or fewer → named as before; more → the first 2
+ * named + "+N more" (and a "See stores" link); none → nothing (the page shows "Out of stock").
+ * `stores` in the order to show (the shopper's city's routing order, else the pool order).
+ */
+export const storesLine = (stores: StoreHas[], poolCount?: number | null): StoresLine => {
+  const n = stores.length;
+  if (!n) return { kind: 'none', text: '', more: 0, canOpen: false };
+  const pool = Number(poolCount) || 0;
+  if (pool > 1 && n >= pool) return { kind: 'all', text: `Available at all ${pool} stores`, more: 0, canOpen: true };
+  if (n <= NAMES_UP_TO) return { kind: 'list', text: availableAtText(stores), more: 0, canOpen: false };
+  const more = n - 2;
+  return { kind: 'more', text: `Available at ${stores.slice(0, 2).map(storeLabel).join(', ')} +${more} more`, more, canOpen: true };
+};
+
+export interface StoreRow {
+  _id: string;
+  name: string;
+  city: string;
+  /** "In stock" / "Few left": a band, never a count */
+  stock: 'In stock' | 'Few left';
+  pickup: boolean;
+}
+
+/** The rows of the "See stores" list (same order as the line). */
+export const storeRows = (stores: StoreHas[]): StoreRow[] =>
+  stores.map((s) => ({ _id: s._id, name: s.name, city: s.city || '', stock: s.band === 'few' ? 'Few left' : 'In stock', pickup: s.pickup }));
+
+/** The list filtered by the search box (store name or city, any case). */
+export const filterStoreRows = (rows: StoreRow[], q: string): StoreRow[] => {
+  const t = String(q || '').trim().toLowerCase();
+  if (!t) return rows;
+  return rows.filter((r) => r.name.toLowerCase().includes(t) || r.city.toLowerCase().includes(t));
+};
+
+/** Where the shopper's city is kept once chosen at checkout (orders the stores on the product page). */
+export const SHOPPER_CITY_KEY = 'bx_shopper_city';

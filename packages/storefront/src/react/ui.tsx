@@ -116,6 +116,7 @@ export function Modal({
   className,
   dismissible = false,
   showClose = true,
+  sheet = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -125,6 +126,8 @@ export function Modal({
   /** Close on backdrop click / Escape. */
   dismissible?: boolean;
   showClose?: boolean;
+  /** a bottom sheet on phones (a centred modal on wider screens) */
+  sheet?: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
   const titleId = useId();
@@ -145,12 +148,12 @@ export function Modal({
 
   if (!open || !mounted) return null;
   return createPortal(
-    <div className="bx-modal-backdrop" onClick={dismissible ? onClose : undefined}>
+    <div className={cx('bx-modal-backdrop', sheet && 'bx-modal-backdrop--sheet')} onClick={dismissible ? onClose : undefined}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        className={cx('bx-modal', className)}
+        className={cx('bx-modal', sheet && 'bx-modal--sheet', className)}
         onClick={(e) => e.stopPropagation()}
       >
         {(title || showClose) && (

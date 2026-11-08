@@ -385,3 +385,19 @@ button.bx-star { cursor: pointer; }
 .bx-checkout-parcels .bx-plan-notice { margin: 0 0 12px; }
 .bx-store-availability { margin: 4px 0 0; font-size: 0.875rem; color: var(--bx-fg); }
 .bx-cancel-scope label { gap: 8px; align-items: center; font-size: 0.875rem; }
+.bx-store-availability-see { border: 0; background: none; padding: 0; color: var(--bx-primary); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.bx-stores-search { width: 100%; margin: 0 0 12px; }
+.bx-stores-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.bx-stores-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--bx-border); }
+.bx-stores-row:first-child { border-top: 0; }
+.bx-stores-row p { margin: 0; font-size: 0.875rem; }
+.bx-stores-tags { display: flex; gap: 6px; flex-shrink: 0; }
+.bx-stores-tag { padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; border: 1px solid var(--bx-border); }
+.bx-stores-tag--in { color: var(--bx-success); }
+.bx-stores-tag--few { color: #b45309; }
+.bx-stores-tag--pickup { background: var(--bx-surface); }
+.bx-stores-empty { padding: 12px 0; font-size: 0.875rem; }
+@media (max-width: 640px) {
+  .bx-modal-backdrop--sheet { align-items: flex-end; padding: 0; }
+  .bx-modal--sheet { max-width: none; border-radius: calc(var(--bx-radius) * 1.5) calc(var(--bx-radius) * 1.5) 0 0; max-height: 85dvh; }
+}

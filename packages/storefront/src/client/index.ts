@@ -16,7 +16,7 @@ import { advanceFromAnswer, parsePending, waitingOnServer, withServerDue, type A
 import { OFFERS_OFF, offersResponseOf, quoteOf, type OffersResponse, type Quote, type QuoteRequest } from '../core/offers.js';
 import { capsFromCheck, noCaps, stockCheckBody, stockWaitLeft, toStockRefusal, type CapLine, type StockCaps, type WaitingProof } from '../core/stock.js';
 import { pickupStockBody } from '../core/pickup.js';
-import { NO_STORE_AVAILABILITY, gatewayFormFields, toCheckoutPlan, toStoreAvailability, type CheckoutPlan, type CheckoutPlanRequest, type StoreAvailability } from '../core/plan.js';
+import { NO_STORE_AVAILABILITY, SHOPPER_CITY_KEY, gatewayFormFields, toCheckoutPlan, toStoreAvailability, type CheckoutPlan, type CheckoutPlanRequest, type StoreAvailability } from '../core/plan.js';
 import type { PickupStockRow } from '../core/types.js';
 import type { Coupon, DeliveryTable, FlashSaleForProduct, OrderPurchaseMeta, OrderResponse, Product, PublicOrder } from '../core/types.js';
 
@@ -88,13 +88,16 @@ export const checkoutPlan = async (body: CheckoutPlanRequest, init?: RequestInit
 
 /**
  * Which of the store's shops have a product, as bands (`in_stock` / `few`), never counts. Ask only
- * when `showsStores(store)`. Never throws (except an abort): an older backend, a 404 or a failed
+ * when `showsStores(store)`. `place` (the shopper's city, when known) orders them by that city's
+ * routing order; otherwise they come in the pool order. Never throws (except an abort): an older backend, a 404 or a failed
  * call is `{ enabled: false, stores: [] }`.
  */
-export const storeAvailability = async (storeId: string, productId: string, init?: RequestInit): Promise<StoreAvailability> => {
+export const storeAvailability = async (storeId: string, productId: string, init?: RequestInit, place?: string | null): Promise<StoreAvailability> => {
   if (!storeId || !productId) return NO_STORE_AVAILABILITY;
+  // the shopper's city known: the stores come in that city's routing order
+  const q = place ? `?place=${enc(place)}` : '';
   try {
-    return toStoreAvailability(await call<any>('GET', `/order/public/store-availability/${enc(storeId)}/${enc(productId)}`, undefined, init));
+    return toStoreAvailability(await call<any>('GET', `/order/public/store-availability/${enc(storeId)}/${enc(productId)}${q}`, undefined, init));
   } catch (e) {
     if (isAbort(e)) throw e;
     return NO_STORE_AVAILABILITY;
@@ -711,6 +714,24 @@ export const rememberCheckoutUser = (u: MetaUser) => {
     sessionStorage.setItem(USER_KEY, JSON.stringify(u));
   } catch {
     /* ignore */
+  }
+};
+
+/** The city the shopper last chose at checkout (orders "Available at" on product pages), or ''. */
+export const shopperCity = (): string => {
+  try {
+    return localStorage.getItem(SHOPPER_CITY_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+/** Keep the city the shopper chose at checkout. */
+export const rememberShopperCity = (city: string) => {
+  try {
+    if (city) localStorage.setItem(SHOPPER_CITY_KEY, city);
+  } catch {
+    /* storage blocked */
   }
 };
 
