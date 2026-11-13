@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/claude/impact.cjs\" --hook",
+            "timeout": 15,
+            "statusMessage": "Feature map: what this change is linked to"
+          }
+        ]
+      }
+    ]
+  }
+}

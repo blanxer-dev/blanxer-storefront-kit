@@ -1,0 +1,2946 @@
+{
+  "version": 1,
+  "about": "The Blanxer feature map. One copy in every repo (docs/feature-map/feature-map.json); edit it in the backend and run `node scripts/claude/impact.cjs --sync <repo>...`. How to keep it: docs/feature-map/README.md.",
+  "repos": {
+    "backend": {
+      "package": "gigbig-backend",
+      "github": "buggged/gigbig_backend",
+      "base": "origin/dev",
+      "check": "scripts/money-test.sh",
+      "cover": [
+        "src/features/**@1",
+        "src/super_admin/**@1",
+        "src/services/**@1",
+        "src/public_features/**@1",
+        "src/mods/**@1",
+        "src/client_web/**@1",
+        "src/core/models/**@1",
+        "src/core/helpers/**@1",
+        "src/core/middlewares/**@1",
+        "src/core/analytics/**@1",
+        "src/core/handlers/**@1"
+      ]
+    },
+    "dashboard": {
+      "package": "vendor_web",
+      "github": "buggged/blanxer_admin",
+      "base": "origin/dev",
+      "check": "scripts/check.sh",
+      "cover": [
+        "src/features/**@1",
+        "src/services/**@1",
+        "src/hooks/**@1"
+      ]
+    },
+    "app": {
+      "package": "blanxermobileapp",
+      "github": "blanxer-dev/blanxer-mobileapp",
+      "base": "origin/main",
+      "check": "scripts/check.sh",
+      "cover": [
+        "src/app/**@1",
+        "src/services/**@1",
+        "src/components/**@1",
+        "src/hooks/**@1",
+        "src/store/**@1"
+      ]
+    },
+    "storefront": {
+      "package": "gigbig_client_web",
+      "github": "blanxer-dev/blanxer-storefront-web",
+      "base": "origin/dev",
+      "check": "scripts/check.sh",
+      "cover": [
+        "src/features/**@1",
+        "pages/**@1",
+        "src/hooks/**@1",
+        "src/context/**@1",
+        "lib/**@1"
+      ]
+    },
+    "kit": {
+      "package": "blanxer-storefront-kit",
+      "github": "blanxer-dev/blanxer-storefront-kit",
+      "base": "origin/main",
+      "check": "npm test --workspace packages/storefront",
+      "cover": [
+        "packages/storefront/src/**@2"
+      ]
+    },
+    "mcp": {
+      "package": "blanxer-mcp-server",
+      "github": "blanxer-dev/BlanxerMCP",
+      "base": "origin/main",
+      "check": "npm run typecheck && npm test",
+      "cover": [
+        "src/**@1",
+        "src/tools/**@1"
+      ]
+    }
+  },
+  "features": {
+    "orders": {
+      "name": "Orders: create, list, detail, status, edit, delete, labels, exports",
+      "summary": "Every order: website, staff-created, lead, counter sale. The status and payment-status changes here move money (order-money), stock and the customer ledger, and fire SMS / email / Meta / Tigg.",
+      "keywords": [
+        "order",
+        "status",
+        "payment status",
+        "edit items",
+        "label",
+        "export",
+        "lead",
+        "create order",
+        "comment",
+        "activity"
+      ],
+      "rules": [
+        "backend:docs/money/flow.md",
+        "backend:docs/order-activity.md",
+        "backend:docs/analytics-rules.md"
+      ],
+      "tests": [
+        "backend:tests/money/order-status-money.test.ts",
+        "backend:tests/money/order-create-money.test.ts",
+        "backend:tests/inventory/order-stock.test.ts",
+        "backend:tests/analytics/export-order-money.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order",
+          "src/features/comment",
+          "src/features/print-design",
+          "src/core/models/order.ts",
+          "src/core/models/order_activity.ts",
+          "src/core/helpers/order-status.helper.ts",
+          "src/core/helpers/order-activity.ts",
+          "src/core/constants/status.ts",
+          "src/core/models/comments.ts"
+        ],
+        "dashboard": [
+          "src/features/orders",
+          "src/features/create_order",
+          "src/features/leads",
+          "src/features/print_preview",
+          "src/services/order.service.ts",
+          "src/services/comment.service.ts",
+          "src/shared/constants/status.ts",
+          "src/shared/constants/order_label.ts"
+        ],
+        "app": [
+          "src/app/(tabs)/orders",
+          "src/components/orders",
+          "src/services/order.service.ts",
+          "src/services/comment.service.ts",
+          "src/services/delete-orders.ts",
+          "src/services/customer-search.ts",
+          "src/services/order-money.ts",
+          "src/hooks/useOrderPages.ts"
+        ],
+        "storefront": [
+          "src/features/tracking",
+          "pages/track"
+        ],
+        "kit": [
+          "packages/storefront/src/core/order.ts",
+          "packages/storefront/src/react/tracking.tsx"
+        ],
+        "mcp": [
+          "src/tools/orders.ts",
+          "src/tools/dispatch.ts",
+          "src/sales.ts"
+        ]
+      },
+      "watch": [
+        "A status or payment-status change books money only through order/service/order-money.ts and must leave stock, the customer ledger and reports agreeing (assertBooks / assertStock in the tests).",
+        "Staff create-order, POS create-order, the website checkout and Sambad all create orders: a new order field or rule must reach every creator.",
+        "Excel exports, SMS texts, Tigg invoices, Meta events and courier COD all read an order's money: a change to how totals are stored reaches all of them."
+      ],
+      "links": [
+        {
+          "to": "inventory",
+          "why": "Creating, cancelling, re-opening, editing items and deleting an order take or give back stock.",
+          "check": "tests/inventory/order-stock.test.ts; assertStock on an advanced store."
+        },
+        {
+          "to": "finance",
+          "why": "Paid / Partial / Refunded / Waiting Reconcile book or reverse money through order-money and postBankTxns.",
+          "check": "tests/money/order-status-money.test.ts"
+        },
+        {
+          "to": "customers-ledger",
+          "why": "Every money change on an order reconciles the customer's ledger.",
+          "check": "reconcileCustomerLedger inside the money transaction; tests/money/customer-ledger.test.ts"
+        },
+        {
+          "to": "offers",
+          "why": "Offer orders carry promotions / promo_total; edits, cancels and returns give claims back.",
+          "check": "tests/promotions/orders.test.ts"
+        },
+        {
+          "to": "couriers",
+          "why": "Sending to a courier, webhooks and COD amounts read the order's status and money.",
+          "check": "codToCollect; every submit-to-* refuses a Refunded order."
+        },
+        {
+          "to": "reports",
+          "why": "Which orders count as sales (countedOrderExpr) depends on status and pos_return_status.",
+          "check": "tests/analytics/counted-orders.test.ts"
+        },
+        {
+          "to": "notifications",
+          "why": "Status changes send SMS and emails.",
+          "check": "tests/sms/event-message.test.ts"
+        },
+        {
+          "to": "tigg",
+          "why": "Linked stores re-issue Tigg invoices when an order's items, prices or outlet change.",
+          "check": "tests/tigg/always-in-step.test.ts"
+        },
+        {
+          "to": "meta-tracking",
+          "why": "Paid orders send the Meta Purchase once.",
+          "check": "tests/money/meta-tracking.test.ts"
+        },
+        {
+          "to": "loyalty",
+          "why": "Points are earned on Paid and taken back on cancel / refund / return.",
+          "check": "tests/money/loyalty.test.ts"
+        }
+      ]
+    },
+    "checkout": {
+      "name": "Website checkout: cart, quote, place order, pay, stock holds",
+      "summary": "What a shopper sees and can do: check_domain tells the storefront which payment options, delivery, pickup and advance are on; the public quote prices the cart; create-order places it; payment start re-holds stock. The storefront, the kit (custom sites) and the MCP shopper route (Sambad) all run this same checkout.",
+      "keywords": [
+        "checkout",
+        "cart",
+        "quote",
+        "check_domain",
+        "place order",
+        "cod",
+        "payment option",
+        "storefront",
+        "sambad",
+        "shopper",
+        "custom site",
+        "hold"
+      ],
+      "rules": [
+        "backend:docs/stock-holds.md",
+        "backend:docs/flash-sales.md",
+        "backend:docs/advance-payment-rules.md",
+        "backend:docs/fulfilment-rules.md",
+        "storefront:src/features/checkout/RULES.md"
+      ],
+      "tests": [
+        "backend:tests/money/sambad-shopper.test.ts",
+        "backend:tests/inventory/web-oversell.test.ts",
+        "backend:tests/multi-outlet/checkout-plan.test.ts",
+        "storefront:src/features/checkout/contract.test.ts",
+        "kit:packages/storefront/test/checkout-logic.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/task/create-order.ts",
+          "src/features/order/task/public-*",
+          "src/features/order/task/checkout-plan.ts",
+          "src/features/order/task/sambad-*",
+          "src/features/order/task/store-availability.ts",
+          "src/features/order/service/checkout-*",
+          "src/features/order/service/pooled-checkout.ts",
+          "src/features/order/service/delivery-charge.ts",
+          "src/features/order/service/customer-auth.ts",
+          "src/features/store/service/check-domain.ts",
+          "src/features/store/service/read-delivery-charge.ts",
+          "src/features/store/service/update-delivery-charge.ts",
+          "src/features/promotion/public.controller.ts",
+          "src/features/stock_hold",
+          "src/public_features",
+          "src/client_web",
+          "src/core/helpers/delivery-date.helper.ts"
+        ],
+        "dashboard": [
+          "src/features/checkout_settings",
+          "src/features/store_setting/DeliveryCharge.tsx",
+          "src/features/store_setting/StorefrontFeatures.tsx"
+        ],
+        "storefront": [
+          "src/features/checkout",
+          "src/features/quick_checkout",
+          "src/features/auth",
+          "pages/checkout.tsx",
+          "pages/buy",
+          "pages/payment",
+          "pages/purchase",
+          "pages/account",
+          "pages/member",
+          "src/hooks",
+          "src/context",
+          "lib/services",
+          "src/components/CartDrawer",
+          "src/components/CartSync.tsx",
+          "src/components/KPaymentAwait.tsx",
+          "src/components/KFonepayCheckoutAwait.tsx",
+          "src/components/PaymentCloseConfirm.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/core",
+          "packages/storefront/src/react",
+          "packages/storefront/src/client",
+          "packages/storefront/src/server"
+        ],
+        "mcp": [
+          "src/shopper",
+          "src/storefront.ts",
+          "src/tools/storefront.ts"
+        ]
+      },
+      "watch": [
+        "A shopper must always be able to complete an order: at least one way to pay must be reachable for every combination of settings (COD, online, pickup, advance). A setting change that removes the last way must switch the dependent setting off or be refused.",
+        "The storefront, the kit and the MCP shopper never decide prices, totals, offers, the advance or stock on their own: they show the backend's answer (check_domain + quote). Any client copy of a rule must have a contract test against backend fixtures.",
+        "A new check_domain or quote field is read by three clients: storefront, kit (published to npm; custom sites update late) and MCP. Old clients must keep working."
+      ],
+      "links": [
+        {
+          "to": "payments",
+          "why": "Which payment options the checkout shows comes from the store's gateways (addons / blanxer_pay) and COD.",
+          "check": "Turn each gateway off in turn: the checkout must still offer a way to pay, or say plainly the store is not taking orders."
+        },
+        {
+          "to": "advance-payment",
+          "why": "The advance decides whether COD needs an online part first.",
+          "check": "docs/advance-payment-rules.md AP-24; tests/money/advance-paths.test.ts"
+        },
+        {
+          "to": "fulfilment",
+          "why": "Pickup and pooled multi-outlet change delivery, the advance, stock reads and how many orders one checkout makes.",
+          "check": "tests/inventory/fulfilment.test.ts, tests/multi-outlet/*"
+        },
+        {
+          "to": "inventory",
+          "why": "The quote, create-order and payment start check and hold stock; continue-selling never applies on advanced stores.",
+          "check": "tests/inventory/stock-gaps.test.ts, web-oversell.test.ts"
+        },
+        {
+          "to": "offers",
+          "why": "The quote applies offers, coupons, gifts and bundle picks; create-order must charge what the quote showed.",
+          "check": "tests/promotions/orders.test.ts (charge = quote)"
+        },
+        {
+          "to": "products",
+          "why": "Draft / POS-only products, variants, bundles and flash-sale prices decide what can be bought.",
+          "check": "tests/seo/public-reads.test.ts, tests/promotions/bundle-products.test.ts"
+        },
+        {
+          "to": "meta-tracking",
+          "why": "The checkout sends pixel / CAPI events; Sambad orders send none.",
+          "check": "tests/money/meta-tracking.test.ts"
+        },
+        {
+          "to": "store-settings",
+          "why": "Plan (POS-only stores have no website), domains and storefront_url decide whether there is a checkout at all.",
+          "check": "check_domain for a POS-plan store"
+        }
+      ]
+    },
+    "advance-payment": {
+      "name": "Advance payment: pay part online, the rest on delivery",
+      "summary": "store.checkout.advance_payment (and the pickup advance in checkout.fulfilment.pickup_advance). A COD order pays the delivery charge, a fixed amount or a percent online first. Needs at least one online payment method.",
+      "keywords": [
+        "advance",
+        "partial payment",
+        "part paid",
+        "delivery advance",
+        "pickup advance",
+        "fake cod"
+      ],
+      "rules": [
+        "backend:docs/advance-payment-rules.md",
+        "dashboard:src/features/orders/advance/RULES.md"
+      ],
+      "tests": [
+        "backend:tests/money/advance-payment.test.ts",
+        "backend:tests/money/advance-paths.test.ts",
+        "backend:tests/money/advance-parity.test.ts",
+        "backend:tests/money/advance-ledger.test.ts",
+        "backend:tests/money/advance-contract.test.ts",
+        "backend:tests/money/advance-rules-index.test.ts",
+        "dashboard:src/features/orders/advance/contract.test.ts",
+        "storefront:src/features/checkout/advance.test.ts",
+        "kit:packages/storefront/test/advance-contract.test.ts",
+        "app:src/services/advance-contract.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/service/advance.ts",
+          "src/features/order/service/advance-quote.ts",
+          "src/core/helpers/order-advance.ts",
+          "src/features/store/service/update-advance-payment.ts"
+        ],
+        "dashboard": [
+          "src/features/orders/advance",
+          "src/features/checkout_settings/AdvancePaymentCard.tsx",
+          "src/features/checkout_settings/AdvanceProducts.tsx",
+          "src/features/checkout_settings/advance.ts"
+        ],
+        "app": [
+          "src/services/advance.ts"
+        ],
+        "storefront": [
+          "src/features/checkout/advance.ts",
+          "src/features/checkout/use-advance.ts",
+          "src/features/checkout/AdvanceUI.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/core/advance.ts",
+          "packages/storefront/src/react/advance-ui.tsx"
+        ],
+        "mcp": [
+          "src/advance.ts",
+          "src/tools/advance-payment.ts"
+        ]
+      },
+      "watch": [
+        "The advance needs an online payment method. Every path that removes the last one switches the advance off (AP-24, switchOffAdvanceWithoutOnline); a new path that can remove a gateway must call it too.",
+        "Only the gateway-locked advance (lockedAdvance) is the customer ledger's floor (CP-4).",
+        "MONEY_OPEN_V must be bumped when the open-money shape of an advance order changes."
+      ],
+      "links": [
+        {
+          "to": "payments",
+          "why": "The advance is paid through the store's online gateways; with none left it cannot be paid.",
+          "check": "AP-24 in tests/money/advance-paths.test.ts"
+        },
+        {
+          "to": "checkout",
+          "why": "The quote and create-order decide whether COD needs the advance.",
+          "check": "advanceFor + the storefront / kit contract fixtures"
+        },
+        {
+          "to": "cod-reconcile",
+          "why": "Courier COD collects only the rest (codToCollect); Reconcile splits advance / rest.",
+          "check": "money_open.parts; tests/money/advance-ledger.test.ts"
+        },
+        {
+          "to": "customers-ledger",
+          "why": "onPaymentSuccess reconciles the advance into the customer ledger.",
+          "check": "tests/money/advance-ledger.test.ts"
+        },
+        {
+          "to": "fulfilment",
+          "why": "A pickup has its own advance (FU-14), only with pay-at-store on.",
+          "check": "tests/inventory/fulfilment.test.ts"
+        },
+        {
+          "to": "refunds-returns",
+          "why": "Refunding a part-paid order while Waiting Reconcile.",
+          "check": "AP rules on refunds"
+        }
+      ]
+    },
+    "payments": {
+      "name": "Online payments: gateways, BlanxerPay, settlements, payment settings",
+      "summary": "eSewa, Khalti, Fonepay (static / dynamic / checkout / QR), ConnectIPS, NPX, Nabil card, Cybersource, BlanxerPay; payment settings saves; the one place an online payment moves an order (payment-flip); settlements and the super-admin QR approval.",
+      "keywords": [
+        "payment",
+        "gateway",
+        "esewa",
+        "khalti",
+        "fonepay",
+        "npx",
+        "nabil",
+        "cybersource",
+        "blanxerpay",
+        "qr",
+        "settlement",
+        "addons",
+        "online method",
+        "foneloan"
+      ],
+      "rules": [
+        "backend:docs/money/flow.md"
+      ],
+      "tests": [
+        "backend:tests/money/payment-flip.test.ts",
+        "backend:tests/money/pos-fonepay.test.ts",
+        "backend:tests/money/advance-paths.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/payment",
+          "src/features/esewa",
+          "src/features/store/service/update-payment-setting.ts",
+          "src/features/store/service/apply-qr-payment-request.ts",
+          "src/features/pos_finance/utils/online-methods.ts",
+          "src/super_admin/store/tasks/*qr-request.ts",
+          "src/super_admin/fonepay_reconcile",
+          "src/super_admin/transaction",
+          "src/services/esewa",
+          "src/services/khalti",
+          "src/services/fone_pay",
+          "src/services/nabil",
+          "src/services/nps",
+          "src/services/cybersource",
+          "src/services/cellpay",
+          "src/core/helpers/payment.helper.ts",
+          "src/core/constants/payment.ts",
+          "src/core/models/transaction.ts",
+          "src/core/models/settlement.ts"
+        ],
+        "dashboard": [
+          "src/features/payment_setting",
+          "src/features/transactions",
+          "src/shared/constants/payment.ts",
+          "src/shared/helpers/payment.helper.ts",
+          "src/services/purchase.service.ts"
+        ],
+        "app": [
+          "src/app/transactions",
+          "src/services/transaction.service.ts",
+          "src/components/finance/online.ts"
+        ],
+        "storefront": [
+          "src/features/checkout/pay.ts",
+          "src/features/checkout/PayMethodModal.tsx",
+          "src/features/checkout/PaymentRadios.tsx",
+          "src/features/checkout/PayOrder.tsx",
+          "pages/payment",
+          "src/components/OlizTab.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/core/payments.ts",
+          "packages/storefront/src/react/payment-modals.tsx",
+          "packages/storefront/src/react/payment-pages.tsx",
+          "packages/storefront/src/react/pay-order.tsx",
+          "packages/storefront/src/react/payment-hold.ts"
+        ],
+        "mcp": [
+          "src/tools/transactions.ts"
+        ]
+      },
+      "watch": [
+        "An online payment moves an order only through payment/service/payment-flip.ts (claimOnlineSettled / markOnlineFailed); never `order.payment_status = …; order.save()`.",
+        "Turning a gateway off can leave a setting that needs it (advance, pickup online-only, money-accounts channel accounts). Every save path that can remove a gateway (Setting → Payment, the generic store save, super-admin QR rejection, plan expiry) must handle the dependants.",
+        "Gateways and the list of 'online methods' exist in several places (onlineMethodsOf, ownGatewayMethods, the dashboard's payment constants, the storefront's pay.ts): a new gateway is added to all of them."
+      ],
+      "links": [
+        {
+          "to": "advance-payment",
+          "why": "The advance needs an online method.",
+          "check": "AP-24"
+        },
+        {
+          "to": "checkout",
+          "why": "The payment options shown to shoppers.",
+          "check": "check_domain addons + the storefront's pay.ts"
+        },
+        {
+          "to": "finance",
+          "why": "Online money books into online_settlement_accounts; BlanxerPay money only from the payout.",
+          "check": "tests/money/money-accounts-plugin.test.ts"
+        },
+        {
+          "to": "fulfilment",
+          "why": "A pickup with pay-at-store off can only be paid online.",
+          "check": "FU-14"
+        },
+        {
+          "to": "inventory",
+          "why": "Paid takes stock once (REDUCE_ON_PAID retry); a failed payment releases holds.",
+          "check": "tests/money/payment-flip.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "The counter Fonepay QR tender and BlanxerPay QR.",
+          "check": "tests/money/pos-fonepay.test.ts"
+        }
+      ]
+    },
+    "cod-reconcile": {
+      "name": "COD and Reconcile: courier remittances, Waiting Reconcile, shortfalls",
+      "summary": "Cash collected by couriers comes back as remittances; Finance → Reconcile lists every order whose money hasn't reached an account; courier fees and shortfalls are expensed even without accounts.",
+      "keywords": [
+        "cod",
+        "reconcile",
+        "remittance",
+        "waiting reconcile",
+        "shortfall",
+        "courier fee",
+        "money_open"
+      ],
+      "rules": [
+        "backend:docs/money/flow.md",
+        "backend:docs/money/decisions.md"
+      ],
+      "tests": [
+        "backend:tests/money/cod-shortfall.test.ts",
+        "backend:tests/money/reconcile-cache.test.ts",
+        "backend:tests/money/courier-reconcile-money.test.ts",
+        "backend:tests/money/returns-couriers.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/pos_finance/task/remit-cod.ts",
+          "src/features/pos_finance/task/remit-matching.ts",
+          "src/features/pos_finance/task/reconcile.ts",
+          "src/features/pos_finance/task/cod-report.ts",
+          "src/features/pos_finance/task/get-cod-records.ts",
+          "src/features/pos_finance/task/recover-cod-shortfall.ts",
+          "src/features/pos_finance/task/returned-held.ts",
+          "src/features/pos_finance/utils/cod.ts",
+          "src/core/models/cod_remittance.ts"
+        ],
+        "dashboard": [
+          "src/features/cod_reconciliation",
+          "src/features/reconcile",
+          "src/features/orders/detail/ReconcileCodModal.tsx",
+          "src/features/orders/detail/WaitingReconcileNotice.tsx"
+        ],
+        "app": [
+          "src/app/pos/cod.tsx",
+          "src/app/pos/reconcile.tsx",
+          "src/components/orders/ReconcileSheet.tsx",
+          "src/components/pos/CodSheets.tsx",
+          "src/services/cod-lines.ts"
+        ],
+        "mcp": [
+          "src/tools/money.ts"
+        ]
+      },
+      "watch": [
+        "COD money comes only from the remittance; BlanxerPay money only from the payout.",
+        "Reconcile caches each order's open money (money_open, MONEY_OPEN_V): a change to what counts as open bumps the version and refills every store once (deploy off-peak)."
+      ],
+      "links": [
+        {
+          "to": "finance",
+          "why": "Remittances, fees and shortfalls post to accounts or as account-less expenses.",
+          "check": "tests/money/cod-shortfall.test.ts"
+        },
+        {
+          "to": "couriers",
+          "why": "Courier statuses (delivered, returned) decide what is expected back; Pathao's collected_amount pre-fills.",
+          "check": "tests/money/returns-couriers.test.ts"
+        },
+        {
+          "to": "orders",
+          "why": "Reconciling moves an order from Waiting Reconcile to Paid.",
+          "check": "tests/money/order-status-money.test.ts"
+        },
+        {
+          "to": "advance-payment",
+          "why": "Part-paid orders only expect the rest.",
+          "check": "money_open.parts"
+        },
+        {
+          "to": "reports",
+          "why": "Courier fees and shortfalls change P&L.",
+          "check": "tests/money/reports-by-place.test.ts"
+        }
+      ]
+    },
+    "couriers": {
+      "name": "Couriers and logistics: send, track, webhooks, comments, shipments",
+      "summary": "Pathao, NCM, Hello Service (GBL), Dash, Daraz, Expo Express, Fabbud, Pick and Drop, Shipday, Upaya (Aramex retired). Submitting orders, webhooks that move status, courier comments, delivery locations, the With couriers page and network insights.",
+      "keywords": [
+        "courier",
+        "logistics",
+        "pathao",
+        "ncm",
+        "hello service",
+        "gbl",
+        "dash",
+        "daraz",
+        "upaya",
+        "shipday",
+        "webhook",
+        "tracking",
+        "shipment",
+        "delivery location",
+        "network"
+      ],
+      "rules": [
+        "backend:docs/money/flow.md"
+      ],
+      "tests": [
+        "backend:tests/money/pathao-webhook.test.ts",
+        "backend:tests/money/pathao-location-sync.test.ts",
+        "backend:tests/money/ncm-comment-webhook.test.ts",
+        "backend:tests/money/courier-comments.test.ts",
+        "backend:tests/analytics/shipments-paging.test.ts",
+        "backend:tests/analytics/shipments-pickup.test.ts",
+        "backend:tests/analytics/retired-couriers.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/task/submit-to-*",
+          "src/features/order/task/handle-*-webhook.ts",
+          "src/features/order/task/cancel-*",
+          "src/features/order/task/track-*",
+          "src/features/order/task/*hello-service*",
+          "src/features/order/task/get-*-areas.ts",
+          "src/features/order/task/get-*-options.ts",
+          "src/features/order/task/get-*-cities.ts",
+          "src/features/order/task/get-address-for-*",
+          "src/features/order/task/get-pick-and-drop-*",
+          "src/features/order/task/ncm-tools.ts",
+          "src/features/order/task/pathao-tools.ts",
+          "src/features/order/task/courier-comments.ts",
+          "src/features/order/task/record-courier-exchange.ts",
+          "src/features/order/task/get-dispatched-orders.ts",
+          "src/features/order/task/get-tracking-link-from-order.ts",
+          "src/features/order/task/utils/afterOrderStatusChangeByWebhook.ts",
+          "src/features/order/task/utils/applyHelloServiceStatus.ts",
+          "src/features/order/task/utils/forwardLogisticsComment.ts",
+          "src/features/order/task/utils/store*InboundComment.ts",
+          "src/features/order/service/courier-exchange.ts",
+          "src/features/logistics_locations",
+          "src/features/network_insights",
+          "src/super_admin/logistics",
+          "src/services/aramex",
+          "src/services/daraz",
+          "src/services/dash",
+          "src/services/expo_express",
+          "src/services/fabbud",
+          "src/services/hello_service",
+          "src/services/ncm",
+          "src/services/pathao",
+          "src/services/pick_and_drop",
+          "src/services/shipday",
+          "src/services/upaye",
+          "src/core/helpers/courier-phone.ts",
+          "src/core/constants/aramex.ts",
+          "src/core/constants/ncm.ts",
+          "src/core/constants/delivery_cost_code.ts"
+        ],
+        "dashboard": [
+          "src/features/logistics_overview",
+          "src/features/courier_comments",
+          "src/features/orders/Submit*.tsx",
+          "src/features/orders/*Tracking.tsx",
+          "src/features/orders/Cancel*.tsx",
+          "src/features/orders/Gbl*.tsx",
+          "src/features/orders/NcmCustomerRecord.tsx",
+          "src/features/orders/BulkLogisticsSubmit.tsx",
+          "src/features/orders/useCourierLocations.ts",
+          "src/features/orders/detail/LogisticsSubmit.tsx",
+          "src/features/orders/detail/CourierCompare.tsx",
+          "src/features/orders/detail/useCourierAdvice.ts",
+          "src/services/gbl.service.ts",
+          "src/services/network.service.ts",
+          "src/services/courier-comments.service.ts",
+          "src/shared/constants/courier.ts",
+          "src/shared/constants/pathao.ts",
+          "src/shared/constants/ncm.ts",
+          "src/shared/constants/daraz.ts",
+          "src/shared/constants/aramex.ts",
+          "src/shared/constants/gbl.ts"
+        ],
+        "app": [
+          "src/app/logistics",
+          "src/components/logistics",
+          "src/services/logistics.service.ts",
+          "src/services/network.service.ts",
+          "src/services/courier-comments.service.ts",
+          "src/services/courier-rules.ts",
+          "src/services/courier-returns.ts",
+          "src/components/orders/Courier*.tsx",
+          "src/components/orders/Delivery*.tsx",
+          "src/components/orders/HelloServiceSheet.tsx",
+          "src/components/orders/LogisticsSubmitSheet.tsx"
+        ],
+        "mcp": [
+          "src/couriers",
+          "src/tools/delivery-sync.ts",
+          "src/tools/network.ts",
+          "src/tracking"
+        ]
+      },
+      "watch": [
+        "Courier lists live in the backend (COURIERS, RETIRED_COURIERS), the dashboard constants, the app's couriers.ts and the MCP registry; name only couriers that have a Plugins-page card.",
+        "A webhook that changes status runs the same money / stock / ledger effects as a staff status change (afterOrderStatusChangeByWebhook).",
+        "A refunded order is never sent to a courier (every submit-to-* checks it)."
+      ],
+      "links": [
+        {
+          "to": "orders",
+          "why": "Webhooks change order status and add comments.",
+          "check": "tests/money/pathao-webhook.test.ts"
+        },
+        {
+          "to": "cod-reconcile",
+          "why": "Delivered COD orders wait for the remittance; returned parcels carry a return fee.",
+          "check": "tests/money/returns-couriers.test.ts"
+        },
+        {
+          "to": "refunds-returns",
+          "why": "Courier exchanges (NCM, Hello Service, Pathao) and returns.",
+          "check": "tests/money/exchanges.test.ts"
+        },
+        {
+          "to": "fulfilment",
+          "why": "Courier pickup per outlet (Outlet.courier_pickup); a pickup order is never sent.",
+          "check": "FU-13"
+        },
+        {
+          "to": "reports",
+          "why": "Delivery success, network insights and the leaderboard read courier statuses.",
+          "check": "tests/analytics/*"
+        },
+        {
+          "to": "notifications",
+          "why": "Dispatched / delivering SMS carry the tracking number.",
+          "check": "tests/sms/event-message.test.ts"
+        }
+      ]
+    },
+    "fulfilment": {
+      "name": "Fulfilment and multi-outlet: store pickup, fulfil from, pooled stock, routing",
+      "summary": "Platinum + advanced inventory: website shoppers pick up at an outlet; staff choose which outlet fulfils; pooled stores sell online from several outlets with routing, split carts into linked orders and between-location moves.",
+      "keywords": [
+        "pickup",
+        "fulfil from",
+        "outlet",
+        "multi-outlet",
+        "pooled",
+        "pool",
+        "routing",
+        "split",
+        "linked orders",
+        "between locations",
+        "website outlet"
+      ],
+      "rules": [
+        "backend:docs/fulfilment-rules.md"
+      ],
+      "tests": [
+        "backend:tests/inventory/fulfilment.test.ts",
+        "backend:tests/multi-outlet/foundations.test.ts",
+        "backend:tests/multi-outlet/settings.test.ts",
+        "backend:tests/multi-outlet/routing.test.ts",
+        "backend:tests/multi-outlet/split-create.test.ts",
+        "backend:tests/multi-outlet/pooled-off-create.test.ts",
+        "storefront:src/features/checkout/pickup.test.ts",
+        "kit:packages/storefront/test/pickup.test.ts"
+      ],
+      "notes": [
+        "backend:e2e/multi-outlet",
+        "backend:scripts/e2e-multi-outlet.sh"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/service/fulfilment.ts",
+          "src/features/order/service/fulfilment-entry.ts",
+          "src/features/order/service/routing.ts",
+          "src/features/order/service/reroute.ts",
+          "src/features/order/service/splitter.ts",
+          "src/features/order/service/checkout-group.ts",
+          "src/features/order/service/pooled-checkout.ts",
+          "src/features/order/task/fulfilment.ts",
+          "src/features/store/service/fulfilment-routing.ts",
+          "src/features/store/service/fulfilment-setting.ts",
+          "src/features/store/service/pool-setting.ts",
+          "src/features/store/service/outlet-delivery.ts",
+          "src/core/helpers/pool.ts",
+          "src/core/helpers/website-stock.ts",
+          "src/super_admin/store/tasks/multi-outlet.ts",
+          "src/features/inventory/tasks/create-outlet.ts",
+          "src/features/inventory/tasks/update-outlet.ts",
+          "src/features/inventory/tasks/change-website-outlet.ts",
+          "src/features/inventory/tasks/held-online.ts",
+          "src/core/models/outlet.ts",
+          "src/core/models/fulfilment_entry.ts",
+          "src/core/models/fulfilment_route.ts"
+        ],
+        "dashboard": [
+          "src/features/multi_outlet",
+          "src/features/checkout_settings/StorePickupCard.tsx",
+          "src/features/checkout_settings/fulfilment.ts",
+          "src/features/orders/detail/FulfilmentPanel.tsx",
+          "src/services/multi-outlet.service.ts",
+          "src/hooks/useOutlet.ts"
+        ],
+        "app": [
+          "src/services/pickup.ts",
+          "src/services/inventory-outlets.ts",
+          "src/hooks/useInventoryOutlet.ts"
+        ],
+        "storefront": [
+          "src/features/checkout/pickup.ts",
+          "src/features/checkout/PickupChoice.tsx",
+          "src/features/checkout/plan.ts",
+          "src/features/checkout/PlanParcels.tsx",
+          "src/features/checkout/use-checkout-plan.ts",
+          "pages/locations.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/core/pickup.ts",
+          "packages/storefront/src/react/pickup-ui.tsx"
+        ],
+        "mcp": [
+          "src/pickup.ts",
+          "src/tools/fulfilment.ts"
+        ]
+      },
+      "watch": [
+        "Pickup needs 1 active outlet, Fulfil from needs 2, pooled needs pooled_allowed + the outlet limit; all need Platinum + advanced inventory (fulfilmentBlockers, isPooled). An outlet deactivated or deleted, a plan downgrade or advanced inventory turned off must not leave a setting pointing at it.",
+        "Every stock check of an order reads the order's own outlet (stockStoreFor); holds are per outlet (holdKey).",
+        "Run scripts/e2e-multi-outlet.sh before merging anything touching orders, stock, delivery, payments or outlets."
+      ],
+      "links": [
+        {
+          "to": "inventory",
+          "why": "Outlets, batches and per-outlet stock; moving an order's outlet moves taken stock.",
+          "check": "tests/inventory/fulfilment.test.ts"
+        },
+        {
+          "to": "checkout",
+          "why": "Pickup / pooled change delivery, the advance and the number of orders a checkout makes.",
+          "check": "tests/multi-outlet/checkout-plan.test.ts"
+        },
+        {
+          "to": "payments",
+          "why": "Pickup with pay-at-store off = online only; group payments pay several linked orders.",
+          "check": "tests/multi-outlet/group-payment.test.ts"
+        },
+        {
+          "to": "reports",
+          "why": "Orders count at their outlet (place); a pickup is a web sale.",
+          "check": "tests/money/place-money.test.ts"
+        },
+        {
+          "to": "store-settings",
+          "why": "Plan and super-admin limits gate the whole feature.",
+          "check": "tests/multi-outlet/settings.test.ts"
+        }
+      ]
+    },
+    "inventory": {
+      "name": "Inventory: stock, batches, outlets, stock moves, advanced inventory",
+      "summary": "Simple stores keep flat quantities; advanced stores keep batches per outlet with FEFO and costs. Stock-in, transfer, write-off, adjust, held stock, stock alerts, the inventory monitor.",
+      "keywords": [
+        "stock",
+        "inventory",
+        "batch",
+        "stock in",
+        "transfer",
+        "write off",
+        "adjust",
+        "advanced inventory",
+        "continue selling",
+        "fefo",
+        "cost",
+        "supplier",
+        "stock alert"
+      ],
+      "rules": [
+        "backend:docs/inventory-rules.md",
+        "dashboard:src/features/orders/stock/RULES.md"
+      ],
+      "tests": [
+        "backend:tests/inventory/order-stock.test.ts",
+        "backend:tests/inventory/pos-stock.test.ts",
+        "backend:tests/inventory/stock-moves.test.ts",
+        "backend:tests/inventory/stock-gaps.test.ts",
+        "backend:tests/inventory/web-rules-index.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/inventory",
+          "src/features/stock-alert",
+          "src/features/order/service/take-stock.ts",
+          "src/features/order/task/utils.ts",
+          "src/features/order/task/utils/handle-inventory-*",
+          "src/features/order/task/utils/was-inventory-reduced.ts",
+          "src/features/order/task/utils/batch-cogs.ts",
+          "src/features/order/task/stock-attention.ts",
+          "src/super_admin/inventory",
+          "src/core/models/batch.ts",
+          "src/core/models/stock_*.ts",
+          "src/core/models/inventory_*.ts",
+          "src/core/models/batch_cost_correction.ts",
+          "src/core/handlers/stock.error.ts",
+          "src/core/handlers/needsConfirmation.error.ts"
+        ],
+        "dashboard": [
+          "src/features/inventory",
+          "src/features/orders/stock",
+          "src/services/inventory.service.ts",
+          "src/services/stock-alert.service.ts",
+          "src/hooks/inventoryCan.ts",
+          "src/hooks/useInventoryCan.ts"
+        ],
+        "app": [
+          "src/app/(tabs)/inventory",
+          "src/services/inventory.service.ts",
+          "src/services/stock-short.ts",
+          "src/services/stock-error.ts",
+          "src/services/stock-alert.service.ts",
+          "src/services/batch-cost.ts",
+          "src/store/inventory.store.ts",
+          "src/hooks/useInventoryPerms.ts",
+          "src/hooks/useStockAttention.ts"
+        ],
+        "storefront": [
+          "src/features/checkout/stock.ts",
+          "src/features/checkout/StockNotice.tsx",
+          "src/features/checkout/use-stock.ts",
+          "src/features/checkout/use-checkout-stock.tsx",
+          "src/components/NotifyMeWhenAvailable.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/core/stock.ts",
+          "packages/storefront/src/react/stock-ui.tsx",
+          "packages/storefront/src/react/stock-alert.tsx"
+        ],
+        "mcp": [
+          "src/stock.ts",
+          "src/stock-short.ts",
+          "src/continue-selling.ts",
+          "src/item-costs.ts",
+          "src/tools/inventory.ts",
+          "src/tools/batch-cost.ts",
+          "src/tools/stock-attention.ts",
+          "src/tools/suppliers.ts"
+        ]
+      },
+      "watch": [
+        "On an advanced store every number agrees with the batches (assertStock: batches = outlet summaries = product / variant totals = ledger).",
+        "Stock moves only through the sanctioned helpers (inventoryReduce / inventoryRevert / restockIntoBatches / executeStockIn / restockPosReturn) and are keyed (client_request_id); caches are busted after (bustStockCaches).",
+        "Continue-selling never applies on an advanced store; staff edits ask (NeedsConfirmationError) before going below units held in live checkouts."
+      ],
+      "links": [
+        {
+          "to": "orders",
+          "why": "Orders take and give back stock.",
+          "check": "tests/inventory/order-stock.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "Counter sales take stock FEFO at the till's outlet.",
+          "check": "tests/inventory/pos-stock.test.ts"
+        },
+        {
+          "to": "refunds-returns",
+          "why": "Returns restock (restockPosReturn) unless kept out.",
+          "check": "tests/money/exchanges.test.ts"
+        },
+        {
+          "to": "products",
+          "why": "Product / variant edits and deletes write stock off; bundles take their parts.",
+          "check": "tests/inventory/stock-moves.test.ts"
+        },
+        {
+          "to": "finance",
+          "why": "Batch costs feed COGS / gross profit; stock-in posts supplier ledgers.",
+          "check": "tests/inventory/supplier-postings.test.ts"
+        },
+        {
+          "to": "tigg",
+          "why": "Tigg's stock of linked items must equal Blanxer's.",
+          "check": "tests/tigg/always-in-step.test.ts"
+        },
+        {
+          "to": "fulfilment",
+          "why": "Outlets and the website outlet decide what the website can sell.",
+          "check": "tests/multi-outlet/pooled-stock.test.ts"
+        }
+      ]
+    },
+    "products": {
+      "name": "Catalog: products, variants, categories, brands, bundles, media, barcodes, size guides",
+      "summary": "Everything a merchant lists. Product saves touch stock (advanced stores), SEO slugs and redirects, the Meta feed, the sitemap and storefront caches.",
+      "keywords": [
+        "product",
+        "variant",
+        "category",
+        "brand",
+        "bundle",
+        "media",
+        "image",
+        "barcode",
+        "label",
+        "sku",
+        "size guide",
+        "price",
+        "draft",
+        "pos only"
+      ],
+      "rules": [
+        "backend:docs/inventory-rules.md",
+        "backend:docs/offers-rules.md"
+      ],
+      "tests": [
+        "backend:tests/barcode-labels.test.ts",
+        "backend:tests/money/alt-barcode.test.ts",
+        "backend:tests/money/media-images.test.ts",
+        "backend:tests/money/size-guide.test.ts",
+        "backend:tests/promotions/bundle-products.test.ts",
+        "backend:tests/money/product-cost-ux.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/product",
+          "src/features/brand",
+          "src/features/size_guide",
+          "src/features/file",
+          "src/core/models/product.ts",
+          "src/core/models/brand.ts",
+          "src/core/models/file.ts",
+          "src/core/models/folder.ts",
+          "src/core/models/size_guide.ts",
+          "src/core/helpers/s3helper.ts",
+          "src/core/helpers/r2.helper.ts"
+        ],
+        "dashboard": [
+          "src/features/add_product",
+          "src/features/edit_product",
+          "src/features/products",
+          "src/features/products_hub",
+          "src/features/product_overview",
+          "src/features/categories",
+          "src/features/brands",
+          "src/features/size_guides",
+          "src/features/media",
+          "src/services/product.service.ts",
+          "src/services/brand.service.ts",
+          "src/services/size_guide.service.ts",
+          "src/services/file.service.ts",
+          "src/hooks/useProduct.ts",
+          "src/hooks/useSingleProduct.tsx",
+          "src/hooks/useBrands.ts",
+          "src/hooks/useCategory.ts"
+        ],
+        "app": [
+          "src/app/(tabs)/products",
+          "src/components/products",
+          "src/components/bg-removal",
+          "src/services/product.service.ts",
+          "src/services/brand.service.ts",
+          "src/services/media.service.ts",
+          "src/services/product-cost.ts",
+          "src/services/product-images.ts",
+          "src/services/barcode-match.ts",
+          "src/services/bundle-picks.ts",
+          "src/hooks/useImageUrl.ts"
+        ],
+        "storefront": [
+          "src/features/all_products",
+          "src/features/product_details",
+          "src/features/brands",
+          "pages/product",
+          "pages/products.tsx",
+          "pages/products.json.tsx",
+          "pages/brand",
+          "pages/brands.tsx",
+          "pages/collections",
+          "pages/p",
+          "pages/search.tsx",
+          "pages/barcode-search.tsx",
+          "src/components/SingleProductView"
+        ],
+        "kit": [
+          "packages/storefront/src/core/variants.ts",
+          "packages/storefront/src/react/product.tsx",
+          "packages/storefront/src/react/image.tsx",
+          "packages/storefront/src/next",
+          "packages/storefront/src/cli"
+        ],
+        "mcp": [
+          "src/tools/products.ts",
+          "src/tools/catalog.ts",
+          "src/tools/bulk-catalog.ts",
+          "src/tools/bulk.ts",
+          "src/tools/barcodes.ts",
+          "src/tools/uploads.ts",
+          "src/tools/product-sales.ts",
+          "src/skus.ts",
+          "src/variant-names.ts",
+          "src/uploads.ts",
+          "src/upload-routes.ts",
+          "src/imageprep.ts",
+          "src/pricing.ts"
+        ]
+      },
+      "watch": [
+        "A slug change records a 301 redirect (recordSlugChange) and queues IndexNow.",
+        "Product / variant saves on advanced stores never change flat numbers alone; removing a variant writes its stock off first.",
+        "Saves clear the store's caches (storefront apicache, sitemap, llms)."
+      ],
+      "links": [
+        {
+          "to": "inventory",
+          "why": "Saves and deletes move stock.",
+          "check": "tests/inventory/stock-moves.test.ts"
+        },
+        {
+          "to": "seo",
+          "why": "Slugs, redirects, sitemap, no_index, image alts.",
+          "check": "tests/seo/seo-backend.test.ts"
+        },
+        {
+          "to": "offers",
+          "why": "Bundle products and bundle offers are products.",
+          "check": "tests/promotions/bundle-offer-product.test.ts"
+        },
+        {
+          "to": "meta-tracking",
+          "why": "The product feed / Meta catalog lists products.",
+          "check": "tests/storefront-site.test.ts"
+        },
+        {
+          "to": "checkout",
+          "why": "Draft / POS-only / stock decide what shoppers can buy.",
+          "check": "tests/seo/public-reads.test.ts"
+        }
+      ]
+    },
+    "offers": {
+      "name": "Offers: the promotion engine, coupons, gifts, bundles, flash sales, campaigns",
+      "summary": "One engine (promotion/engine) prices every cart on every channel: website quote, staff orders, POS. Old coupon screens and reward coupons run through it. Offer campaigns and flash sales.",
+      "keywords": [
+        "offer",
+        "promotion",
+        "coupon",
+        "discount",
+        "gift",
+        "bogo",
+        "buy x get y",
+        "bundle offer",
+        "flash sale",
+        "campaign",
+        "reward coupon"
+      ],
+      "rules": [
+        "backend:docs/offers-rules.md",
+        "backend:docs/flash-sales.md",
+        "dashboard:src/features/offers/RULES.md",
+        "app:docs/offers-rules.md"
+      ],
+      "tests": [
+        "backend:tests/promotions/engine.test.ts",
+        "backend:tests/promotions/orders.test.ts",
+        "backend:tests/promotions/rules-index.test.ts",
+        "backend:tests/money/coupon-claims.test.ts",
+        "backend:tests/tigg/offers.test.ts",
+        "dashboard:src/features/offers/rules-index.test.ts",
+        "app:src/offers-rules-index.test.ts",
+        "kit:packages/storefront/test/offers.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/promotion",
+          "src/features/coupon",
+          "src/features/offer",
+          "src/features/offer-campaign",
+          "src/core/models/promotion*.ts",
+          "src/core/models/coupan*.ts",
+          "src/core/models/offer*.ts"
+        ],
+        "dashboard": [
+          "src/features/offers",
+          "src/features/offer",
+          "src/features/discount_coupons",
+          "src/features/orders/offers",
+          "src/services/offer.service.ts",
+          "src/services/offer-campaign.service.ts",
+          "src/services/promotion.service.ts",
+          "src/services/coupon.service.ts",
+          "src/services/offers-quote.service.ts",
+          "src/shared/helpers/order-offers.helper.ts"
+        ],
+        "app": [
+          "src/app/offers",
+          "src/services/promotion.service.ts",
+          "src/services/offer-list.ts",
+          "src/services/offer-requests.ts",
+          "src/services/offer-returns.ts",
+          "src/components/orders/Offers.tsx",
+          "src/components/orders/offer-lines.ts",
+          "src/components/pos/usePosOffers.ts"
+        ],
+        "storefront": [
+          "src/features/offers",
+          "pages/offers",
+          "pages/bundles",
+          "pages/sale.tsx",
+          "src/components/FlashSaleBox.tsx",
+          "src/hooks/useCoupon.ts"
+        ],
+        "kit": [
+          "packages/storefront/src/core/offers.ts",
+          "packages/storefront/src/core/coupon.ts",
+          "packages/storefront/src/react/offers.tsx",
+          "packages/storefront/src/react/offer-ui.tsx",
+          "packages/storefront/src/react/flash-sale.tsx"
+        ],
+        "mcp": [
+          "src/offers.ts",
+          "src/tools/offers.ts"
+        ]
+      },
+      "watch": [
+        "Clients never compute offer money: they show the engine's answer (quote). The charge equals the quote.",
+        "Claims (limits, one per customer) are taken in the order transaction and given back exactly once on cancel / failed payment / expiry.",
+        "A rule change is an owner decision: change docs/offers-rules.md and its named test together (rules-index test)."
+      ],
+      "links": [
+        {
+          "to": "checkout",
+          "why": "The quote prices website carts.",
+          "check": "tests/promotions/orders.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "The till prices carts with the same engine.",
+          "check": "tests/promotions/orders.test.ts POS golden totals"
+        },
+        {
+          "to": "refunds-returns",
+          "why": "Returns refund offer orders by line (refundUnitPrice) and give gifts / claims back.",
+          "check": "docs/refund-exchange-rules.md OF rules"
+        },
+        {
+          "to": "inventory",
+          "why": "Gift lines and bundle parts take stock.",
+          "check": "tests/promotions/bundle-products.test.ts"
+        },
+        {
+          "to": "reports",
+          "why": "By offer reports and product revenue (D4).",
+          "check": "tests/promotions/orders.test.ts"
+        },
+        {
+          "to": "tigg",
+          "why": "Offer amounts become Tigg item discounts.",
+          "check": "tests/tigg/offers.test.ts"
+        },
+        {
+          "to": "loyalty",
+          "why": "Reward coupons are offers.",
+          "check": "tests/money/loyalty.test.ts"
+        }
+      ]
+    },
+    "loyalty": {
+      "name": "Loyalty, membership and Samparka rewards",
+      "summary": "Points earned on Paid, taken back on cancel / refund / return, tiers, reward coupons; Samparka POS rewards.",
+      "keywords": [
+        "loyalty",
+        "points",
+        "membership",
+        "member",
+        "tier",
+        "reward",
+        "samparka"
+      ],
+      "rules": [
+        "backend:docs/money/flow.md"
+      ],
+      "tests": [
+        "backend:tests/money/loyalty.test.ts",
+        "backend:tests/samparka-rewards.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/membership",
+          "src/features/samparka-plugin",
+          "src/core/helpers/customer-program.ts",
+          "src/core/models/loyalty_*.ts"
+        ],
+        "dashboard": [
+          "src/features/membership",
+          "src/services/membership.service.ts",
+          "src/features/pos/useSamparkaLoyalty.ts",
+          "src/features/pos/SamparkaRewardsModal.tsx"
+        ]
+      },
+      "links": [
+        {
+          "to": "orders",
+          "why": "Earned on Paid, taken back on cancel / refund / return.",
+          "check": "tests/money/loyalty.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "Cashier limits and counter redemptions.",
+          "check": "tests/money/loyalty.test.ts"
+        }
+      ]
+    },
+    "pos": {
+      "name": "POS: counter sales, tills, shifts and drawers, tenders, voids",
+      "summary": "The counter: sales with several tenders (cash, card, Fonepay QR, credit), shifts and drawers, counters, payment methods, quick setup, the POS-only plan.",
+      "keywords": [
+        "pos",
+        "counter",
+        "till",
+        "shift",
+        "drawer",
+        "tender",
+        "void",
+        "counter sale",
+        "sell",
+        "cashier",
+        "pos plan"
+      ],
+      "rules": [
+        "backend:docs/money/flow.md",
+        "backend:docs/inventory-rules.md"
+      ],
+      "tests": [
+        "backend:tests/money/counter-sale-money.test.ts",
+        "backend:tests/money/drawer-money.test.ts",
+        "backend:tests/money/pos-plan.test.ts",
+        "backend:tests/pos-checkout-rules.test.ts",
+        "backend:tests/pos-scope.test.ts",
+        "backend:tests/pos/payment-status.test.ts",
+        "backend:tests/inventory/pos-stock.test.ts",
+        "app:src/components/pos/tender-rules.test.ts",
+        "app:src/store/pos-totals.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/pos",
+          "src/features/order/task/pos-*",
+          "src/core/middlewares/posScope.ts",
+          "src/core/middlewares/checkPosPlan.ts",
+          "src/core/helpers/pos-*.ts",
+          "src/core/models/pos_*.ts"
+        ],
+        "dashboard": [
+          "src/features/pos",
+          "src/features/pos_settings",
+          "src/services/pos-sale.service.ts",
+          "src/services/pos-settings.service.ts",
+          "src/services/pos-shift.service.ts",
+          "src/shared/helpers/pos-sale.helper.ts",
+          "src/hooks/usePosOnly.ts"
+        ],
+        "app": [
+          "src/app/pos",
+          "src/components/pos",
+          "src/store/pos.store.ts",
+          "src/store/pos-totals.ts",
+          "src/services/pos.service.ts"
+        ],
+        "mcp": [
+          "src/pos-money.ts",
+          "src/tools/pos.ts"
+        ]
+      },
+      "watch": [
+        "The till's totals, change and payment status come from the backend's checkout rules (pos/service/checkout-rules.ts); the dashboard and app copies must agree with them.",
+        "Outlet limits (posScope) and cashier permissions apply to every POS route."
+      ],
+      "links": [
+        {
+          "to": "inventory",
+          "why": "Sales take stock FEFO at the till's outlet; voids give it back.",
+          "check": "tests/inventory/pos-stock.test.ts"
+        },
+        {
+          "to": "finance",
+          "why": "Tenders book into drawers and accounts.",
+          "check": "tests/money/counter-sale-money.test.ts, drawer-money.test.ts"
+        },
+        {
+          "to": "customers-ledger",
+          "why": "Credit sales, store credit, keep change, overpay.",
+          "check": "tests/money/customer-ledger-counter.test.ts"
+        },
+        {
+          "to": "offers",
+          "why": "The till prices with the offers engine.",
+          "check": "tests/promotions/orders.test.ts"
+        },
+        {
+          "to": "refunds-returns",
+          "why": "Counter returns, exchanges and voids.",
+          "check": "tests/money/exchanges.test.ts"
+        },
+        {
+          "to": "payments",
+          "why": "Counter Fonepay QR and BlanxerPay QR tenders.",
+          "check": "tests/money/pos-fonepay.test.ts"
+        },
+        {
+          "to": "staff-roles",
+          "why": "Cashier permissions; csr returns / voids only when allowed.",
+          "check": "RF-11 tests"
+        }
+      ]
+    },
+    "refunds-returns": {
+      "name": "Refunds, returns and exchanges",
+      "summary": "Two return engines (online order return, counter return) share the exchange builder and the refund service. Money-only refund, Refunded / Cancelled / Returned by status, void, courier exchanges, Refund to book.",
+      "keywords": [
+        "refund",
+        "return",
+        "exchange",
+        "void",
+        "cancel",
+        "returned",
+        "damaged",
+        "credit note"
+      ],
+      "rules": [
+        "backend:docs/refund-exchange-rules.md",
+        "dashboard:src/features/orders/returns/RULES.md",
+        "app:src/services/refunds/RULES.md"
+      ],
+      "tests": [
+        "backend:tests/money/exchanges.test.ts",
+        "backend:tests/money/refunds.test.ts",
+        "backend:tests/money/returns-couriers.test.ts",
+        "backend:tests/money/refund-rules-index.test.ts",
+        "backend:tests/pos/refund-plan.test.ts",
+        "dashboard:src/features/orders/returns/rules-index.test.ts",
+        "app:src/services/refunds/rules-index.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/service/exchange-builder.ts",
+          "src/features/order/service/exchange-customer.ts",
+          "src/features/order/service/refund-money.ts",
+          "src/features/order/service/return-lines.ts",
+          "src/features/order/service/credit-out.ts",
+          "src/features/order/task/create-order-return.ts",
+          "src/features/order/task/create-order-refund.ts",
+          "src/features/order/task/return-preview.ts",
+          "src/features/order/task/get-order-returnable.ts",
+          "src/features/order/task/list-order-returns.ts",
+          "src/features/order/task/mark-return-damaged.ts",
+          "src/features/order/task/utils/returned-value.ts",
+          "src/features/pos/task/create-return.ts",
+          "src/features/pos/task/void-sale.ts",
+          "src/features/pos/task/get-return*.ts",
+          "src/features/pos/service/refund-plan.ts",
+          "src/features/pos/task/utils/restock-return.ts",
+          "src/features/promotion/service/returns.ts",
+          "src/core/models/pos_return.ts"
+        ],
+        "dashboard": [
+          "src/features/orders/returns",
+          "src/features/orders/exchange",
+          "src/features/orders/ReturnExchangeModal.tsx",
+          "src/features/orders/detail/RefundSheet.tsx",
+          "src/features/orders/detail/RefundSource.tsx",
+          "src/features/orders/detail/StatusRefund.tsx",
+          "src/features/orders/detail/ExchangePanel.tsx",
+          "src/features/orders/detail/MarkDamagedModal.tsx"
+        ],
+        "app": [
+          "src/services/refunds",
+          "src/components/orders/RefundSheet.tsx",
+          "src/components/orders/RefundedStatusSheet.tsx",
+          "src/components/orders/ReturnPreview.tsx",
+          "src/app/(tabs)/orders/return",
+          "src/app/pos/return",
+          "src/app/pos/returns.tsx"
+        ],
+        "mcp": [
+          "src/refunds.ts",
+          "src/tools/refunds.ts"
+        ]
+      },
+      "watch": [
+        "It connects money, stock, offers and reports, so it must never break: rules RF / EX / ST / OF / RC each name their tests.",
+        "Both engines share exchange-builder.ts and refund-money.ts: never fork a third path."
+      ],
+      "links": [
+        {
+          "to": "finance",
+          "why": "Refunds pay back from an account / drawer; Refund to book in Reconcile.",
+          "check": "tests/money/exchanges.test.ts"
+        },
+        {
+          "to": "inventory",
+          "why": "Returns restock; damaged stays out.",
+          "check": "tests/money/returns-couriers.test.ts"
+        },
+        {
+          "to": "offers",
+          "why": "Offer orders refund by line; gifts and claims come back.",
+          "check": "OF rules"
+        },
+        {
+          "to": "customers-ledger",
+          "why": "Refunds and held money show in the customer's account.",
+          "check": "tests/money/customer-ledger.test.ts"
+        },
+        {
+          "to": "reports",
+          "why": "Returned / refunded orders leave revenue on the right date basis.",
+          "check": "tests/analytics/counted-orders.test.ts"
+        },
+        {
+          "to": "staff-roles",
+          "why": "csr may return / refund / void only with the owner's OK (RF-11).",
+          "check": "tests/money/exchanges.test.ts RF-11"
+        },
+        {
+          "to": "couriers",
+          "why": "Courier exchanges.",
+          "check": "tests/money/exchanges.test.ts"
+        }
+      ]
+    },
+    "finance": {
+      "name": "Finance: accounts, cash book, expenses, suppliers, day close, money-accounts plugin",
+      "summary": "Bank and cash accounts (a plugin since 2026-11-01), every account movement through postBankTxns, expenses, suppliers, Day close / Daybook, finance by branch (place).",
+      "keywords": [
+        "finance",
+        "account",
+        "bank",
+        "cash book",
+        "expense",
+        "supplier",
+        "day close",
+        "daybook",
+        "drawer",
+        "place",
+        "branch",
+        "money accounts",
+        "deposit",
+        "transfer"
+      ],
+      "rules": [
+        "backend:docs/money/README.md",
+        "backend:docs/money/flow.md",
+        "backend:docs/money/decisions.md",
+        "backend:docs/analytics-rules.md"
+      ],
+      "tests": [
+        "backend:tests/money/account-entry-money.test.ts",
+        "backend:tests/money/cash-book.test.ts",
+        "backend:tests/money/expense-money.test.ts",
+        "backend:tests/money/finance-scope.test.ts",
+        "backend:tests/money/place-money.test.ts",
+        "backend:tests/money/money-accounts-plugin.test.ts",
+        "backend:tests/pos_finance/bank-txn-rules.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/pos_finance",
+          "src/core/constants/bank-txn-source.ts",
+          "src/core/models/pos_bank_*.ts",
+          "src/core/models/expense*.ts",
+          "src/core/models/supplier*.ts",
+          "src/core/helpers/with-txn.ts"
+        ],
+        "dashboard": [
+          "src/features/finance",
+          "src/features/bank_accounts",
+          "src/features/cash_book",
+          "src/features/daybook",
+          "src/features/expenses",
+          "src/features/suppliers",
+          "src/features/finance_analytics",
+          "src/services/pos-finance.service.ts",
+          "src/services/supplier.service.ts"
+        ],
+        "app": [
+          "src/app/pos/bank",
+          "src/app/pos/cash-book.tsx",
+          "src/app/pos/day-close.tsx",
+          "src/app/pos/finance.tsx",
+          "src/app/pos/finance-analytics.tsx",
+          "src/app/pos/settlement-accounts.tsx",
+          "src/app/pos/supplier",
+          "src/components/finance",
+          "src/services/pos-finance.service.ts",
+          "src/services/finance-analytics.service.ts",
+          "src/services/order-money.ts",
+          "src/hooks/useAccountsOn.ts",
+          "src/components/orders/OrderMoneyCard.tsx",
+          "src/components/pos/DrawerExpenses.tsx",
+          "src/components/pos/PaidFrom.tsx",
+          "src/components/pos/accounts.ts",
+          "src/components/pos/tenders.ts"
+        ],
+        "mcp": [
+          "src/money-accounts.ts",
+          "src/ledger.ts",
+          "src/tools/money.ts",
+          "src/tools/expenses.ts",
+          "src/tools/suppliers.ts"
+        ]
+      },
+      "watch": [
+        "Account movements only through postBankTxns; every money write is idempotent per store and safe to run twice at once.",
+        "The account is asked, never preselected; no account means the money waits in Reconcile.",
+        "Account screens show only with the money_accounts plugin; channel accounts are made by ensureChannelAccounts."
+      ],
+      "links": [
+        {
+          "to": "orders",
+          "why": "Order money posts here.",
+          "check": "tests/money/order-status-money.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "Drawers and tenders.",
+          "check": "tests/money/drawer-money.test.ts"
+        },
+        {
+          "to": "cod-reconcile",
+          "why": "Remittances and Reconcile deposits.",
+          "check": "tests/money/cod-shortfall.test.ts"
+        },
+        {
+          "to": "payments",
+          "why": "Gateways get channel accounts.",
+          "check": "tests/money/money-accounts-plugin.test.ts"
+        },
+        {
+          "to": "reports",
+          "why": "P&L, cash flow, expenses by category / place.",
+          "check": "tests/money/reports-by-place.test.ts"
+        },
+        {
+          "to": "inventory",
+          "why": "Supplier postings from stock-in; batch COGS.",
+          "check": "tests/inventory/supplier-postings.test.ts"
+        }
+      ]
+    },
+    "customers-ledger": {
+      "name": "Customers and the customer ledger: balances, Receive payment, store credit",
+      "summary": "Every customer's full account: orders, advances, refunds, store credit, credit limit, Receive payment. Order rows are never written by hand.",
+      "keywords": [
+        "customer",
+        "ledger",
+        "balance",
+        "receive payment",
+        "store credit",
+        "credit limit",
+        "due",
+        "customer risk"
+      ],
+      "rules": [
+        "backend:docs/customer-ledger-rules.md",
+        "dashboard:src/features/customers/RULES.md"
+      ],
+      "tests": [
+        "backend:tests/money/customer-ledger.test.ts",
+        "backend:tests/money/customer-ledger-counter.test.ts",
+        "backend:tests/money/customer-ledger-receive.test.ts",
+        "backend:tests/money/customer-ledger-rules-index.test.ts",
+        "app:src/services/customer-ledger.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/customer_ledger",
+          "src/features/customers",
+          "src/features/pos_finance/task/create-customer-entry.ts",
+          "src/features/pos_finance/task/get-customer-*.ts",
+          "src/features/pos/task/utils/credit-ledger.ts",
+          "src/core/models/customer*.ts",
+          "src/core/models/app_customer.ts"
+        ],
+        "dashboard": [
+          "src/features/customers",
+          "src/services/customers.service.ts",
+          "src/features/orders/risk"
+        ],
+        "app": [
+          "src/app/customers",
+          "src/app/pos/customer",
+          "src/app/(tabs)/orders/customer",
+          "src/services/customer.service.ts",
+          "src/services/customer-ledger.ts"
+        ],
+        "mcp": [
+          "src/tools/customer-ledger.ts",
+          "src/tools/customers.ts",
+          "src/tools/bulk-customers.ts"
+        ]
+      },
+      "watch": [
+        "Change the order, then reconcileCustomerLedger(orderId, {session}); customer rows only through postCustomerEntries; assertBooks checks every customer."
+      ],
+      "links": [
+        {
+          "to": "orders",
+          "why": "Every order money change.",
+          "check": "tests/money/customer-ledger.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "Credit sales and store credit.",
+          "check": "tests/money/customer-ledger-counter.test.ts"
+        },
+        {
+          "to": "finance",
+          "why": "Receive payment into an account / drawer or Reconcile.",
+          "check": "tests/money/customer-ledger-receive.test.ts"
+        }
+      ]
+    },
+    "reports": {
+      "name": "Reports and analytics: overview, analytics hub, P&L, leaderboard, traffic, vendor analytics",
+      "summary": "Which orders count, revenue, gross profit, P&L by place, omnichannel rollups, generated reports, the network leaderboard, website traffic, super-admin vendor analytics.",
+      "keywords": [
+        "report",
+        "analytics",
+        "overview",
+        "revenue",
+        "profit",
+        "p&l",
+        "leaderboard",
+        "traffic",
+        "insights",
+        "dashboard home",
+        "export"
+      ],
+      "rules": [
+        "backend:docs/analytics-rules.md"
+      ],
+      "tests": [
+        "backend:tests/analytics/counted-orders.test.ts",
+        "backend:tests/money/reports-by-place.test.ts",
+        "backend:tests/money/traffic.test.ts",
+        "backend:tests/analytics/leaderboard-entry.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/sales_overview",
+          "src/features/omni_analytics",
+          "src/features/reports",
+          "src/features/pos_reports",
+          "src/features/store_analytics",
+          "src/features/order/task/sales-overview.ts",
+          "src/core/analytics",
+          "src/core/middlewares/analyticsScope.ts",
+          "src/super_admin/vendor_analytics",
+          "src/super_admin/dashboard",
+          "src/core/models/sales_daily*.ts",
+          "src/core/models/report_job.ts",
+          "src/core/models/analytics_rollup_state.ts",
+          "src/core/models/store_analytics.ts"
+        ],
+        "dashboard": [
+          "src/features/analytics",
+          "src/features/overview",
+          "src/features/leaderboard",
+          "src/features/dashboard_home",
+          "src/services/analytics.service.ts",
+          "src/services/omni-analytics.service.ts",
+          "src/services/reports.service.ts",
+          "src/services/sales_overview.service.ts",
+          "src/services/pos-reports.service.ts",
+          "src/shared/helpers/analytics.helper.ts",
+          "src/shared/helpers/omni.helper.ts",
+          "src/hooks/useGrossProfitGate.ts"
+        ],
+        "app": [
+          "src/app/(tabs)/analytics",
+          "src/app/(tabs)/(home)",
+          "src/app/leaderboard",
+          "src/app/pos/reports.tsx",
+          "src/components/insights",
+          "src/components/leaderboard",
+          "src/services/analytics.service.ts",
+          "src/services/omni-analytics.service.ts",
+          "src/services/reports.service.ts",
+          "src/services/pos-reports.service.ts"
+        ],
+        "storefront": [
+          "lib/utils/visit.ts"
+        ],
+        "mcp": [
+          "src/tools/reports.ts",
+          "src/tools/insights.ts",
+          "src/tools/gaps.ts"
+        ]
+      },
+      "watch": [
+        "Read docs/analytics-rules.md before touching anything that feeds Sales overview / Analytics / Insights / POS reports; the database rule (countedOrderExpr) and its JS twin (isCountedOrder) must agree."
+      ],
+      "links": [
+        {
+          "to": "orders",
+          "why": "Status decides what counts.",
+          "check": "tests/analytics/counted-orders.test.ts"
+        },
+        {
+          "to": "finance",
+          "why": "P&L reads expenses and courier fees.",
+          "check": "tests/money/reports-by-place.test.ts"
+        },
+        {
+          "to": "refunds-returns",
+          "why": "Returns come off revenue.",
+          "check": "tests/analytics/counted-orders.test.ts"
+        }
+      ]
+    },
+    "store-settings": {
+      "name": "Store, plans and plugins: settings, subscription, domains, plugins, auth, POS-only plan",
+      "summary": "The store document, the generic store save, plans (pos / premium / business plus / platinum / elite) and their gates, subscriptions and expiry, the Plugins page (install / uninstall), domains and storefront_url, login.",
+      "keywords": [
+        "store",
+        "setting",
+        "plan",
+        "premium",
+        "platinum",
+        "elite",
+        "subscription",
+        "expiry",
+        "plugin",
+        "install",
+        "uninstall",
+        "domain",
+        "storefront_url",
+        "kyc",
+        "login",
+        "auth"
+      ],
+      "rules": [
+        "backend:CLAUDE.md"
+      ],
+      "tests": [
+        "backend:tests/money/pos-plan.test.ts",
+        "backend:tests/storefront-site.test.ts",
+        "backend:tests/auth/customer-otp.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/store",
+          "src/features/subscription",
+          "src/features/auth",
+          "src/features/api_keys",
+          "src/super_admin/store",
+          "src/super_admin/subscription",
+          "src/super_admin/auth",
+          "src/core/models/store.ts",
+          "src/core/models/store_users.ts",
+          "src/core/models/subscription.ts",
+          "src/core/models/user.ts",
+          "src/core/models/super_user.ts",
+          "src/core/models/api_keys.ts",
+          "src/core/helpers/general.ts",
+          "src/core/helpers/storefront-url.ts",
+          "src/core/helpers/store-scope.ts",
+          "src/core/helpers/jwt.ts",
+          "src/core/helpers/oauth.ts",
+          "src/core/middlewares",
+          "src/core/handlers",
+          "src/core/constants/blanxer.ts",
+          "src/core/constants/generic.constant.ts"
+        ],
+        "dashboard": [
+          "src/features/store_setting",
+          "src/features/plugins",
+          "src/features/subscription",
+          "src/features/auth",
+          "src/features/support",
+          "src/features/issues",
+          "src/features/learn",
+          "src/services/store.service.ts",
+          "src/services/auth.service.ts",
+          "src/services/support.service.ts",
+          "src/shared/constants/plans.ts",
+          "src/hooks/useAuth.ts",
+          "src/hooks/useStores.ts",
+          "src/hooks/useSubscription.ts",
+          "src/hooks/useMine.ts",
+          "src/hooks/useIssues.ts"
+        ],
+        "app": [
+          "src/app/settings",
+          "src/app/(auth)",
+          "src/app/_layout.tsx",
+          "src/app/index.tsx",
+          "src/app/(tabs)/_layout.tsx",
+          "src/services/store.service.ts",
+          "src/services/support.service.ts",
+          "src/services/app-update.service.ts",
+          "src/services/axios.ts",
+          "src/services/confirm.ts",
+          "src/store/auth.store.ts",
+          "src/store/sheet.store.ts",
+          "src/hooks/useStorePlan.ts",
+          "src/hooks/useAppMode.ts",
+          "src/hooks/useStoreId.ts",
+          "src/hooks/useSoftAppUpdate.ts",
+          "src/components/ui",
+          "src/components/drawer"
+        ],
+        "storefront": [
+          "pages/_app.tsx",
+          "pages/_document.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/core/store.ts",
+          "packages/storefront/src/core/config.ts"
+        ],
+        "mcp": [
+          "src/tools/store.ts",
+          "src/tools/stores.ts",
+          "src/tools/manage.ts",
+          "src/features.ts",
+          "src/context.ts"
+        ]
+      },
+      "watch": [
+        "Plan gating is checked in many places (isPremiumStore, isPremiumOrPos, isStorePremium, checkPremium / checkPosPlan middlewares, literal plan arrays, the dashboard's plans.ts, the app's useStorePlan). A plan change must keep them in step.",
+        "Uninstalling a plugin, a plan downgrade or a subscription expiring must switch off or ignore every setting that needed it (see the settings table).",
+        "The generic store save must not overwrite fields that have their own endpoint (checkout.fulfilment, limits, advance)."
+      ],
+      "links": [
+        {
+          "to": "checkout",
+          "why": "check_domain publishes the store's settings to every storefront.",
+          "check": "clearCache(store) after every settings save"
+        },
+        {
+          "to": "payments",
+          "why": "Payment addons live on the store document.",
+          "check": "update-payment-setting.ts"
+        },
+        {
+          "to": "fulfilment",
+          "why": "Plan + limits gate pickup / pooled.",
+          "check": "fulfilmentBlockers"
+        },
+        {
+          "to": "staff-roles",
+          "why": "Store users and their roles.",
+          "check": "staff-permission.ts"
+        }
+      ]
+    },
+    "staff-roles": {
+      "name": "Staff roles and permissions",
+      "summary": "owner / manager / csr / viewer, inventory_roles (incl. return_exchange, refund_money, void_sale), outlet limits, cashier permissions.",
+      "keywords": [
+        "role",
+        "permission",
+        "staff",
+        "csr",
+        "manager",
+        "viewer",
+        "owner",
+        "allowed roles",
+        "inventory roles",
+        "cashier"
+      ],
+      "rules": [
+        "backend:docs/refund-exchange-rules.md"
+      ],
+      "tests": [
+        "backend:tests/pos-scope.test.ts",
+        "backend:tests/money/finance-scope.test.ts",
+        "dashboard:src/hooks/staffCan.test.ts",
+        "dashboard:src/hooks/inventoryCan.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/core/helpers/staff-permission.ts",
+          "src/core/middlewares/authRoleCheck.ts",
+          "src/core/middlewares/checkRole.ts",
+          "src/core/middlewares/inventoryRoleCheck.ts",
+          "src/core/middlewares/storeWithRole.ts",
+          "src/core/middlewares/posScope.ts",
+          "src/features/store/service/update-store-user-*.ts",
+          "src/features/store/service/get-store-user-role.ts"
+        ],
+        "dashboard": [
+          "src/features/store_users",
+          "src/features/inventory/UserAccessAndRoles.tsx",
+          "src/hooks/staffCan.ts",
+          "src/hooks/useStaffCan.ts",
+          "src/hooks/inventoryCan.ts",
+          "src/hooks/useInventoryCan.ts",
+          "src/hooks/useStoreUsers.ts",
+          "src/shared/components/KHasAccess.tsx"
+        ],
+        "app": [
+          "src/hooks/useRole.ts",
+          "src/hooks/useStaffCan.ts",
+          "src/hooks/useInventoryPerms.ts"
+        ]
+      },
+      "watch": [
+        "The backend decides; client role checks only hide buttons. A new route gets the same role middleware as its neighbours."
+      ],
+      "links": [
+        {
+          "to": "refunds-returns",
+          "why": "Return / refund / void permissions.",
+          "check": "RF-11"
+        },
+        {
+          "to": "finance",
+          "why": "Branch-limited managers.",
+          "check": "tests/money/finance-scope.test.ts"
+        },
+        {
+          "to": "pos",
+          "why": "Cashier permissions and outlet limits.",
+          "check": "tests/pos-scope.test.ts"
+        }
+      ]
+    },
+    "website-content": {
+      "name": "Website content: themes, page builder, pages, blog, forms, navigation, footer",
+      "summary": "What the storefront looks like: themes (one CSS per theme), the page builder and its sections, pages, blog, forms, menus, footer, print designs.",
+      "keywords": [
+        "theme",
+        "page builder",
+        "section",
+        "page",
+        "blog",
+        "form",
+        "navigation",
+        "footer",
+        "appearance",
+        "site builder",
+        "print design",
+        "landing"
+      ],
+      "tests": [
+        "backend:tests/storefront-site.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/pages",
+          "src/features/blog",
+          "src/features/forms",
+          "src/core/models/pages.ts",
+          "src/core/models/blog_post.ts",
+          "src/core/models/custom_form.ts",
+          "src/core/models/form_submission.ts"
+        ],
+        "dashboard": [
+          "src/features/appearance",
+          "src/features/site_builder",
+          "src/features/pages",
+          "src/features/blog",
+          "src/features/content",
+          "src/features/custom_footer",
+          "src/features/custom_navigation",
+          "src/features/forms",
+          "src/features/form_builder",
+          "src/features/form_submissions",
+          "src/features/print_designs",
+          "src/services/pages.service.ts",
+          "src/services/blog.service.ts",
+          "src/services/forms.service.ts",
+          "src/services/printDesign.service.ts",
+          "src/services/builder-service.helper.ts",
+          "src/hooks/useSiteBuilder.ts",
+          "src/hooks/use-site-builder-view-mode.tsx"
+        ],
+        "storefront": [
+          "src/features/landing_page",
+          "src/features/page",
+          "src/features/blog",
+          "src/features/forms",
+          "src/features/print_designs",
+          "src/sections",
+          "pages/index.tsx",
+          "pages/[...path].tsx",
+          "pages/blog",
+          "pages/blogs",
+          "pages/forms",
+          "pages/prints.tsx",
+          "pages/emi-calculator.tsx",
+          "pages/404.tsx",
+          "pages/_error.tsx",
+          "pages/api",
+          "lib/utils",
+          "public/themes"
+        ],
+        "kit": [
+          "packages/storefront/src/react/ui.tsx",
+          "packages/storefront/src/react/form.tsx",
+          "packages/storefront/src/core/custom-fields.ts"
+        ],
+        "mcp": [
+          "src/site",
+          "src/tools/site.ts",
+          "src/tools/blog.ts"
+        ]
+      },
+      "links": [
+        {
+          "to": "seo",
+          "why": "Page / blog slugs, redirects and the sitemap.",
+          "check": "tests/seo/seo-backend.test.ts"
+        },
+        {
+          "to": "checkout",
+          "why": "Theme components host the cart and checkout entry points.",
+          "check": "checkout logic must never be forked per theme"
+        }
+      ]
+    },
+    "seo": {
+      "name": "SEO: slugs, redirects, sitemap, llms.txt, audit, IndexNow, SEO AI",
+      "keywords": [
+        "seo",
+        "slug",
+        "redirect",
+        "sitemap",
+        "llms",
+        "indexnow",
+        "canonical",
+        "no_index",
+        "audit",
+        "robots"
+      ],
+      "summary": "The SEO plugin and the public SEO reads.",
+      "tests": [
+        "backend:tests/seo/seo-rules.test.ts",
+        "backend:tests/seo/seo-backend.test.ts",
+        "backend:tests/seo/public-reads.test.ts",
+        "backend:tests/seo-public.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/seo",
+          "src/public_features/seo-xml*.ts",
+          "src/public_features/llms*.ts",
+          "src/core/helpers/romanize.ts",
+          "src/features/store/service/sitemap-entries.ts",
+          "src/features/store/service/bulk-category-seo.ts",
+          "src/core/models/redirect.ts",
+          "src/core/models/seo_score.ts"
+        ],
+        "dashboard": [
+          "src/features/seo",
+          "src/services/seo.service.ts"
+        ],
+        "storefront": [
+          "pages/sitemap",
+          "pages/sitemap.xml.tsx",
+          "pages/robots.txt.tsx",
+          "pages/llms.txt.tsx",
+          "pages/llms-full.txt.tsx",
+          "pages/indexnow.txt.tsx",
+          "pages/blog-feed.xml.tsx",
+          "src/components/KSeo.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/seo"
+        ],
+        "mcp": [
+          "src/seo.ts",
+          "src/tools/seo.ts",
+          "src/tools/seo-admin.ts"
+        ]
+      },
+      "links": [
+        {
+          "to": "products",
+          "why": "Product slugs, alts, no_index.",
+          "check": "tests/seo/seo-backend.test.ts"
+        },
+        {
+          "to": "ai",
+          "why": "Fix with BlanxerAI jobs (seo/ai).",
+          "check": "seo AI jobs"
+        }
+      ]
+    },
+    "tigg": {
+      "name": "Tigg accounting sync",
+      "summary": "Invoices, credit notes and stock pushed to Tigg; always in step with Blanxer.",
+      "keywords": [
+        "tigg",
+        "invoice",
+        "credit note",
+        "accounting",
+        "sync"
+      ],
+      "rules": [
+        "backend:docs/inventory-rules.md"
+      ],
+      "tests": [
+        "backend:tests/tigg/always-in-step.test.ts",
+        "backend:tests/tigg/offers.test.ts",
+        "backend:tests/tigg/mapping.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/tigg-plugin",
+          "src/services/tigg"
+        ],
+        "dashboard": [
+          "src/features/tigg_stock",
+          "src/features/orders/BulkTiggSync.tsx",
+          "src/features/orders/TiggOrderSync.tsx"
+        ]
+      },
+      "watch": [
+        "Changing moneyOf's shape re-issues every open auto-synced order once."
+      ],
+      "links": [
+        {
+          "to": "inventory",
+          "why": "Stock of linked items.",
+          "check": "tests/tigg/always-in-step.test.ts"
+        },
+        {
+          "to": "orders",
+          "why": "Invoices follow order edits.",
+          "check": "tests/tigg/always-in-step.test.ts"
+        }
+      ]
+    },
+    "notifications": {
+      "name": "SMS and email",
+      "summary": "Order-event SMS, bulk SMS, SMS credit, emails to customers and stores.",
+      "keywords": [
+        "sms",
+        "email",
+        "notification",
+        "sparrow",
+        "infoalert",
+        "message"
+      ],
+      "tests": [
+        "backend:tests/sms/event-message.test.ts",
+        "backend:tests/sms/bulk-sms-sender.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/sms",
+          "src/mods/sms.ts",
+          "src/services/sms",
+          "src/services/email",
+          "src/core/helpers/sendMail.ts",
+          "src/core/helpers/notify-customer.ts",
+          "src/core/helpers/emailTemplates",
+          "src/core/models/sms_*.ts"
+        ],
+        "dashboard": [
+          "src/features/sms",
+          "src/services/sms.service.ts"
+        ],
+        "app": [
+          "src/app/settings/sms.tsx",
+          "src/services/sms.service.ts"
+        ],
+        "mcp": [
+          "src/tools/sms.ts"
+        ]
+      },
+      "links": [
+        {
+          "to": "orders",
+          "why": "Status changes send SMS.",
+          "check": "tests/sms/event-message.test.ts"
+        }
+      ]
+    },
+    "meta-tracking": {
+      "name": "Meta pixel, Conversions API and catalog feed",
+      "keywords": [
+        "meta",
+        "facebook",
+        "pixel",
+        "capi",
+        "conversions api",
+        "catalog",
+        "product feed",
+        "gtm"
+      ],
+      "summary": "Purchase events once per paid order, the product feed for Meta catalogs.",
+      "tests": [
+        "backend:tests/money/meta-tracking.test.ts",
+        "backend:tests/meta-capi.test.ts",
+        "kit:packages/storefront/test/meta.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/service/meta-tracking.ts",
+          "src/public_features/meta-event.ts",
+          "src/public_features/product-feed.ts",
+          "src/services/meta_capi",
+          "src/features/store/service/meta-connection.ts",
+          "src/core/models/meta_capi_status.ts"
+        ],
+        "dashboard": [
+          "src/features/metaCatalog"
+        ],
+        "storefront": [
+          "lib/meta-capi.ts",
+          "lib/datalayer.ts",
+          "src/plugins",
+          "pages/product-feed.xml.tsx"
+        ],
+        "kit": [
+          "packages/storefront/src/react/pixel.tsx"
+        ]
+      },
+      "links": [
+        {
+          "to": "payments",
+          "why": "The Purchase fires on the payment flip, once.",
+          "check": "tests/money/payment-flip.test.ts"
+        },
+        {
+          "to": "products",
+          "why": "The feed lists products.",
+          "check": "tests/storefront-site.test.ts"
+        }
+      ]
+    },
+    "reviews": {
+      "name": "Product reviews",
+      "keywords": [
+        "review",
+        "rating",
+        "reply",
+        "ask to edit"
+      ],
+      "summary": "Customer reviews from the tracking page, store replies, Ask to edit.",
+      "tests": [
+        "backend:tests/reviews/review-reply-edit.test.ts"
+      ],
+      "paths": {
+        "backend": [
+          "src/features/order/task/public-review.ts",
+          "src/features/order/task/public-update-review.ts",
+          "src/features/order/task/review-actions.ts",
+          "src/features/order/task/get-store-reviews.ts",
+          "src/core/models/review.ts"
+        ],
+        "dashboard": [
+          "src/features/reviews"
+        ],
+        "app": [
+          "src/app/(tabs)/products/reviews.tsx",
+          "src/services/review.service.ts"
+        ],
+        "storefront": [
+          "src/components/ReviewReply.tsx",
+          "src/components/KRating.tsx"
+        ]
+      },
+      "links": [
+        {
+          "to": "orders",
+          "why": "Reviews hang off delivered orders.",
+          "check": "tests/reviews/review-reply-edit.test.ts"
+        }
+      ]
+    },
+    "ai": {
+      "name": "BlanxerAI, the agent, BlanxerAPI keys and the MCP server",
+      "keywords": [
+        "ai",
+        "agent",
+        "blanxerai",
+        "chat",
+        "studio",
+        "mcp",
+        "api key",
+        "blanxerapi",
+        "custom site"
+      ],
+      "summary": "The dashboard's AI agent and studio, AI jobs, BlanxerAPI keys for custom sites, the MCP server for outside agents.",
+      "paths": {
+        "backend": [
+          "src/features/ai_agent",
+          "src/features/seo/ai",
+          "src/super_admin/ai_agent",
+          "src/core/helpers/openai.ts",
+          "src/core/models/ai_*.ts",
+          "src/core/models/csr_ai.ts"
+        ],
+        "dashboard": [
+          "src/features/agent_mode",
+          "src/features/ai_agent",
+          "src/features/ai_assist",
+          "src/features/ai_chat",
+          "src/features/ai_studio",
+          "src/features/blanxer_ai",
+          "src/features/blanxer_api",
+          "src/features/blanxer_mcp",
+          "src/services/ai.service.ts"
+        ],
+        "app": [
+          "src/app/agent",
+          "src/components/agent",
+          "src/services/agent.service.ts",
+          "src/hooks/useAgentStatus.ts"
+        ],
+        "mcp": [
+          "src/tools/guide.ts",
+          "src/tools/learn.ts",
+          "src/learn-videos.ts",
+          "src/oauth",
+          "src/index.ts",
+          "src/server.ts",
+          "src/http.ts"
+        ]
+      },
+      "watch": [
+        "The MCP mirrors dashboard features (DASHBOARD_PARITY.md): a feature that ships in the dashboard needs its MCP tool updated too (mcp repo)."
+      ],
+      "links": [
+        {
+          "to": "store-settings",
+          "why": "API keys and plan gating.",
+          "check": "authFromApiKey"
+        },
+        {
+          "to": "seo",
+          "why": "SEO AI jobs.",
+          "check": "seo/ai"
+        }
+      ]
+    },
+    "platform": {
+      "name": "Platform plumbing: app setup, routes, cache, queues, jobs, shared helpers",
+      "summary": "Express setup, route loaders, Redis / Bull queues, cron jobs, caches, DynamoDB, Cloudflare, websockets, shared HTTP clients. Changes here touch everything.",
+      "keywords": [
+        "cache",
+        "redis",
+        "queue",
+        "cron",
+        "job",
+        "loader",
+        "route",
+        "axios",
+        "http",
+        "websocket",
+        "cloudflare",
+        "dynamodb"
+      ],
+      "paths": {
+        "backend": [
+          "src/app.ts",
+          "src/index.ts",
+          "src/core/loaders",
+          "src/core/config",
+          "src/core/declarations",
+          "src/core/constants",
+          "src/core/helpers",
+          "src/mods/cache.ts",
+          "src/services/cloudflare",
+          "src/services/cornjob",
+          "src/services/db_seed",
+          "src/services/dynamodb",
+          "src/services/queue",
+          "src/services/redis",
+          "src/services/ws",
+          "src/services/instagram",
+          "src/services/ird",
+          "src/services/mirrago",
+          "src/services/expo_express",
+          "src/features/mirrago",
+          "src/core/models/index.ts",
+          "src/core/models/counter.ts",
+          "src/core/models/key_value.ts",
+          "src/core/models/deleted_items.ts",
+          "src/core/models/external_api_log.ts",
+          "src/core/models/request_demo.ts",
+          "src/core/models/purchase_history.ts",
+          "src/core/models/dns_zone.ts",
+          "src/core/models/sale_alert.ts",
+          "src/core/models/print_*.ts",
+          "src/client_web"
+        ],
+        "dashboard": [
+          "src/hooks",
+          "src/services/builder-service.helper.ts"
+        ],
+        "app": [
+          "src/hooks",
+          "src/store",
+          "src/components/ui"
+        ],
+        "storefront": [
+          "lib",
+          "src/hooks",
+          "src/context",
+          "pages/api"
+        ],
+        "kit": [
+          "packages/storefront/src/core/http.ts",
+          "packages/storefront/src/core/format.ts",
+          "packages/storefront/src/core/types.ts",
+          "packages/storefront/src/core/index.ts",
+          "packages/storefront/src/core/validation.ts",
+          "packages/storefront/src/react/index.ts",
+          "packages/storefront/src/react/provider.tsx",
+          "packages/storefront/src/react/context.tsx",
+          "packages/storefront/src/react/money.tsx",
+          "packages/storefront/src/react/cart.tsx",
+          "packages/storefront/src/react/cart-lines.tsx",
+          "packages/storefront/src/react/checkout.tsx",
+          "packages/storefront/src/core/cart.ts",
+          "packages/storefront/src/core/checkout.ts",
+          "packages/storefront/src/core/delivery.ts"
+        ],
+        "mcp": [
+          "src/api.ts",
+          "src/client.ts",
+          "src/http.ts",
+          "src/net-guard.ts",
+          "src/outbound.ts",
+          "src/pacing.ts",
+          "src/budget.ts",
+          "src/lru.ts",
+          "src/jobs.ts",
+          "src/idempotency.ts",
+          "src/confirm.ts",
+          "src/backend-confirm.ts",
+          "src/constants.ts",
+          "src/dates.ts",
+          "src/format.ts",
+          "src/links.ts",
+          "src/schemas.ts",
+          "src/types.ts",
+          "src/tools/index.ts",
+          "src/tools/helpers.ts"
+        ]
+      },
+      "watch": [
+        "A shared helper or middleware change reaches every feature: run the full check of the repo, not only the tests of the feature you meant to change."
+      ],
+      "links": []
+    }
+  },
+  "settings": [
+    {
+      "id": "advance-payment",
+      "feature": "advance-payment",
+      "key": "store.checkout.advance_payment.enabled",
+      "summary": "COD orders pay part online first.",
+      "requires": [
+        {
+          "what": "at least one online payment method (onlineMethodsOf)",
+          "feature": "payments",
+          "handled": "PR #386, open",
+          "note": "switchOffAdvanceWithoutOnline on Setting → Payment, the generic store save and the super-admin QR rejection (AP-24). Not merged as of 2026-11-13."
+        },
+        {
+          "what": "a premium plan",
+          "feature": "store-settings",
+          "handled": "read time",
+          "note": "onlineMethodsOf returns [] off premium, so advanceFor returns null."
+        }
+      ]
+    },
+    {
+      "id": "pickup-advance",
+      "feature": "fulfilment",
+      "key": "store.checkout.fulfilment.pickup_advance.enabled",
+      "summary": "A pickup pays part online first (FU-14).",
+      "requires": [
+        {
+          "what": "at least one online payment method",
+          "feature": "payments",
+          "handled": "PR #386, open"
+        },
+        {
+          "what": "pickup_pay_at_store on",
+          "feature": "fulfilment",
+          "handled": "on save"
+        }
+      ]
+    },
+    {
+      "id": "pickup-online-only",
+      "feature": "fulfilment",
+      "key": "store.checkout.fulfilment.pickup_pay_at_store = false",
+      "summary": "A pickup can only be paid online in full.",
+      "requires": [
+        {
+          "what": "at least one online payment method",
+          "feature": "payments",
+          "handled": "no",
+          "note": "Left out of PR #386 on purpose (changes how pickup works): an owner decision."
+        }
+      ]
+    },
+    {
+      "id": "store-pickup",
+      "feature": "fulfilment",
+      "key": "store.checkout.fulfilment.pickup_enabled + pickup_outlets",
+      "summary": "Website shoppers pick up at an outlet.",
+      "requires": [
+        {
+          "what": "Platinum plan + advanced inventory",
+          "feature": "store-settings",
+          "handled": "on save + read time",
+          "note": "fulfilmentBlockers"
+        },
+        {
+          "what": "1+ active pickup outlet",
+          "feature": "inventory",
+          "handled": "on save",
+          "note": "What an outlet deactivated or deleted later does to pickup_outlets: see the audit."
+        }
+      ]
+    },
+    {
+      "id": "choose-outlet",
+      "feature": "fulfilment",
+      "key": "store.checkout.fulfilment.choose_outlet",
+      "summary": "Staff choose which outlet fulfils a website order.",
+      "requires": [
+        {
+          "what": "Platinum + advanced inventory + 2 active outlets",
+          "feature": "inventory",
+          "handled": "on save + read time",
+          "note": "can_choose_outlet / canChooseOutlet"
+        }
+      ]
+    },
+    {
+      "id": "pooled-stock",
+      "feature": "fulfilment",
+      "key": "store.checkout.fulfilment.online_stock = pooled + pool_outlets",
+      "summary": "Sell online from several outlets.",
+      "requires": [
+        {
+          "what": "limits.pooled_allowed (super admin) + plan + advanced inventory",
+          "feature": "store-settings",
+          "handled": "read time",
+          "note": "isPooled: the setting only counts while eligible."
+        },
+        {
+          "what": "active pool outlets",
+          "feature": "inventory",
+          "handled": "on outlet save",
+          "note": "syncPoolBuffers keeps pool_live / pool_buffers in step."
+        }
+      ]
+    },
+    {
+      "id": "money-accounts",
+      "feature": "finance",
+      "key": "store.plugins[name=money_accounts]",
+      "summary": "Bank & cash account screens; channels get accounts.",
+      "requires": [
+        {
+          "what": "each connected channel has an account (ensureChannelAccounts)",
+          "feature": "payments",
+          "handled": "on payment save while installed"
+        }
+      ]
+    },
+    {
+      "id": "offers-plugin",
+      "feature": "offers",
+      "key": "store.plugins[name=offers]",
+      "summary": "The offers engine on every channel.",
+      "requires": [
+        {
+          "what": "advanced inventory for some offer kinds",
+          "feature": "inventory",
+          "handled": "on save",
+          "note": "What an offer may add per inventory mode: tests/promotions/foundation.test.ts"
+        }
+      ]
+    },
+    {
+      "id": "continue-selling",
+      "feature": "inventory",
+      "key": "product continue_selling",
+      "summary": "Sell past zero stock.",
+      "requires": [
+        {
+          "what": "a simple (non-advanced) store",
+          "feature": "inventory",
+          "handled": "read time + backfill",
+          "note": "Never applies on an advanced store (W12); scripts/continue-selling-advanced-backfill.ts"
+        }
+      ]
+    },
+    {
+      "id": "courier-pickup-per-outlet",
+      "feature": "couriers",
+      "key": "Outlet.courier_pickup {pathao_store_id, ncm_branch}",
+      "summary": "Each outlet's own courier pickup point.",
+      "requires": [
+        {
+          "what": "the courier plugin installed",
+          "feature": "couriers",
+          "handled": "unknown",
+          "note": "see the audit"
+        }
+      ]
+    }
+  ],
+  "single_homes": [
+    {
+      "rule": "Book or reverse an order's money",
+      "home": "backend:src/features/order/service/order-money.ts",
+      "features": [
+        "orders",
+        "finance",
+        "cod-reconcile"
+      ],
+      "mirrors": [
+        "app:src/services/order-money.ts (display only)"
+      ]
+    },
+    {
+      "rule": "Post any account movement",
+      "home": "backend:src/features/pos_finance/utils/bank-txn.ts postBankTxns",
+      "features": [
+        "finance"
+      ]
+    },
+    {
+      "rule": "Move an order to Paid / Failed after an online payment",
+      "home": "backend:src/features/payment/service/payment-flip.ts claimOnlineSettled",
+      "features": [
+        "payments",
+        "orders"
+      ]
+    },
+    {
+      "rule": "Write the customer ledger",
+      "home": "backend:src/features/customer_ledger/service/reconcile.ts reconcileCustomerLedger",
+      "features": [
+        "customers-ledger"
+      ],
+      "mirrors": [
+        "backend:src/features/customer_ledger/service/post-entries.ts postCustomerEntries (customer rows)"
+      ]
+    },
+    {
+      "rule": "Which online payment methods a store has",
+      "home": "backend:src/features/order/service/advance.ts onlineMethodsOf",
+      "features": [
+        "payments",
+        "advance-payment",
+        "checkout"
+      ],
+      "mirrors": [
+        "backend:src/features/pos_finance/utils/online-methods.ts ownGatewayMethods",
+        "storefront:src/features/checkout/pay.ts",
+        "kit:packages/storefront/src/core/payments.ts",
+        "dashboard:src/shared/constants/payment.ts"
+      ]
+    },
+    {
+      "rule": "The advance an order needs",
+      "home": "backend:src/features/order/service/advance.ts advanceFor",
+      "features": [
+        "advance-payment",
+        "checkout"
+      ],
+      "mirrors": [
+        "dashboard:src/features/orders/advance/advance.ts",
+        "app:src/services/advance.ts",
+        "storefront:src/features/checkout/advance.ts",
+        "kit:packages/storefront/src/core/advance.ts",
+        "mcp:src/advance.ts"
+      ]
+    },
+    {
+      "rule": "What a courier collects on a COD order",
+      "home": "backend:src/features/order/task/utils.ts codToCollect",
+      "features": [
+        "couriers",
+        "cod-reconcile"
+      ]
+    },
+    {
+      "rule": "Which orders count in reports",
+      "home": "backend:src/core/analytics/rules.ts countedOrderExpr",
+      "features": [
+        "reports"
+      ],
+      "mirrors": [
+        "backend:src/core/analytics/rules.ts isCountedOrder (JS twin)"
+      ]
+    },
+    {
+      "rule": "Price a cart with offers",
+      "home": "backend:src/features/promotion/engine/index.ts priceCart",
+      "features": [
+        "offers",
+        "checkout",
+        "pos"
+      ],
+      "mirrors": [
+        "kit:packages/storefront/src/core/offers.ts (display fallback)",
+        "dashboard:src/shared/helpers/order-offers.helper.ts"
+      ]
+    },
+    {
+      "rule": "Take / give back stock for an order",
+      "home": "backend:src/features/order/task/utils.ts inventoryReduce / inventoryRevert / restockIntoBatches",
+      "features": [
+        "inventory",
+        "orders"
+      ]
+    },
+    {
+      "rule": "The outlet an order's stock comes from",
+      "home": "backend:src/features/order/service/fulfilment.ts stockStoreFor",
+      "features": [
+        "fulfilment",
+        "inventory"
+      ]
+    },
+    {
+      "rule": "Whether pickup / fulfil-from may be on",
+      "home": "backend:src/features/order/service/fulfilment.ts fulfilmentBlockers",
+      "features": [
+        "fulfilment"
+      ],
+      "mirrors": [
+        "dashboard:src/features/checkout_settings/fulfilment.ts",
+        "app:src/services/pickup.ts",
+        "storefront:src/features/checkout/pickup.ts",
+        "kit:packages/storefront/src/core/pickup.ts",
+        "mcp:src/pickup.ts"
+      ]
+    },
+    {
+      "rule": "Whether pooled stock is live",
+      "home": "backend:src/core/helpers/pool.ts isPooled",
+      "features": [
+        "fulfilment"
+      ]
+    },
+    {
+      "rule": "A store's public website origin",
+      "home": "backend:src/core/helpers/storefront-url.ts getStoreSiteOrigin",
+      "features": [
+        "store-settings",
+        "seo"
+      ]
+    },
+    {
+      "rule": "Whether staff may do something",
+      "home": "backend:src/core/helpers/staff-permission.ts staffMay",
+      "features": [
+        "staff-roles"
+      ],
+      "mirrors": [
+        "dashboard:src/hooks/staffCan.ts",
+        "app:src/hooks/useStaffCan.ts"
+      ]
+    },
+    {
+      "rule": "A store's SEO settings with defaults",
+      "home": "backend:src/features/seo/service/settings-rules.ts seoSettingsOf",
+      "features": [
+        "seo"
+      ]
+    },
+    {
+      "rule": "Record a slug change (301 + IndexNow)",
+      "home": "backend:src/features/seo/service/redirects.ts recordSlugChange",
+      "features": [
+        "seo",
+        "products"
+      ]
+    }
+  ]
+}
