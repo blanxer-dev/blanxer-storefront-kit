@@ -14,7 +14,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @blanxer-dev/storefront",
-    "test": "npm test -w @blanxer-dev/storefront",
+    "test": "node scripts/claude/impact.cjs --check && npm test -w @blanxer-dev/storefront",
     "typecheck": "npm run typecheck -w @blanxer-dev/storefront",
     "build:starter": "npm run build -w blanxer-storefront-starter",
     "check": "npm run check -w blanxer-storefront-starter"
