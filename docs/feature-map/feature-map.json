@@ -2619,14 +2619,32 @@
         {
           "what": "at least one online payment method (onlineMethodsOf)",
           "feature": "payments",
-          "handled": "PR #386, open",
-          "note": "switchOffAdvanceWithoutOnline on Setting → Payment, the generic store save and the super-admin QR rejection (AP-24). Not merged as of 2026-11-13."
+          "handled": "read time; on save in PR #386 (AP-24, open)",
+          "note": "advanceFor needs hasGateway, so the quote asks no advance; check_domain still says enabled until #386."
         },
         {
-          "what": "a premium plan",
+          "what": "a web plan",
           "feature": "store-settings",
           "handled": "read time",
-          "note": "onlineMethodsOf returns [] off premium, so advanceFor returns null."
+          "note": "onlineMethodsOf returns [] off a web plan (plan expiry cron, trial cron)."
+        },
+        {
+          "what": "every online method it counts can be paid on the storefront",
+          "feature": "checkout",
+          "handled": "no",
+          "note": "onlineMethodsOf counts static Fonepay QR, but the storefront and kit never show a static QR tile: a store whose only online method is static QR blocks COD and offers nothing to pay with. Owner decision: show the tile or stop counting it."
+        },
+        {
+          "what": "advance.places.names still in the delivery table",
+          "feature": "checkout",
+          "handled": "no",
+          "note": "A delivery-table save never re-checks them: mode \"only\" with the places gone silently asks no advance."
+        },
+        {
+          "what": "advance.products.ids still exist",
+          "feature": "products",
+          "handled": "partly",
+          "note": "A deleted product never matches, so the advance just isn't asked; ids are cleaned on the next advance save."
         }
       ]
     },
@@ -2637,14 +2655,14 @@
       "summary": "A pickup pays part online first (FU-14).",
       "requires": [
         {
-          "what": "at least one online payment method",
-          "feature": "payments",
-          "handled": "PR #386, open"
-        },
-        {
           "what": "pickup_pay_at_store on",
           "feature": "fulfilment",
-          "handled": "on save"
+          "handled": "on save + read time"
+        },
+        {
+          "what": "at least one online payment method",
+          "feature": "payments",
+          "handled": "read time; on save in PR #386"
         }
       ]
     },
@@ -2652,13 +2670,13 @@
       "id": "pickup-online-only",
       "feature": "fulfilment",
       "key": "store.checkout.fulfilment.pickup_pay_at_store = false",
-      "summary": "A pickup can only be paid online in full.",
+      "summary": "A pickup is paid online in full.",
       "requires": [
         {
           "what": "at least one online payment method",
           "feature": "payments",
-          "handled": "no",
-          "note": "Left out of PR #386 on purpose (changes how pickup works): an owner decision."
+          "handled": "read time (FU-16, fix/setting-dependants)",
+          "note": "Before FU-16 the outlets stayed listed and the pickup checkout had no way to pay."
         }
       ]
     },
@@ -2669,16 +2687,16 @@
       "summary": "Website shoppers pick up at an outlet.",
       "requires": [
         {
-          "what": "Platinum plan + advanced inventory",
+          "what": "Platinum + advanced inventory",
           "feature": "store-settings",
           "handled": "on save + read time",
           "note": "fulfilmentBlockers"
         },
         {
-          "what": "1+ active pickup outlet",
+          "what": "each pickup outlet active",
           "feature": "inventory",
-          "handled": "on save",
-          "note": "What an outlet deactivated or deleted later does to pickup_outlets: see the audit."
+          "handled": "on save + read time (FU-17 clears the storefront cache on every outlet save)",
+          "note": "Before FU-17 a closed outlet stayed pickable for the cache's hour on stores that aren't pooled."
         }
       ]
     },
@@ -2692,7 +2710,7 @@
           "what": "Platinum + advanced inventory + 2 active outlets",
           "feature": "inventory",
           "handled": "on save + read time",
-          "note": "can_choose_outlet / canChooseOutlet"
+          "note": "canChooseOutlet"
         }
       ]
     },
@@ -2703,16 +2721,78 @@
       "summary": "Sell online from several outlets.",
       "requires": [
         {
-          "what": "limits.pooled_allowed (super admin) + plan + advanced inventory",
+          "what": "limits.pooled_allowed + Platinum + advanced inventory",
           "feature": "store-settings",
           "handled": "read time",
-          "note": "isPooled: the setting only counts while eligible."
+          "note": "isPooled; super admin turning pooled_allowed off switches it off."
         },
         {
-          "what": "active pool outlets",
+          "what": "at least one live pool outlet (active, a city, a courier pickup when a courier plugin is on)",
           "feature": "inventory",
-          "handled": "on outlet save",
-          "note": "syncPoolBuffers keeps pool_live / pool_buffers in step."
+          "handled": "read time (PS-17, fix/setting-dependants)",
+          "note": "Before PS-17 an emptied pool routed every line to nobody: OUT_OF_STOCK on every delivery checkout."
+        },
+        {
+          "what": "courier plugins as they were when the pool was synced",
+          "feature": "couriers",
+          "handled": "on plugin save (PS-17)",
+          "note": "update_plugin / delete_plugin re-sync pool_live."
+        }
+      ]
+    },
+    {
+      "id": "website-outlet",
+      "feature": "inventory",
+      "key": "store.website_outlet",
+      "summary": "The outlet the website sells from.",
+      "requires": [
+        {
+          "what": "the outlet active",
+          "feature": "inventory",
+          "handled": "no",
+          "note": "change-website-outlet and update-outlet allow an inactive website outlet; websiteStockOf ignores status. Shoppers see stock, pooled routing excludes it."
+        }
+      ]
+    },
+    {
+      "id": "blanxerpay-qr",
+      "feature": "payments",
+      "key": "store.addons.qr_request_enabled (+ qr_request, setting.qr_request_key)",
+      "summary": "BlanxerPay QR: Blanxer collects, pays out later.",
+      "requires": [
+        {
+          "what": "KYC + super-admin approval (qr_request = approved)",
+          "feature": "payments",
+          "handled": "on save; the generic store save bypassed it until fix/security-open-routes",
+          "note": "update_payment_setting checks the approval; the super admin sets the merchant key."
+        }
+      ]
+    },
+    {
+      "id": "own-gateway-keys",
+      "feature": "payments",
+      "key": "store.addons.khalti / fonepay (+ setting keys)",
+      "summary": "The store's own gateway.",
+      "requires": [
+        {
+          "what": "the gateway's secret keys saved",
+          "feature": "payments",
+          "handled": "no",
+          "note": "A manager saving self-hosted Khalti / Fonepay through the generic save has the keys silently dropped while the addon turns on: Khalti payments fail, Fonepay runs in Blanxer mode. Owner decision: refuse non-owner payment saves or keep the addon off without keys."
+        }
+      ]
+    },
+    {
+      "id": "counter-fonepay",
+      "feature": "pos",
+      "key": "store.setting.pos_fonepay (default_outlet_value_iss)",
+      "summary": "Fonepay QR at the counter.",
+      "requires": [
+        {
+          "what": "the store's outlet layout when it was connected",
+          "feature": "inventory",
+          "handled": "no",
+          "note": "Turning advanced inventory on sets website_outlet but leaves the key under the default bucket; POS then looks it up by outlet id: \"Fonepay Integration is not enabled\" until reconnected per outlet."
         }
       ]
     },
@@ -2725,21 +2805,13 @@
         {
           "what": "each connected channel has an account (ensureChannelAccounts)",
           "feature": "payments",
-          "handled": "on payment save while installed"
-        }
-      ]
-    },
-    {
-      "id": "offers-plugin",
-      "feature": "offers",
-      "key": "store.plugins[name=offers]",
-      "summary": "The offers engine on every channel.",
-      "requires": [
+          "handled": "on install + payment save"
+        },
         {
-          "what": "advanced inventory for some offer kinds",
-          "feature": "inventory",
-          "handled": "on save",
-          "note": "What an offer may add per inventory mode: tests/promotions/foundation.test.ts"
+          "what": "accounts used by channels stay live",
+          "feature": "finance",
+          "handled": "on delete / archive",
+          "note": "assertAccountNotInUse"
         }
       ]
     },
@@ -2752,22 +2824,41 @@
         {
           "what": "a simple (non-advanced) store",
           "feature": "inventory",
-          "handled": "read time + backfill",
-          "note": "Never applies on an advanced store (W12); scripts/continue-selling-advanced-backfill.ts"
+          "handled": "read time + on enabling advanced",
+          "note": "Never applies on an advanced store (W12)."
         }
       ]
     },
     {
-      "id": "courier-pickup-per-outlet",
+      "id": "courier-booking",
       "feature": "couriers",
-      "key": "Outlet.courier_pickup {pathao_store_id, ncm_branch}",
-      "summary": "Each outlet's own courier pickup point.",
+      "key": "courier submits",
+      "summary": "Sending orders to a courier.",
       "requires": [
         {
           "what": "the courier plugin installed",
           "feature": "couriers",
+          "handled": "read time",
+          "note": "Each service refuses \"plugin is not enabled\"."
+        },
+        {
+          "what": "Outlet.courier_pickup ids belong to the current courier account",
+          "feature": "couriers",
           "handled": "unknown",
-          "note": "see the audit"
+          "note": "Re-keying the Pathao plugin to another account may leave outlets pointing at the old account's stores (not traced)."
+        }
+      ]
+    },
+    {
+      "id": "meta-capi",
+      "feature": "meta-tracking",
+      "key": "store.plugins[name=meta_capi]",
+      "summary": "Server-side Purchase events.",
+      "requires": [
+        {
+          "what": "the fb_pixel plugin + a token",
+          "feature": "meta-tracking",
+          "handled": "on save + read time"
         }
       ]
     }
@@ -2940,6 +3031,100 @@
       "features": [
         "seo",
         "products"
+      ]
+    },
+    {
+      "rule": "Whether a delivery place takes cash on delivery",
+      "home": "backend:src/features/order/service/delivery-charge.ts hasCodAt",
+      "features": [
+        "checkout"
+      ],
+      "mirrors": [
+        "storefront:src/features/checkout/place.ts placeCod",
+        "kit:packages/storefront/src/core/delivery.ts isCodAllowed",
+        "mcp:src/shopper/tools.ts"
+      ]
+    },
+    {
+      "rule": "A delivery charge from the store's table",
+      "home": "backend:src/features/order/service/delivery-charge.ts",
+      "features": [
+        "checkout",
+        "couriers"
+      ],
+      "mirrors": [
+        "backend:src/features/order/task/utils.ts (second backend copy)",
+        "storefront:src/features/checkout/index.tsx",
+        "storefront:src/features/checkout/koseliexpress.tsx",
+        "storefront:src/features/quick_checkout/index.tsx",
+        "kit:packages/storefront/src/core/delivery.ts",
+        "mcp:src/shopper/tools.ts",
+        "mcp:src/tools/store.ts",
+        "app:src/app/(tabs)/orders/create.tsx",
+        "dashboard:src/features/multi_outlet/delivery.ts"
+      ]
+    },
+    {
+      "rule": "The courier list (logistics codes and names)",
+      "home": "backend:src/core/constants/status.ts logistics",
+      "features": [
+        "couriers"
+      ],
+      "mirrors": [
+        "dashboard:src/shared/constants/courier.ts",
+        "app:src/constants/logistics.ts",
+        "mcp:src/constants.ts LOGISTICS_NAMES (test/courier-names.test.mjs pins it)",
+        "backend:src/core/helpers/pool.ts COURIER_PLUGINS",
+        "backend:src/super_admin/vendor_analytics/metrics/definitions.ts"
+      ]
+    },
+    {
+      "rule": "Which plans are paid web plans",
+      "home": "backend:src/core/helpers/general.ts isPremiumStore",
+      "features": [
+        "store-settings"
+      ],
+      "mirrors": [
+        "dashboard:src/hooks/useSubscription.ts",
+        "dashboard:src/shared/constants/plans.ts",
+        "app:src/hooks/useStorePlan.ts",
+        "storefront:src/shared/helpers/general.helpers.ts",
+        "kit:packages/storefront/src/core/payments.ts",
+        "mcp:src/constants.ts"
+      ]
+    },
+    {
+      "rule": "Which statuses a bulk status change may move between",
+      "home": "backend:src/features/order/task/update-status-bulk.ts",
+      "features": [
+        "orders"
+      ],
+      "mirrors": [
+        "dashboard:src/features/orders/BulkOrderStatusEdit.tsx",
+        "app:src/app/(tabs)/orders/index.tsx (fix/bulk-status-groups adds src/services/bulk-status.ts)"
+      ]
+    },
+    {
+      "rule": "What a refund may still pay back",
+      "home": "backend:src/features/pos/task/utils/payment-status.ts refundableNow",
+      "features": [
+        "refunds-returns"
+      ],
+      "mirrors": [
+        "dashboard:src/features/orders/returns/returns.ts",
+        "app:src/services/refunds/index.ts",
+        "mcp:src/pos-money.ts refundRoom"
+      ]
+    },
+    {
+      "rule": "What COD reconciling expects back from a courier",
+      "home": "backend:src/features/pos_finance/task/get-cod-records.ts (cod_expected)",
+      "features": [
+        "cod-reconcile"
+      ],
+      "mirrors": [
+        "dashboard:src/features/orders/advance/advance.ts",
+        "app:src/components/orders/ReconcileSheet.tsx"
       ]
     }
   ]

@@ -10,6 +10,10 @@ The map is `feature-map.json` in this folder. The same three files (`feature-map
 README and `scripts/claude/impact.cjs`) are in every Blanxer repo: backend, dashboard, app,
 storefront, storefront kit and MCP.
 
+**Open findings** from the audit that built this map (security holes closed, settings that
+dangled, rules copied across repos, owner decisions still needed): `docs/feature-map/findings-2026-11-13.md`
+in the backend repo.
+
 ## How to use it
 
 ```bash
@@ -171,20 +175,30 @@ A setting here stops working when what it needs is switched off, removed or down
 
 | Setting | Feature | Needs | Handled |
 |---|---|---|---|
-| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | at least one online payment method (onlineMethodsOf) (`payments`) | PR #386, open: switchOffAdvanceWithoutOnline on Setting → Payment, the generic store save and the super-admin QR rejection (AP-24). Not merged as of 2026-11-13. |
-| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | a premium plan (`store-settings`) | read time: onlineMethodsOf returns [] off premium, so advanceFor returns null. |
-| `pickup-advance`<br>store.checkout.fulfilment.pickup_advance.enabled | `fulfilment` | at least one online payment method (`payments`) | PR #386, open |
-| `pickup-advance`<br>store.checkout.fulfilment.pickup_advance.enabled | `fulfilment` | pickup_pay_at_store on (`fulfilment`) | on save |
-| `pickup-online-only`<br>store.checkout.fulfilment.pickup_pay_at_store = false | `fulfilment` | at least one online payment method (`payments`) | no: Left out of PR #386 on purpose (changes how pickup works): an owner decision. |
-| `store-pickup`<br>store.checkout.fulfilment.pickup_enabled + pickup_outlets | `fulfilment` | Platinum plan + advanced inventory (`store-settings`) | on save + read time: fulfilmentBlockers |
-| `store-pickup`<br>store.checkout.fulfilment.pickup_enabled + pickup_outlets | `fulfilment` | 1+ active pickup outlet (`inventory`) | on save: What an outlet deactivated or deleted later does to pickup_outlets: see the audit. |
-| `choose-outlet`<br>store.checkout.fulfilment.choose_outlet | `fulfilment` | Platinum + advanced inventory + 2 active outlets (`inventory`) | on save + read time: can_choose_outlet / canChooseOutlet |
-| `pooled-stock`<br>store.checkout.fulfilment.online_stock = pooled + pool_outlets | `fulfilment` | limits.pooled_allowed (super admin) + plan + advanced inventory (`store-settings`) | read time: isPooled: the setting only counts while eligible. |
-| `pooled-stock`<br>store.checkout.fulfilment.online_stock = pooled + pool_outlets | `fulfilment` | active pool outlets (`inventory`) | on outlet save: syncPoolBuffers keeps pool_live / pool_buffers in step. |
-| `money-accounts`<br>store.plugins[name=money_accounts] | `finance` | each connected channel has an account (ensureChannelAccounts) (`payments`) | on payment save while installed |
-| `offers-plugin`<br>store.plugins[name=offers] | `offers` | advanced inventory for some offer kinds (`inventory`) | on save: What an offer may add per inventory mode: tests/promotions/foundation.test.ts |
-| `continue-selling`<br>product continue_selling | `inventory` | a simple (non-advanced) store (`inventory`) | read time + backfill: Never applies on an advanced store (W12); scripts/continue-selling-advanced-backfill.ts |
-| `courier-pickup-per-outlet`<br>Outlet.courier_pickup {pathao_store_id, ncm_branch} | `couriers` | the courier plugin installed (`couriers`) | unknown: see the audit |
+| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | at least one online payment method (onlineMethodsOf) (`payments`) | read time; on save in PR #386 (AP-24, open): advanceFor needs hasGateway, so the quote asks no advance; check_domain still says enabled until #386. |
+| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | a web plan (`store-settings`) | read time: onlineMethodsOf returns [] off a web plan (plan expiry cron, trial cron). |
+| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | every online method it counts can be paid on the storefront (`checkout`) | no: onlineMethodsOf counts static Fonepay QR, but the storefront and kit never show a static QR tile: a store whose only online method is static QR blocks COD and offers nothing to pay with. Owner decision: show the tile or stop counting it. |
+| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | advance.places.names still in the delivery table (`checkout`) | no: A delivery-table save never re-checks them: mode "only" with the places gone silently asks no advance. |
+| `advance-payment`<br>store.checkout.advance_payment.enabled | `advance-payment` | advance.products.ids still exist (`products`) | partly: A deleted product never matches, so the advance just isn't asked; ids are cleaned on the next advance save. |
+| `pickup-advance`<br>store.checkout.fulfilment.pickup_advance.enabled | `fulfilment` | pickup_pay_at_store on (`fulfilment`) | on save + read time |
+| `pickup-advance`<br>store.checkout.fulfilment.pickup_advance.enabled | `fulfilment` | at least one online payment method (`payments`) | read time; on save in PR #386 |
+| `pickup-online-only`<br>store.checkout.fulfilment.pickup_pay_at_store = false | `fulfilment` | at least one online payment method (`payments`) | read time (FU-16, fix/setting-dependants): Before FU-16 the outlets stayed listed and the pickup checkout had no way to pay. |
+| `store-pickup`<br>store.checkout.fulfilment.pickup_enabled + pickup_outlets | `fulfilment` | Platinum + advanced inventory (`store-settings`) | on save + read time: fulfilmentBlockers |
+| `store-pickup`<br>store.checkout.fulfilment.pickup_enabled + pickup_outlets | `fulfilment` | each pickup outlet active (`inventory`) | on save + read time (FU-17 clears the storefront cache on every outlet save): Before FU-17 a closed outlet stayed pickable for the cache's hour on stores that aren't pooled. |
+| `choose-outlet`<br>store.checkout.fulfilment.choose_outlet | `fulfilment` | Platinum + advanced inventory + 2 active outlets (`inventory`) | on save + read time: canChooseOutlet |
+| `pooled-stock`<br>store.checkout.fulfilment.online_stock = pooled + pool_outlets | `fulfilment` | limits.pooled_allowed + Platinum + advanced inventory (`store-settings`) | read time: isPooled; super admin turning pooled_allowed off switches it off. |
+| `pooled-stock`<br>store.checkout.fulfilment.online_stock = pooled + pool_outlets | `fulfilment` | at least one live pool outlet (active, a city, a courier pickup when a courier plugin is on) (`inventory`) | read time (PS-17, fix/setting-dependants): Before PS-17 an emptied pool routed every line to nobody: OUT_OF_STOCK on every delivery checkout. |
+| `pooled-stock`<br>store.checkout.fulfilment.online_stock = pooled + pool_outlets | `fulfilment` | courier plugins as they were when the pool was synced (`couriers`) | on plugin save (PS-17): update_plugin / delete_plugin re-sync pool_live. |
+| `website-outlet`<br>store.website_outlet | `inventory` | the outlet active (`inventory`) | no: change-website-outlet and update-outlet allow an inactive website outlet; websiteStockOf ignores status. Shoppers see stock, pooled routing excludes it. |
+| `blanxerpay-qr`<br>store.addons.qr_request_enabled (+ qr_request, setting.qr_request_key) | `payments` | KYC + super-admin approval (qr_request = approved) (`payments`) | on save; the generic store save bypassed it until fix/security-open-routes: update_payment_setting checks the approval; the super admin sets the merchant key. |
+| `own-gateway-keys`<br>store.addons.khalti / fonepay (+ setting keys) | `payments` | the gateway's secret keys saved (`payments`) | no: A manager saving self-hosted Khalti / Fonepay through the generic save has the keys silently dropped while the addon turns on: Khalti payments fail, Fonepay runs in Blanxer mode. Owner decision: refuse non-owner payment saves or keep the addon off without keys. |
+| `counter-fonepay`<br>store.setting.pos_fonepay (default_outlet_value_iss) | `pos` | the store's outlet layout when it was connected (`inventory`) | no: Turning advanced inventory on sets website_outlet but leaves the key under the default bucket; POS then looks it up by outlet id: "Fonepay Integration is not enabled" until reconnected per outlet. |
+| `money-accounts`<br>store.plugins[name=money_accounts] | `finance` | each connected channel has an account (ensureChannelAccounts) (`payments`) | on install + payment save |
+| `money-accounts`<br>store.plugins[name=money_accounts] | `finance` | accounts used by channels stay live (`finance`) | on delete / archive: assertAccountNotInUse |
+| `continue-selling`<br>product continue_selling | `inventory` | a simple (non-advanced) store (`inventory`) | read time + on enabling advanced: Never applies on an advanced store (W12). |
+| `courier-booking`<br>courier submits | `couriers` | the courier plugin installed (`couriers`) | read time: Each service refuses "plugin is not enabled". |
+| `courier-booking`<br>courier submits | `couriers` | Outlet.courier_pickup ids belong to the current courier account (`couriers`) | unknown: Re-keying the Pathao plugin to another account may leave outlets pointing at the old account's stores (not traced). |
+| `meta-capi`<br>store.plugins[name=meta_capi] | `meta-tracking` | the fb_pixel plugin + a token (`meta-tracking`) | on save + read time |
 
 ## One home only
 
@@ -210,6 +224,13 @@ the ones that already exist in other repos and must change in the same piece of 
 | Whether staff may do something | `backend:src/core/helpers/staff-permission.ts staffMay` | `dashboard:src/hooks/staffCan.ts`<br>`app:src/hooks/useStaffCan.ts` |
 | A store's SEO settings with defaults | `backend:src/features/seo/service/settings-rules.ts seoSettingsOf` |  |
 | Record a slug change (301 + IndexNow) | `backend:src/features/seo/service/redirects.ts recordSlugChange` |  |
+| Whether a delivery place takes cash on delivery | `backend:src/features/order/service/delivery-charge.ts hasCodAt` | `storefront:src/features/checkout/place.ts placeCod`<br>`kit:packages/storefront/src/core/delivery.ts isCodAllowed`<br>`mcp:src/shopper/tools.ts` |
+| A delivery charge from the store's table | `backend:src/features/order/service/delivery-charge.ts` | `backend:src/features/order/task/utils.ts (second backend copy)`<br>`storefront:src/features/checkout/index.tsx`<br>`storefront:src/features/checkout/koseliexpress.tsx`<br>`storefront:src/features/quick_checkout/index.tsx`<br>`kit:packages/storefront/src/core/delivery.ts`<br>`mcp:src/shopper/tools.ts`<br>`mcp:src/tools/store.ts`<br>`app:src/app/(tabs)/orders/create.tsx`<br>`dashboard:src/features/multi_outlet/delivery.ts` |
+| The courier list (logistics codes and names) | `backend:src/core/constants/status.ts logistics` | `dashboard:src/shared/constants/courier.ts`<br>`app:src/constants/logistics.ts`<br>`mcp:src/constants.ts LOGISTICS_NAMES (test/courier-names.test.mjs pins it)`<br>`backend:src/core/helpers/pool.ts COURIER_PLUGINS`<br>`backend:src/super_admin/vendor_analytics/metrics/definitions.ts` |
+| Which plans are paid web plans | `backend:src/core/helpers/general.ts isPremiumStore` | `dashboard:src/hooks/useSubscription.ts`<br>`dashboard:src/shared/constants/plans.ts`<br>`app:src/hooks/useStorePlan.ts`<br>`storefront:src/shared/helpers/general.helpers.ts`<br>`kit:packages/storefront/src/core/payments.ts`<br>`mcp:src/constants.ts` |
+| Which statuses a bulk status change may move between | `backend:src/features/order/task/update-status-bulk.ts` | `dashboard:src/features/orders/BulkOrderStatusEdit.tsx`<br>`app:src/app/(tabs)/orders/index.tsx (fix/bulk-status-groups adds src/services/bulk-status.ts)` |
+| What a refund may still pay back | `backend:src/features/pos/task/utils/payment-status.ts refundableNow` | `dashboard:src/features/orders/returns/returns.ts`<br>`app:src/services/refunds/index.ts`<br>`mcp:src/pos-money.ts refundRoom` |
+| What COD reconciling expects back from a courier | `backend:src/features/pos_finance/task/get-cod-records.ts (cod_expected)` | `dashboard:src/features/orders/advance/advance.ts`<br>`app:src/components/orders/ReconcileSheet.tsx` |
 
 ## Feature by feature
 
