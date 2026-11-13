@@ -171,7 +171,9 @@ const brief = (map, id, repo, compact = false) => {
       L.push(`  - ${k}: ${f.paths[k].join(', ')}`);
     }
   }
-  if (f.notes?.length && !compact) L.push(`Notes: ${f.notes.join(', ')}`);
+  // notes from past work: all of them in the full brief, this repo's in the hook's
+  const notes = (f.notes || []).filter((n) => !compact || n.startsWith(`${repo}:`));
+  if (notes.length) L.push(`Notes from past work (read before changing it): ${notes.join(', ')}`);
   return L.join('\n');
 };
 
