@@ -438,7 +438,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
       else {
         const dres = await fetch(`${apiBase}/public/delivery_charge/${store._id}`, { signal: AbortSignal.timeout(15000) });
         const delivery: any = dres.ok ? await dres.json() : { places: [] };
-        const { paymentMethodsFor } = await import('../core/payments.js');
+        const { paymentMethodsFor, planName } = await import('../core/payments.js');
         const { isCodAllowed } = await import('../core/delivery.js');
         const places = (delivery?.places || []) as any[];
         const codPlaces = places.filter((p) => isCodAllowed(p?.[1])).length;
@@ -455,7 +455,7 @@ export async function runCheck(opts: CheckOptions): Promise<number> {
         add(
           'PASS',
           'Store data',
-          `${store.customization?.brand_name || store.name} (${store.sub_domain}, plan ${store.plan || 'free'}) via ${apiBase}\n` +
+          `${store.customization?.brand_name || store.name} (${store.sub_domain}, plan ${planName(store)}) via ${apiBase}\n` +
             `${places.length} delivery places (${codPlaces} with COD); online methods: ${online.length ? online.join(', ') : 'none (COD only)'}` +
             (store.storefront_url ? `\nstorefront_url: ${store.storefront_url}` : '\nstorefront_url not set yet (link the site after deploy)'),
         );

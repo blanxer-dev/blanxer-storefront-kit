@@ -39,6 +39,29 @@ export interface StorePlugin {
   _id?: string;
 }
 
+/**
+ * What the store's plan includes, resolved by the API (`check_domain`). `features` is the
+ * store's final answer: read it instead of comparing the plan id. Absent on older backends.
+ */
+export interface PlanInfo extends Loose {
+  /** '' = free */
+  plan?: string;
+  /** "Premium", "Business Plus", "Platinum", "Elite", "Basic", "POS", "Free" */
+  name?: string;
+  active?: boolean;
+  legacy?: boolean;
+  on_sale?: boolean;
+  qr_fee?: number;
+  ai_level?: string;
+  features?: {
+    website?: boolean;
+    online_payments?: boolean;
+    store_pickup?: boolean;
+    advanced_inventory?: boolean;
+    [feature: string]: boolean | undefined;
+  };
+}
+
 export interface Store extends Loose {
   _id: string;
   name: string;
@@ -47,6 +70,7 @@ export interface Store extends Loose {
   custom_domain?: string;
   storefront_url?: string;
   plan?: string;
+  plan_info?: PlanInfo;
   checkout?: StoreCheckoutSettings;
   customization?: Loose & {
     brand_name?: string;

@@ -76,6 +76,8 @@ export const toClientStore = (store: Store): Store => {
     custom_domain: store.custom_domain || '',
     storefront_url: store.storefront_url || '',
     plan: store.plan,
+    // the plan's name and features (nothing secret): checkout reads features.online_payments
+    ...(store.plan_info ? { plan_info: store.plan_info } : {}),
     checkout: store.checkout || {},
     customization: store.customization || {},
     categories: store.categories || [],
