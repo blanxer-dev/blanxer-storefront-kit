@@ -240,6 +240,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/flow.md`, `backend:docs/order-activity.md`, `backend:docs/analytics-rules.md`
 - **Tests:** `backend:tests/money/order-status-money.test.ts`, `backend:tests/money/order-create-money.test.ts`, `backend:tests/inventory/order-stock.test.ts`, `backend:tests/analytics/export-order-money.test.ts`
+- **Notes:** `backend:docs/findings/orders.md`, `dashboard:docs/findings/orders.md`, `mcp:docs/findings/orders.md`
 - **backend:** `src/features/order`, `src/features/comment`, `src/features/print-design`, `src/core/models/order.ts`, `src/core/models/order_activity.ts`, `src/core/helpers/order-status.helper.ts`, `src/core/helpers/order-activity.ts`, `src/core/constants/status.ts`, `src/core/models/comments.ts`
 - **dashboard:** `src/features/orders`, `src/features/create_order`, `src/features/leads`, `src/features/print_preview`, `src/services/order.service.ts`, `src/services/comment.service.ts`, `src/shared/constants/status.ts`, `src/shared/constants/order_label.ts`
 - **app:** `src/app/(tabs)/orders`, `src/components/orders`, `src/services/order.service.ts`, `src/services/comment.service.ts`, `src/services/delete-orders.ts`, `src/services/customer-search.ts`, `src/services/order-money.ts`, `src/hooks/useOrderPages.ts`
@@ -270,6 +271,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/stock-holds.md`, `backend:docs/flash-sales.md`, `backend:docs/advance-payment-rules.md`, `backend:docs/fulfilment-rules.md`, `storefront:src/features/checkout/RULES.md`
 - **Tests:** `backend:tests/money/sambad-shopper.test.ts`, `backend:tests/inventory/web-oversell.test.ts`, `backend:tests/multi-outlet/checkout-plan.test.ts`, `storefront:src/features/checkout/contract.test.ts`, `kit:packages/storefront/test/checkout-logic.test.ts`
+- **Notes:** `backend:docs/findings/checkout.md`, `dashboard:docs/findings/checkout.md`, `storefront:docs/findings/checkout.md`, `mcp:docs/findings/checkout.md`
 - **backend:** `src/features/order/task/create-order.ts`, `src/features/order/task/public-*`, `src/features/order/task/checkout-plan.ts`, `src/features/order/task/sambad-*`, `src/features/order/task/store-availability.ts`, `src/features/order/service/checkout-*`, `src/features/order/service/pooled-checkout.ts`, `src/features/order/service/delivery-charge.ts`, `src/features/order/service/customer-auth.ts`, `src/features/store/service/check-domain.ts`, `src/features/store/service/read-delivery-charge.ts`, `src/features/store/service/update-delivery-charge.ts`, `src/features/promotion/public.controller.ts`, `src/features/stock_hold`, `src/public_features`, `src/client_web`, `src/core/helpers/delivery-date.helper.ts`
 - **dashboard:** `src/features/checkout_settings`, `src/features/store_setting/DeliveryCharge.tsx`, `src/features/store_setting/StorefrontFeatures.tsx`
 - **storefront:** `src/features/checkout`, `src/features/quick_checkout`, `src/features/auth`, `pages/checkout.tsx`, `pages/buy`, `pages/payment`, `pages/purchase`, `pages/account`, `pages/member`, `src/hooks`, `src/context`, `lib/services`, `src/components/CartDrawer`, `src/components/CartSync.tsx`, `src/components/KPaymentAwait.tsx`, `src/components/KFonepayCheckoutAwait.tsx`, `src/components/PaymentCloseConfirm.tsx`
@@ -296,6 +298,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/advance-payment-rules.md`, `dashboard:src/features/orders/advance/RULES.md`
 - **Tests:** `backend:tests/money/advance-payment.test.ts`, `backend:tests/money/advance-paths.test.ts`, `backend:tests/money/advance-parity.test.ts`, `backend:tests/money/advance-ledger.test.ts`, `backend:tests/money/advance-contract.test.ts`, `backend:tests/money/advance-rules-index.test.ts`, `dashboard:src/features/orders/advance/contract.test.ts`, `storefront:src/features/checkout/advance.test.ts`, `kit:packages/storefront/test/advance-contract.test.ts`, `app:src/services/advance-contract.test.ts`
+- **Notes:** `dashboard:docs/findings/advance-payment.md`, `storefront:docs/findings/advance-payment.md`, `mcp:docs/findings/advance-payment.md`
 - **backend:** `src/features/order/service/advance.ts`, `src/features/order/service/advance-quote.ts`, `src/core/helpers/order-advance.ts`, `src/features/store/service/update-advance-payment.ts`
 - **dashboard:** `src/features/orders/advance`, `src/features/checkout_settings/AdvancePaymentCard.tsx`, `src/features/checkout_settings/AdvanceProducts.tsx`, `src/features/checkout_settings/advance.ts`
 - **app:** `src/services/advance.ts`
@@ -320,6 +323,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/flow.md`
 - **Tests:** `backend:tests/money/payment-flip.test.ts`, `backend:tests/money/pos-fonepay.test.ts`, `backend:tests/money/advance-paths.test.ts`
+- **Notes:** `backend:docs/findings/payments.md`, `dashboard:docs/findings/payments.md`
 - **backend:** `src/features/payment`, `src/features/esewa`, `src/features/store/service/update-payment-setting.ts`, `src/features/store/service/apply-qr-payment-request.ts`, `src/features/pos_finance/utils/online-methods.ts`, `src/super_admin/store/tasks/*qr-request.ts`, `src/super_admin/fonepay_reconcile`, `src/super_admin/transaction`, `src/services/esewa`, `src/services/khalti`, `src/services/fone_pay`, `src/services/nabil`, `src/services/nps`, `src/services/cybersource`, `src/services/cellpay`, `src/core/helpers/payment.helper.ts`, `src/core/constants/payment.ts`, `src/core/models/transaction.ts`, `src/core/models/settlement.ts`
 - **dashboard:** `src/features/payment_setting`, `src/features/transactions`, `src/shared/constants/payment.ts`, `src/shared/helpers/payment.helper.ts`, `src/services/purchase.service.ts`
 - **app:** `src/app/transactions`, `src/services/transaction.service.ts`, `src/components/finance/online.ts`
@@ -346,6 +350,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/flow.md`, `backend:docs/money/decisions.md`
 - **Tests:** `backend:tests/money/cod-shortfall.test.ts`, `backend:tests/money/reconcile-cache.test.ts`, `backend:tests/money/courier-reconcile-money.test.ts`, `backend:tests/money/returns-couriers.test.ts`
+- **Notes:** `backend:docs/findings/cod-reconcile.md`, `dashboard:docs/findings/cod-reconcile.md`
 - **backend:** `src/features/pos_finance/task/remit-cod.ts`, `src/features/pos_finance/task/remit-matching.ts`, `src/features/pos_finance/task/reconcile.ts`, `src/features/pos_finance/task/cod-report.ts`, `src/features/pos_finance/task/get-cod-records.ts`, `src/features/pos_finance/task/recover-cod-shortfall.ts`, `src/features/pos_finance/task/returned-held.ts`, `src/features/pos_finance/utils/cod.ts`, `src/core/models/cod_remittance.ts`
 - **dashboard:** `src/features/cod_reconciliation`, `src/features/reconcile`, `src/features/orders/detail/ReconcileCodModal.tsx`, `src/features/orders/detail/WaitingReconcileNotice.tsx`
 - **app:** `src/app/pos/cod.tsx`, `src/app/pos/reconcile.tsx`, `src/components/orders/ReconcileSheet.tsx`, `src/components/pos/CodSheets.tsx`, `src/services/cod-lines.ts`
@@ -366,6 +371,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/flow.md`
 - **Tests:** `backend:tests/money/pathao-webhook.test.ts`, `backend:tests/money/pathao-location-sync.test.ts`, `backend:tests/money/ncm-comment-webhook.test.ts`, `backend:tests/money/courier-comments.test.ts`, `backend:tests/analytics/shipments-paging.test.ts`, `backend:tests/analytics/shipments-pickup.test.ts`, `backend:tests/analytics/retired-couriers.test.ts`
+- **Notes:** `backend:docs/findings/couriers.md`, `dashboard:docs/findings/couriers.md`, `mcp:docs/findings/couriers.md`
 - **backend:** `src/features/order/task/submit-to-*`, `src/features/order/task/handle-*-webhook.ts`, `src/features/order/task/cancel-*`, `src/features/order/task/track-*`, `src/features/order/task/*hello-service*`, `src/features/order/task/get-*-areas.ts`, `src/features/order/task/get-*-options.ts`, `src/features/order/task/get-*-cities.ts`, `src/features/order/task/get-address-for-*`, `src/features/order/task/get-pick-and-drop-*`, `src/features/order/task/ncm-tools.ts`, `src/features/order/task/pathao-tools.ts`, `src/features/order/task/courier-comments.ts`, `src/features/order/task/record-courier-exchange.ts`, `src/features/order/task/get-dispatched-orders.ts`, `src/features/order/task/get-tracking-link-from-order.ts`, `src/features/order/task/utils/afterOrderStatusChangeByWebhook.ts`, `src/features/order/task/utils/applyHelloServiceStatus.ts`, `src/features/order/task/utils/forwardLogisticsComment.ts`, `src/features/order/task/utils/store*InboundComment.ts`, `src/features/order/service/courier-exchange.ts`, `src/features/logistics_locations`, `src/features/network_insights`, `src/super_admin/logistics`, `src/services/aramex`, `src/services/daraz`, `src/services/dash`, `src/services/expo_express`, `src/services/fabbud`, `src/services/hello_service`, `src/services/ncm`, `src/services/pathao`, `src/services/pick_and_drop`, `src/services/shipday`, `src/services/upaye`, `src/core/helpers/courier-phone.ts`, `src/core/constants/aramex.ts`, `src/core/constants/ncm.ts`, `src/core/constants/delivery_cost_code.ts`
 - **dashboard:** `src/features/logistics_overview`, `src/features/courier_comments`, `src/features/orders/Submit*.tsx`, `src/features/orders/*Tracking.tsx`, `src/features/orders/Cancel*.tsx`, `src/features/orders/Gbl*.tsx`, `src/features/orders/NcmCustomerRecord.tsx`, `src/features/orders/BulkLogisticsSubmit.tsx`, `src/features/orders/useCourierLocations.ts`, `src/features/orders/detail/LogisticsSubmit.tsx`, `src/features/orders/detail/CourierCompare.tsx`, `src/features/orders/detail/useCourierAdvice.ts`, `src/services/gbl.service.ts`, `src/services/network.service.ts`, `src/services/courier-comments.service.ts`, `src/shared/constants/courier.ts`, `src/shared/constants/pathao.ts`, `src/shared/constants/ncm.ts`, `src/shared/constants/daraz.ts`, `src/shared/constants/aramex.ts`, `src/shared/constants/gbl.ts`
 - **app:** `src/app/logistics`, `src/components/logistics`, `src/services/logistics.service.ts`, `src/services/network.service.ts`, `src/services/courier-comments.service.ts`, `src/services/courier-rules.ts`, `src/services/courier-returns.ts`, `src/components/orders/Courier*.tsx`, `src/components/orders/Delivery*.tsx`, `src/components/orders/HelloServiceSheet.tsx`, `src/components/orders/LogisticsSubmitSheet.tsx`
@@ -388,7 +394,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/fulfilment-rules.md`
 - **Tests:** `backend:tests/inventory/fulfilment.test.ts`, `backend:tests/multi-outlet/foundations.test.ts`, `backend:tests/multi-outlet/settings.test.ts`, `backend:tests/multi-outlet/routing.test.ts`, `backend:tests/multi-outlet/split-create.test.ts`, `backend:tests/multi-outlet/pooled-off-create.test.ts`, `storefront:src/features/checkout/pickup.test.ts`, `kit:packages/storefront/test/pickup.test.ts`
-- **Notes:** `backend:e2e/multi-outlet`, `backend:scripts/e2e-multi-outlet.sh`
+- **Notes:** `backend:e2e/multi-outlet`, `backend:scripts/e2e-multi-outlet.sh`, `backend:docs/findings/fulfilment.md`, `dashboard:docs/findings/fulfilment.md`, `storefront:docs/findings/fulfilment.md`, `mcp:docs/findings/fulfilment.md`
 - **backend:** `src/features/order/service/fulfilment.ts`, `src/features/order/service/fulfilment-entry.ts`, `src/features/order/service/routing.ts`, `src/features/order/service/reroute.ts`, `src/features/order/service/splitter.ts`, `src/features/order/service/checkout-group.ts`, `src/features/order/service/pooled-checkout.ts`, `src/features/order/task/fulfilment.ts`, `src/features/store/service/fulfilment-routing.ts`, `src/features/store/service/fulfilment-setting.ts`, `src/features/store/service/pool-setting.ts`, `src/features/store/service/outlet-delivery.ts`, `src/core/helpers/pool.ts`, `src/core/helpers/website-stock.ts`, `src/super_admin/store/tasks/multi-outlet.ts`, `src/features/inventory/tasks/create-outlet.ts`, `src/features/inventory/tasks/update-outlet.ts`, `src/features/inventory/tasks/change-website-outlet.ts`, `src/features/inventory/tasks/held-online.ts`, `src/core/models/outlet.ts`, `src/core/models/fulfilment_entry.ts`, `src/core/models/fulfilment_route.ts`
 - **dashboard:** `src/features/multi_outlet`, `src/features/checkout_settings/StorePickupCard.tsx`, `src/features/checkout_settings/fulfilment.ts`, `src/features/orders/detail/FulfilmentPanel.tsx`, `src/services/multi-outlet.service.ts`, `src/hooks/useOutlet.ts`
 - **app:** `src/services/pickup.ts`, `src/services/inventory-outlets.ts`, `src/hooks/useInventoryOutlet.ts`
@@ -414,6 +420,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/inventory-rules.md`, `dashboard:src/features/orders/stock/RULES.md`
 - **Tests:** `backend:tests/inventory/order-stock.test.ts`, `backend:tests/inventory/pos-stock.test.ts`, `backend:tests/inventory/stock-moves.test.ts`, `backend:tests/inventory/stock-gaps.test.ts`, `backend:tests/inventory/web-rules-index.test.ts`
+- **Notes:** `backend:docs/findings/inventory.md`, `dashboard:docs/findings/inventory.md`, `storefront:docs/findings/inventory.md`, `mcp:docs/findings/inventory.md`
 - **backend:** `src/features/inventory`, `src/features/stock-alert`, `src/features/order/service/take-stock.ts`, `src/features/order/task/utils.ts`, `src/features/order/task/utils/handle-inventory-*`, `src/features/order/task/utils/was-inventory-reduced.ts`, `src/features/order/task/utils/batch-cogs.ts`, `src/features/order/task/stock-attention.ts`, `src/super_admin/inventory`, `src/core/models/batch.ts`, `src/core/models/stock_*.ts`, `src/core/models/inventory_*.ts`, `src/core/models/batch_cost_correction.ts`, `src/core/handlers/stock.error.ts`, `src/core/handlers/needsConfirmation.error.ts`
 - **dashboard:** `src/features/inventory`, `src/features/orders/stock`, `src/services/inventory.service.ts`, `src/services/stock-alert.service.ts`, `src/hooks/inventoryCan.ts`, `src/hooks/useInventoryCan.ts`
 - **app:** `src/app/(tabs)/inventory`, `src/services/inventory.service.ts`, `src/services/stock-short.ts`, `src/services/stock-error.ts`, `src/services/stock-alert.service.ts`, `src/services/batch-cost.ts`, `src/store/inventory.store.ts`, `src/hooks/useInventoryPerms.ts`, `src/hooks/useStockAttention.ts`
@@ -442,6 +449,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/inventory-rules.md`, `backend:docs/offers-rules.md`
 - **Tests:** `backend:tests/barcode-labels.test.ts`, `backend:tests/money/alt-barcode.test.ts`, `backend:tests/money/media-images.test.ts`, `backend:tests/money/size-guide.test.ts`, `backend:tests/promotions/bundle-products.test.ts`, `backend:tests/money/product-cost-ux.test.ts`
+- **Notes:** `backend:docs/findings/products.md`, `dashboard:docs/findings/products.md`, `storefront:docs/findings/products.md`, `mcp:docs/findings/products.md`
 - **backend:** `src/features/product`, `src/features/brand`, `src/features/size_guide`, `src/features/file`, `src/core/models/product.ts`, `src/core/models/brand.ts`, `src/core/models/file.ts`, `src/core/models/folder.ts`, `src/core/models/size_guide.ts`, `src/core/helpers/s3helper.ts`, `src/core/helpers/r2.helper.ts`
 - **dashboard:** `src/features/add_product`, `src/features/edit_product`, `src/features/products`, `src/features/products_hub`, `src/features/product_overview`, `src/features/categories`, `src/features/brands`, `src/features/size_guides`, `src/features/media`, `src/services/product.service.ts`, `src/services/brand.service.ts`, `src/services/size_guide.service.ts`, `src/services/file.service.ts`, `src/hooks/useProduct.ts`, `src/hooks/useSingleProduct.tsx`, `src/hooks/useBrands.ts`, `src/hooks/useCategory.ts`
 - **app:** `src/app/(tabs)/products`, `src/components/products`, `src/components/bg-removal`, `src/services/product.service.ts`, `src/services/brand.service.ts`, `src/services/media.service.ts`, `src/services/product-cost.ts`, `src/services/product-images.ts`, `src/services/barcode-match.ts`, `src/services/bundle-picks.ts`, `src/hooks/useImageUrl.ts`
@@ -465,6 +473,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/offers-rules.md`, `backend:docs/flash-sales.md`, `dashboard:src/features/offers/RULES.md`, `app:docs/offers-rules.md`
 - **Tests:** `backend:tests/promotions/engine.test.ts`, `backend:tests/promotions/orders.test.ts`, `backend:tests/promotions/rules-index.test.ts`, `backend:tests/money/coupon-claims.test.ts`, `backend:tests/tigg/offers.test.ts`, `dashboard:src/features/offers/rules-index.test.ts`, `app:src/offers-rules-index.test.ts`, `kit:packages/storefront/test/offers.test.ts`
+- **Notes:** `backend:docs/findings/offers.md`, `dashboard:docs/findings/offers.md`, `storefront:docs/findings/offers.md`, `mcp:docs/findings/offers.md`
 - **backend:** `src/features/promotion`, `src/features/coupon`, `src/features/offer`, `src/features/offer-campaign`, `src/core/models/promotion*.ts`, `src/core/models/coupan*.ts`, `src/core/models/offer*.ts`
 - **dashboard:** `src/features/offers`, `src/features/offer`, `src/features/discount_coupons`, `src/features/orders/offers`, `src/services/offer.service.ts`, `src/services/offer-campaign.service.ts`, `src/services/promotion.service.ts`, `src/services/coupon.service.ts`, `src/services/offers-quote.service.ts`, `src/shared/helpers/order-offers.helper.ts`
 - **app:** `src/app/offers`, `src/services/promotion.service.ts`, `src/services/offer-list.ts`, `src/services/offer-requests.ts`, `src/services/offer-returns.ts`, `src/components/orders/Offers.tsx`, `src/components/orders/offer-lines.ts`, `src/components/pos/usePosOffers.ts`
@@ -492,6 +501,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/flow.md`
 - **Tests:** `backend:tests/money/loyalty.test.ts`, `backend:tests/samparka-rewards.test.ts`
+- **Notes:** `backend:docs/findings/loyalty.md`, `dashboard:docs/findings/loyalty.md`
 - **backend:** `src/features/membership`, `src/features/samparka-plugin`, `src/core/helpers/customer-program.ts`, `src/core/models/loyalty_*.ts`
 - **dashboard:** `src/features/membership`, `src/services/membership.service.ts`, `src/features/pos/useSamparkaLoyalty.ts`, `src/features/pos/SamparkaRewardsModal.tsx`
 - **Linked features:**
@@ -505,6 +515,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/flow.md`, `backend:docs/inventory-rules.md`
 - **Tests:** `backend:tests/money/counter-sale-money.test.ts`, `backend:tests/money/drawer-money.test.ts`, `backend:tests/money/pos-plan.test.ts`, `backend:tests/pos-checkout-rules.test.ts`, `backend:tests/pos-scope.test.ts`, `backend:tests/pos/payment-status.test.ts`, `backend:tests/inventory/pos-stock.test.ts`, `app:src/components/pos/tender-rules.test.ts`, `app:src/store/pos-totals.test.ts`
+- **Notes:** `backend:docs/findings/pos.md`, `dashboard:docs/findings/pos.md`, `mcp:docs/findings/pos.md`
 - **backend:** `src/features/pos`, `src/features/order/task/pos-*`, `src/core/middlewares/posScope.ts`, `src/core/middlewares/checkPosPlan.ts`, `src/core/helpers/pos-*.ts`, `src/core/models/pos_*.ts`
 - **dashboard:** `src/features/pos`, `src/features/pos_settings`, `src/services/pos-sale.service.ts`, `src/services/pos-settings.service.ts`, `src/services/pos-shift.service.ts`, `src/shared/helpers/pos-sale.helper.ts`, `src/hooks/usePosOnly.ts`
 - **app:** `src/app/pos`, `src/components/pos`, `src/store/pos.store.ts`, `src/store/pos-totals.ts`, `src/services/pos.service.ts`
@@ -528,6 +539,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/refund-exchange-rules.md`, `dashboard:src/features/orders/returns/RULES.md`, `app:src/services/refunds/RULES.md`
 - **Tests:** `backend:tests/money/exchanges.test.ts`, `backend:tests/money/refunds.test.ts`, `backend:tests/money/returns-couriers.test.ts`, `backend:tests/money/refund-rules-index.test.ts`, `backend:tests/pos/refund-plan.test.ts`, `dashboard:src/features/orders/returns/rules-index.test.ts`, `app:src/services/refunds/rules-index.test.ts`
+- **Notes:** `backend:docs/findings/refunds-returns.md`, `dashboard:docs/findings/refunds-returns.md`, `mcp:docs/findings/refunds-returns.md`
 - **backend:** `src/features/order/service/exchange-builder.ts`, `src/features/order/service/exchange-customer.ts`, `src/features/order/service/refund-money.ts`, `src/features/order/service/return-lines.ts`, `src/features/order/service/credit-out.ts`, `src/features/order/task/create-order-return.ts`, `src/features/order/task/create-order-refund.ts`, `src/features/order/task/return-preview.ts`, `src/features/order/task/get-order-returnable.ts`, `src/features/order/task/list-order-returns.ts`, `src/features/order/task/mark-return-damaged.ts`, `src/features/order/task/utils/returned-value.ts`, `src/features/pos/task/create-return.ts`, `src/features/pos/task/void-sale.ts`, `src/features/pos/task/get-return*.ts`, `src/features/pos/service/refund-plan.ts`, `src/features/pos/task/utils/restock-return.ts`, `src/features/promotion/service/returns.ts`, `src/core/models/pos_return.ts`
 - **dashboard:** `src/features/orders/returns`, `src/features/orders/exchange`, `src/features/orders/ReturnExchangeModal.tsx`, `src/features/orders/detail/RefundSheet.tsx`, `src/features/orders/detail/RefundSource.tsx`, `src/features/orders/detail/StatusRefund.tsx`, `src/features/orders/detail/ExchangePanel.tsx`, `src/features/orders/detail/MarkDamagedModal.tsx`
 - **app:** `src/services/refunds`, `src/components/orders/RefundSheet.tsx`, `src/components/orders/RefundedStatusSheet.tsx`, `src/components/orders/ReturnPreview.tsx`, `src/app/(tabs)/orders/return`, `src/app/pos/return`, `src/app/pos/returns.tsx`
@@ -552,6 +564,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/money/README.md`, `backend:docs/money/flow.md`, `backend:docs/money/decisions.md`, `backend:docs/analytics-rules.md`
 - **Tests:** `backend:tests/money/account-entry-money.test.ts`, `backend:tests/money/cash-book.test.ts`, `backend:tests/money/expense-money.test.ts`, `backend:tests/money/finance-scope.test.ts`, `backend:tests/money/place-money.test.ts`, `backend:tests/money/money-accounts-plugin.test.ts`, `backend:tests/pos_finance/bank-txn-rules.test.ts`
+- **Notes:** `backend:docs/findings/finance.md`, `dashboard:docs/findings/finance.md`, `mcp:docs/findings/finance.md`
 - **backend:** `src/features/pos_finance`, `src/core/constants/bank-txn-source.ts`, `src/core/models/pos_bank_*.ts`, `src/core/models/expense*.ts`, `src/core/models/supplier*.ts`, `src/core/helpers/with-txn.ts`
 - **dashboard:** `src/features/finance`, `src/features/bank_accounts`, `src/features/cash_book`, `src/features/daybook`, `src/features/expenses`, `src/features/suppliers`, `src/features/finance_analytics`, `src/services/pos-finance.service.ts`, `src/services/supplier.service.ts`
 - **app:** `src/app/pos/bank`, `src/app/pos/cash-book.tsx`, `src/app/pos/day-close.tsx`, `src/app/pos/finance.tsx`, `src/app/pos/finance-analytics.tsx`, `src/app/pos/settlement-accounts.tsx`, `src/app/pos/supplier`, `src/components/finance`, `src/services/pos-finance.service.ts`, `src/services/finance-analytics.service.ts`, `src/services/order-money.ts`, `src/hooks/useAccountsOn.ts`, `src/components/orders/OrderMoneyCard.tsx`, `src/components/pos/DrawerExpenses.tsx`, `src/components/pos/PaidFrom.tsx`, `src/components/pos/accounts.ts`, `src/components/pos/tenders.ts`
@@ -577,6 +590,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/customer-ledger-rules.md`, `dashboard:src/features/customers/RULES.md`
 - **Tests:** `backend:tests/money/customer-ledger.test.ts`, `backend:tests/money/customer-ledger-counter.test.ts`, `backend:tests/money/customer-ledger-receive.test.ts`, `backend:tests/money/customer-ledger-rules-index.test.ts`, `app:src/services/customer-ledger.test.ts`
+- **Notes:** `dashboard:docs/findings/customers-ledger.md`
 - **backend:** `src/features/customer_ledger`, `src/features/customers`, `src/features/pos_finance/task/create-customer-entry.ts`, `src/features/pos_finance/task/get-customer-*.ts`, `src/features/pos/task/utils/credit-ledger.ts`, `src/core/models/customer*.ts`, `src/core/models/app_customer.ts`
 - **dashboard:** `src/features/customers`, `src/services/customers.service.ts`, `src/features/orders/risk`
 - **app:** `src/app/customers`, `src/app/pos/customer`, `src/app/(tabs)/orders/customer`, `src/services/customer.service.ts`, `src/services/customer-ledger.ts`
@@ -596,6 +610,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/analytics-rules.md`
 - **Tests:** `backend:tests/analytics/counted-orders.test.ts`, `backend:tests/money/reports-by-place.test.ts`, `backend:tests/money/traffic.test.ts`, `backend:tests/analytics/leaderboard-entry.test.ts`
+- **Notes:** `backend:docs/findings/reports.md`, `dashboard:docs/findings/reports.md`
 - **backend:** `src/features/sales_overview`, `src/features/omni_analytics`, `src/features/reports`, `src/features/pos_reports`, `src/features/store_analytics`, `src/features/order/task/sales-overview.ts`, `src/core/analytics`, `src/core/middlewares/analyticsScope.ts`, `src/super_admin/vendor_analytics`, `src/super_admin/dashboard`, `src/core/models/sales_daily*.ts`, `src/core/models/report_job.ts`, `src/core/models/analytics_rollup_state.ts`, `src/core/models/store_analytics.ts`
 - **dashboard:** `src/features/analytics`, `src/features/overview`, `src/features/leaderboard`, `src/features/dashboard_home`, `src/services/analytics.service.ts`, `src/services/omni-analytics.service.ts`, `src/services/reports.service.ts`, `src/services/sales_overview.service.ts`, `src/services/pos-reports.service.ts`, `src/shared/helpers/analytics.helper.ts`, `src/shared/helpers/omni.helper.ts`, `src/hooks/useGrossProfitGate.ts`
 - **app:** `src/app/(tabs)/analytics`, `src/app/(tabs)/(home)`, `src/app/leaderboard`, `src/app/pos/reports.tsx`, `src/components/insights`, `src/components/leaderboard`, `src/services/analytics.service.ts`, `src/services/omni-analytics.service.ts`, `src/services/reports.service.ts`, `src/services/pos-reports.service.ts`
@@ -618,6 +633,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:CLAUDE.md`
 - **Tests:** `backend:tests/money/pos-plan.test.ts`, `backend:tests/storefront-site.test.ts`, `backend:tests/auth/customer-otp.test.ts`
+- **Notes:** `backend:docs/findings/store-settings.md`, `dashboard:docs/findings/store-settings.md`
 - **backend:** `src/features/store`, `src/features/subscription`, `src/features/auth`, `src/features/api_keys`, `src/super_admin/store`, `src/super_admin/subscription`, `src/super_admin/auth`, `src/core/models/store.ts`, `src/core/models/store_users.ts`, `src/core/models/subscription.ts`, `src/core/models/user.ts`, `src/core/models/super_user.ts`, `src/core/models/api_keys.ts`, `src/core/helpers/general.ts`, `src/core/helpers/storefront-url.ts`, `src/core/helpers/store-scope.ts`, `src/core/helpers/jwt.ts`, `src/core/helpers/oauth.ts`, `src/core/middlewares`, `src/core/handlers`, `src/core/constants/blanxer.ts`, `src/core/constants/generic.constant.ts`
 - **dashboard:** `src/features/store_setting`, `src/features/plugins`, `src/features/subscription`, `src/features/auth`, `src/features/support`, `src/features/issues`, `src/features/learn`, `src/services/store.service.ts`, `src/services/auth.service.ts`, `src/services/support.service.ts`, `src/shared/constants/plans.ts`, `src/hooks/useAuth.ts`, `src/hooks/useStores.ts`, `src/hooks/useSubscription.ts`, `src/hooks/useMine.ts`, `src/hooks/useIssues.ts`
 - **app:** `src/app/settings`, `src/app/(auth)`, `src/app/_layout.tsx`, `src/app/index.tsx`, `src/app/(tabs)/_layout.tsx`, `src/services/store.service.ts`, `src/services/support.service.ts`, `src/services/app-update.service.ts`, `src/services/axios.ts`, `src/services/confirm.ts`, `src/store/auth.store.ts`, `src/store/sheet.store.ts`, `src/hooks/useStorePlan.ts`, `src/hooks/useAppMode.ts`, `src/hooks/useStoreId.ts`, `src/hooks/useSoftAppUpdate.ts`, `src/components/ui`, `src/components/drawer`
@@ -641,6 +657,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/refund-exchange-rules.md`
 - **Tests:** `backend:tests/pos-scope.test.ts`, `backend:tests/money/finance-scope.test.ts`, `dashboard:src/hooks/staffCan.test.ts`, `dashboard:src/hooks/inventoryCan.test.ts`
+- **Notes:** `dashboard:docs/findings/staff-roles.md`
 - **backend:** `src/core/helpers/staff-permission.ts`, `src/core/middlewares/authRoleCheck.ts`, `src/core/middlewares/checkRole.ts`, `src/core/middlewares/inventoryRoleCheck.ts`, `src/core/middlewares/storeWithRole.ts`, `src/core/middlewares/posScope.ts`, `src/features/store/service/update-store-user-*.ts`, `src/features/store/service/get-store-user-role.ts`
 - **dashboard:** `src/features/store_users`, `src/features/inventory/UserAccessAndRoles.tsx`, `src/hooks/staffCan.ts`, `src/hooks/useStaffCan.ts`, `src/hooks/inventoryCan.ts`, `src/hooks/useInventoryCan.ts`, `src/hooks/useStoreUsers.ts`, `src/shared/components/KHasAccess.tsx`
 - **app:** `src/hooks/useRole.ts`, `src/hooks/useStaffCan.ts`, `src/hooks/useInventoryPerms.ts`
@@ -657,6 +674,7 @@ the ones that already exist in other repos and must change in the same piece of 
 **Website content: themes, page builder, pages, blog, forms, navigation, footer.** What the storefront looks like: themes (one CSS per theme), the page builder and its sections, pages, blog, forms, menus, footer, print designs.
 
 - **Tests:** `backend:tests/storefront-site.test.ts`
+- **Notes:** `backend:docs/findings/website-content.md`, `dashboard:docs/findings/website-content.md`, `storefront:docs/findings/website-content.md`, `mcp:docs/findings/website-content.md`
 - **backend:** `src/features/pages`, `src/features/blog`, `src/features/forms`, `src/core/models/pages.ts`, `src/core/models/blog_post.ts`, `src/core/models/custom_form.ts`, `src/core/models/form_submission.ts`
 - **dashboard:** `src/features/appearance`, `src/features/site_builder`, `src/features/pages`, `src/features/blog`, `src/features/content`, `src/features/custom_footer`, `src/features/custom_navigation`, `src/features/forms`, `src/features/form_builder`, `src/features/form_submissions`, `src/features/print_designs`, `src/services/pages.service.ts`, `src/services/blog.service.ts`, `src/services/forms.service.ts`, `src/services/printDesign.service.ts`, `src/services/builder-service.helper.ts`, `src/hooks/useSiteBuilder.ts`, `src/hooks/use-site-builder-view-mode.tsx`
 - **storefront:** `src/features/landing_page`, `src/features/page`, `src/features/blog`, `src/features/forms`, `src/features/print_designs`, `src/sections`, `pages/index.tsx`, `pages/[...path].tsx`, `pages/blog`, `pages/blogs`, `pages/forms`, `pages/prints.tsx`, `pages/emi-calculator.tsx`, `pages/404.tsx`, `pages/_error.tsx`, `pages/api`, `lib/utils`, `public/themes`
@@ -671,6 +689,7 @@ the ones that already exist in other repos and must change in the same piece of 
 **SEO: slugs, redirects, sitemap, llms.txt, audit, IndexNow, SEO AI.** The SEO plugin and the public SEO reads.
 
 - **Tests:** `backend:tests/seo/seo-rules.test.ts`, `backend:tests/seo/seo-backend.test.ts`, `backend:tests/seo/public-reads.test.ts`, `backend:tests/seo-public.test.ts`
+- **Notes:** `backend:docs/findings/seo.md`, `dashboard:docs/findings/seo.md`, `storefront:docs/findings/seo.md`, `mcp:docs/findings/seo.md`
 - **backend:** `src/features/seo`, `src/public_features/seo-xml*.ts`, `src/public_features/llms*.ts`, `src/core/helpers/romanize.ts`, `src/features/store/service/sitemap-entries.ts`, `src/features/store/service/bulk-category-seo.ts`, `src/core/models/redirect.ts`, `src/core/models/seo_score.ts`
 - **dashboard:** `src/features/seo`, `src/services/seo.service.ts`
 - **storefront:** `pages/sitemap`, `pages/sitemap.xml.tsx`, `pages/robots.txt.tsx`, `pages/llms.txt.tsx`, `pages/llms-full.txt.tsx`, `pages/indexnow.txt.tsx`, `pages/blog-feed.xml.tsx`, `src/components/KSeo.tsx`
@@ -687,6 +706,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 - **Rules:** `backend:docs/inventory-rules.md`
 - **Tests:** `backend:tests/tigg/always-in-step.test.ts`, `backend:tests/tigg/offers.test.ts`, `backend:tests/tigg/mapping.test.ts`
+- **Notes:** `backend:docs/findings/tigg.md`, `dashboard:docs/findings/tigg.md`
 - **backend:** `src/features/tigg-plugin`, `src/services/tigg`
 - **dashboard:** `src/features/tigg_stock`, `src/features/orders/BulkTiggSync.tsx`, `src/features/orders/TiggOrderSync.tsx`
 - **Never break:**
@@ -701,6 +721,7 @@ the ones that already exist in other repos and must change in the same piece of 
 **SMS and email.** Order-event SMS, bulk SMS, SMS credit, emails to customers and stores.
 
 - **Tests:** `backend:tests/sms/event-message.test.ts`, `backend:tests/sms/bulk-sms-sender.test.ts`
+- **Notes:** `dashboard:docs/findings/notifications.md`, `mcp:docs/findings/notifications.md`
 - **backend:** `src/features/sms`, `src/mods/sms.ts`, `src/services/sms`, `src/services/email`, `src/core/helpers/sendMail.ts`, `src/core/helpers/notify-customer.ts`, `src/core/helpers/emailTemplates`, `src/core/models/sms_*.ts`
 - **dashboard:** `src/features/sms`, `src/services/sms.service.ts`
 - **app:** `src/app/settings/sms.tsx`, `src/services/sms.service.ts`
@@ -714,6 +735,7 @@ the ones that already exist in other repos and must change in the same piece of 
 **Meta pixel, Conversions API and catalog feed.** Purchase events once per paid order, the product feed for Meta catalogs.
 
 - **Tests:** `backend:tests/money/meta-tracking.test.ts`, `backend:tests/meta-capi.test.ts`, `kit:packages/storefront/test/meta.test.ts`
+- **Notes:** `backend:docs/findings/meta-tracking.md`, `dashboard:docs/findings/meta-tracking.md`, `storefront:docs/findings/meta-tracking.md`
 - **backend:** `src/features/order/service/meta-tracking.ts`, `src/public_features/meta-event.ts`, `src/public_features/product-feed.ts`, `src/services/meta_capi`, `src/features/store/service/meta-connection.ts`, `src/core/models/meta_capi_status.ts`
 - **dashboard:** `src/features/metaCatalog`
 - **storefront:** `lib/meta-capi.ts`, `lib/datalayer.ts`, `src/plugins`, `pages/product-feed.xml.tsx`
@@ -729,6 +751,7 @@ the ones that already exist in other repos and must change in the same piece of 
 **Product reviews.** Customer reviews from the tracking page, store replies, Ask to edit.
 
 - **Tests:** `backend:tests/reviews/review-reply-edit.test.ts`
+- **Notes:** `backend:docs/findings/reviews.md`, `dashboard:docs/findings/reviews.md`
 - **backend:** `src/features/order/task/public-review.ts`, `src/features/order/task/public-update-review.ts`, `src/features/order/task/review-actions.ts`, `src/features/order/task/get-store-reviews.ts`, `src/core/models/review.ts`
 - **dashboard:** `src/features/reviews`
 - **app:** `src/app/(tabs)/products/reviews.tsx`, `src/services/review.service.ts`
@@ -740,6 +763,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 **BlanxerAI, the agent, BlanxerAPI keys and the MCP server.** The dashboard's AI agent and studio, AI jobs, BlanxerAPI keys for custom sites, the MCP server for outside agents.
 
+- **Notes:** `dashboard:docs/findings/ai.md`, `mcp:docs/findings/ai.md`
 - **backend:** `src/features/ai_agent`, `src/features/seo/ai`, `src/super_admin/ai_agent`, `src/core/helpers/openai.ts`, `src/core/models/ai_*.ts`, `src/core/models/csr_ai.ts`
 - **dashboard:** `src/features/agent_mode`, `src/features/ai_agent`, `src/features/ai_assist`, `src/features/ai_chat`, `src/features/ai_studio`, `src/features/blanxer_ai`, `src/features/blanxer_api`, `src/features/blanxer_mcp`, `src/services/ai.service.ts`
 - **app:** `src/app/agent`, `src/components/agent`, `src/services/agent.service.ts`, `src/hooks/useAgentStatus.ts`
@@ -754,6 +778,7 @@ the ones that already exist in other repos and must change in the same piece of 
 
 **Platform plumbing: app setup, routes, cache, queues, jobs, shared helpers.** Express setup, route loaders, Redis / Bull queues, cron jobs, caches, DynamoDB, Cloudflare, websockets, shared HTTP clients. Changes here touch everything.
 
+- **Notes:** `dashboard:docs/findings/general.md`
 - **backend:** `src/app.ts`, `src/index.ts`, `src/core/loaders`, `src/core/config`, `src/core/declarations`, `src/core/constants`, `src/core/helpers`, `src/mods/cache.ts`, `src/services/cloudflare`, `src/services/cornjob`, `src/services/db_seed`, `src/services/dynamodb`, `src/services/queue`, `src/services/redis`, `src/services/ws`, `src/services/instagram`, `src/services/ird`, `src/services/mirrago`, `src/services/expo_express`, `src/features/mirrago`, `src/core/models/index.ts`, `src/core/models/counter.ts`, `src/core/models/key_value.ts`, `src/core/models/deleted_items.ts`, `src/core/models/external_api_log.ts`, `src/core/models/request_demo.ts`, `src/core/models/purchase_history.ts`, `src/core/models/dns_zone.ts`, `src/core/models/sale_alert.ts`, `src/core/models/print_*.ts`, `src/client_web`
 - **dashboard:** `src/hooks`, `src/services/builder-service.helper.ts`
 - **app:** `src/hooks`, `src/store`, `src/components/ui`

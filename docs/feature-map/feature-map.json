@@ -207,6 +207,11 @@
           "why": "Points are earned on Paid and taken back on cancel / refund / return.",
           "check": "tests/money/loyalty.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/orders.md",
+        "dashboard:docs/findings/orders.md",
+        "mcp:docs/findings/orders.md"
       ]
     },
     "checkout": {
@@ -342,6 +347,12 @@
           "why": "Plan (POS-only stores have no website), domains and storefront_url decide whether there is a checkout at all.",
           "check": "check_domain for a POS-plan store"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/checkout.md",
+        "dashboard:docs/findings/checkout.md",
+        "storefront:docs/findings/checkout.md",
+        "mcp:docs/findings/checkout.md"
       ]
     },
     "advance-payment": {
@@ -437,6 +448,11 @@
           "why": "Refunding a part-paid order while Waiting Reconcile.",
           "check": "AP rules on refunds"
         }
+      ],
+      "notes": [
+        "dashboard:docs/findings/advance-payment.md",
+        "storefront:docs/findings/advance-payment.md",
+        "mcp:docs/findings/advance-payment.md"
       ]
     },
     "payments": {
@@ -555,6 +571,10 @@
           "why": "The counter Fonepay QR tender and BlanxerPay QR.",
           "check": "tests/money/pos-fonepay.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/payments.md",
+        "dashboard:docs/findings/payments.md"
       ]
     },
     "cod-reconcile": {
@@ -638,6 +658,10 @@
           "why": "Courier fees and shortfalls change P&L.",
           "check": "tests/money/reports-by-place.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/cod-reconcile.md",
+        "dashboard:docs/findings/cod-reconcile.md"
       ]
     },
     "couriers": {
@@ -793,6 +817,11 @@
           "why": "Dispatched / delivering SMS carry the tracking number.",
           "check": "tests/sms/event-message.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/couriers.md",
+        "dashboard:docs/findings/couriers.md",
+        "mcp:docs/findings/couriers.md"
       ]
     },
     "fulfilment": {
@@ -826,7 +855,11 @@
       ],
       "notes": [
         "backend:e2e/multi-outlet",
-        "backend:scripts/e2e-multi-outlet.sh"
+        "backend:scripts/e2e-multi-outlet.sh",
+        "backend:docs/findings/fulfilment.md",
+        "dashboard:docs/findings/fulfilment.md",
+        "storefront:docs/findings/fulfilment.md",
+        "mcp:docs/findings/fulfilment.md"
       ],
       "paths": {
         "backend": [
@@ -1046,6 +1079,12 @@
           "why": "Outlets and the website outlet decide what the website can sell.",
           "check": "tests/multi-outlet/pooled-stock.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/inventory.md",
+        "dashboard:docs/findings/inventory.md",
+        "storefront:docs/findings/inventory.md",
+        "mcp:docs/findings/inventory.md"
       ]
     },
     "products": {
@@ -1194,6 +1233,12 @@
           "why": "Draft / POS-only / stock decide what shoppers can buy.",
           "check": "tests/seo/public-reads.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/products.md",
+        "dashboard:docs/findings/products.md",
+        "storefront:docs/findings/products.md",
+        "mcp:docs/findings/products.md"
       ]
     },
     "offers": {
@@ -1321,6 +1366,12 @@
           "why": "Reward coupons are offers.",
           "check": "tests/money/loyalty.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/offers.md",
+        "dashboard:docs/findings/offers.md",
+        "storefront:docs/findings/offers.md",
+        "mcp:docs/findings/offers.md"
       ]
     },
     "loyalty": {
@@ -1367,6 +1418,10 @@
           "why": "Cashier limits and counter redemptions.",
           "check": "tests/money/loyalty.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/loyalty.md",
+        "dashboard:docs/findings/loyalty.md"
       ]
     },
     "pos": {
@@ -1470,6 +1525,11 @@
           "why": "Cashier permissions; csr returns / voids only when allowed.",
           "check": "RF-11 tests"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/pos.md",
+        "dashboard:docs/findings/pos.md",
+        "mcp:docs/findings/pos.md"
       ]
     },
     "refunds-returns": {
@@ -1585,6 +1645,11 @@
           "why": "Courier exchanges.",
           "check": "tests/money/exchanges.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/refunds-returns.md",
+        "dashboard:docs/findings/refunds-returns.md",
+        "mcp:docs/findings/refunds-returns.md"
       ]
     },
     "finance": {
@@ -1704,6 +1769,11 @@
           "why": "Supplier postings from stock-in; batch COGS.",
           "check": "tests/inventory/supplier-postings.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/finance.md",
+        "dashboard:docs/findings/finance.md",
+        "mcp:docs/findings/finance.md"
       ]
     },
     "customers-ledger": {
@@ -1777,6 +1847,9 @@
           "why": "Receive payment into an account / drawer or Reconcile.",
           "check": "tests/money/customer-ledger-receive.test.ts"
         }
+      ],
+      "notes": [
+        "dashboard:docs/findings/customers-ledger.md"
       ]
     },
     "reports": {
@@ -1875,6 +1948,10 @@
           "why": "Returns come off revenue.",
           "check": "tests/analytics/counted-orders.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/reports.md",
+        "dashboard:docs/findings/reports.md"
       ]
     },
     "store-settings": {
@@ -2011,6 +2088,10 @@
           "why": "Store users and their roles.",
           "check": "staff-permission.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/store-settings.md",
+        "dashboard:docs/findings/store-settings.md"
       ]
     },
     "staff-roles": {
@@ -2083,6 +2164,9 @@
           "why": "Cashier permissions and outlet limits.",
           "check": "tests/pos-scope.test.ts"
         }
+      ],
+      "notes": [
+        "dashboard:docs/findings/staff-roles.md"
       ]
     },
     "website-content": {
@@ -2177,6 +2261,12 @@
           "why": "Theme components host the cart and checkout entry points.",
           "check": "checkout logic must never be forked per theme"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/website-content.md",
+        "dashboard:docs/findings/website-content.md",
+        "storefront:docs/findings/website-content.md",
+        "mcp:docs/findings/website-content.md"
       ]
     },
     "seo": {
@@ -2245,6 +2335,12 @@
           "why": "Fix with BlanxerAI jobs (seo/ai).",
           "check": "seo AI jobs"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/seo.md",
+        "dashboard:docs/findings/seo.md",
+        "storefront:docs/findings/seo.md",
+        "mcp:docs/findings/seo.md"
       ]
     },
     "tigg": {
@@ -2290,6 +2386,10 @@
           "why": "Invoices follow order edits.",
           "check": "tests/tigg/always-in-step.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/tigg.md",
+        "dashboard:docs/findings/tigg.md"
       ]
     },
     "notifications": {
@@ -2336,6 +2436,10 @@
           "why": "Status changes send SMS.",
           "check": "tests/sms/event-message.test.ts"
         }
+      ],
+      "notes": [
+        "dashboard:docs/findings/notifications.md",
+        "mcp:docs/findings/notifications.md"
       ]
     },
     "meta-tracking": {
@@ -2389,6 +2493,11 @@
           "why": "The feed lists products.",
           "check": "tests/storefront-site.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/meta-tracking.md",
+        "dashboard:docs/findings/meta-tracking.md",
+        "storefront:docs/findings/meta-tracking.md"
       ]
     },
     "reviews": {
@@ -2429,6 +2538,10 @@
           "why": "Reviews hang off delivered orders.",
           "check": "tests/reviews/review-reply-edit.test.ts"
         }
+      ],
+      "notes": [
+        "backend:docs/findings/reviews.md",
+        "dashboard:docs/findings/reviews.md"
       ]
     },
     "ai": {
@@ -2495,6 +2608,10 @@
           "why": "SEO AI jobs.",
           "check": "seo/ai"
         }
+      ],
+      "notes": [
+        "dashboard:docs/findings/ai.md",
+        "mcp:docs/findings/ai.md"
       ]
     },
     "platform": {
@@ -2606,7 +2723,10 @@
       "watch": [
         "A shared helper or middleware change reaches every feature: run the full check of the repo, not only the tests of the feature you meant to change."
       ],
-      "links": []
+      "links": [],
+      "notes": [
+        "dashboard:docs/findings/general.md"
+      ]
     }
   },
   "settings": [
