@@ -1,8 +1,34 @@
 import type { PaymentMethod, PaymentMethodName, Store } from './types.js';
 
-/** Plans that may take online payments. Free stores are COD-only. */
-export const PAID_PLANS = ['basic', 'premium', 'plus', 'platinum'];
-export const isPaidPlan = (plan?: string): boolean => PAID_PLANS.includes(String(plan || ''));
+/**
+ * Plans that may take online payments (blanxer.com/pricing, 2026-11): Premium, Business Plus
+ * (`plus`), Platinum, Elite, and Basic (no longer sold; its stores keep it). Free stores and the
+ * POS-only plan are COD-only.
+ *
+ * This list is only the fallback. The API sends `plan_info.features` with the store and that is
+ * the store's answer: use `hasOnlinePayments(store)`.
+ */
+export const PAID_PLANS = ['basic', 'premium', 'plus', 'platinum', 'elite'];
+export const isPaidPlan = (plan?: string): boolean => PAID_PLANS.includes(String(plan || '').trim().toLowerCase());
+
+/**
+ * May this store take online payments? The store's `plan_info.features.online_payments` when the
+ * API sent it; the plan list above when it did not (an older backend, a cached store).
+ */
+export const hasOnlinePayments = (store?: Partial<Store> | null): boolean => {
+  if (!store) return false;
+  const answer = store.plan_info?.features?.online_payments;
+  return typeof answer === 'boolean' ? answer : isPaidPlan(store.plan);
+};
+
+/** "Business Plus", "Elite", "Free": the plan's name as Blanxer writes it. */
+export const planName = (store?: Partial<Store> | null): string => {
+  const plan = String(store?.plan || '').trim();
+  const info = store?.plan_info;
+  if (info?.name && String(info.plan ?? plan) === plan) return info.name;
+  const names: Record<string, string> = { premium: 'Premium', plus: 'Business Plus', platinum: 'Platinum', elite: 'Elite', basic: 'Basic', pos: 'POS' };
+  return names[plan.toLowerCase()] || plan || 'Free';
+};
 
 export const PAYMENT_METHODS: Record<string, PaymentMethod> = {
   cash_on_delivery: { name: 'COD', display_name: 'Cash on delivery' },
@@ -45,7 +71,7 @@ export const storePaymentConfig = (store?: Partial<Store> | null): StorePaymentC
     nbank_card: false,
     card: false,
   };
-  if (!store || !isPaidPlan(store.plan)) return off;
+  if (!store || !hasOnlinePayments(store)) return off;
   const a = store.addons || {};
   const s = store.setting || {};
   return {

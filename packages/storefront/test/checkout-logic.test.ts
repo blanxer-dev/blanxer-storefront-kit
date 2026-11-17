@@ -8,12 +8,14 @@ import {
   customizationCharge,
   deliveryPlaces,
   extractCustomFields,
+  hasOnlinePayments,
   initCustomFieldState,
   initialCheckoutValues,
   isCodAllowed,
   isInPageMethod,
   paymentFlow,
   paymentMethodsFor,
+  planName,
   quoteCheckout,
   serializeCustomFields,
   toClientStore,
@@ -120,6 +122,54 @@ describe('payment methods', () => {
   it('free plan: COD only', () => {
     expect(paymentMethodsFor({ ...full, plan: 'free' }, { codAllowed: true }).map((m) => m.name)).toEqual(['COD']);
     expect(paymentMethodsFor({ ...full, plan: undefined }, { codAllowed: false })).toEqual([]);
+  });
+
+  // 2026-11 pricing: Elite was added, Basic is no longer sold (its stores keep it), `plus` is
+  // "Business Plus". Before this an Elite store was treated as free: Cash on Delivery only.
+  it('every website plan takes online payments when the API sends no plan_info: Elite too', () => {
+    const online = paymentMethodsFor(full, { codAllowed: false }).map((m) => m.name);
+    expect(online.length).toBe(8);
+    for (const plan of ['basic', 'premium', 'plus', 'platinum', 'elite']) {
+      expect(hasOnlinePayments({ plan }), plan).toBe(true);
+      expect(paymentMethodsFor({ ...full, plan }, { codAllowed: false }).map((m) => m.name), plan).toEqual(online);
+    }
+    expect(paymentMethodsFor({ ...full, plan: 'elite' }, { codAllowed: true })[0]!.name).toBe('COD');
+  });
+
+  it('the POS-only plan and no plan are COD only', () => {
+    for (const plan of ['pos', '', undefined]) {
+      expect(hasOnlinePayments({ plan }), String(plan)).toBe(false);
+      expect(paymentMethodsFor({ ...full, plan }, { codAllowed: true }).map((m) => m.name), String(plan)).toEqual(['COD']);
+    }
+    expect(hasOnlinePayments(null)).toBe(false);
+  });
+
+  it('plan_info.features.online_payments is the answer when the API sends it', () => {
+    const info = (plan: string, online_payments: boolean) => ({ plan, name: plan, active: true, features: { website: online_payments, online_payments } });
+    // a plan id this kit has never heard of, with the feature
+    const future = { ...full, plan: 'titanium', plan_info: info('titanium', true) };
+    expect(hasOnlinePayments(future)).toBe(true);
+    expect(paymentMethodsFor(future, { codAllowed: false }).length).toBe(8);
+    // the API says no: the plan list is not asked
+    const off = { ...full, plan: 'premium', plan_info: info('premium', false) };
+    expect(hasOnlinePayments(off)).toBe(false);
+    expect(paymentMethodsFor(off, { codAllowed: true }).map((m) => m.name)).toEqual(['COD']);
+    // Elite as the API sends it
+    expect(paymentMethodsFor({ ...full, plan: 'elite', plan_info: info('elite', true) }, { codAllowed: false }).length).toBe(8);
+    // a plan_info without the answer (half-shaped, cached): the plan list
+    expect(hasOnlinePayments({ plan: 'elite', plan_info: { plan: 'elite' } })).toBe(true);
+    expect(hasOnlinePayments({ plan: 'elite', plan_info: { plan: 'elite', features: {} } })).toBe(true);
+    expect(hasOnlinePayments({ plan: '', plan_info: { plan: '', features: {} } })).toBe(false);
+  });
+
+  it('planName: the API\'s name, else the pricing page\'s', () => {
+    expect(planName({ plan: 'plus' })).toBe('Business Plus');
+    expect(planName({ plan: 'elite' })).toBe('Elite');
+    expect(planName({ plan: 'basic' })).toBe('Basic');
+    expect(planName({ plan: '' })).toBe('Free');
+    expect(planName(null)).toBe('Free');
+    expect(planName({ plan: 'titanium' })).toBe('titanium');
+    expect(planName({ plan: 'titanium', plan_info: { plan: 'titanium', name: 'Titanium' } })).toBe('Titanium');
   });
 
   it('keyed methods need their key', () => {
@@ -355,6 +405,21 @@ describe('toClientStore', () => {
       { name: 'fb_pixel', details: '123' },
       { name: 'meta_capi', details: true },
     ]);
+    expect('plan_info' in s).toBe(false);
+  });
+
+  it('keeps plan_info, so the browser checkout gets the API\'s answer on online payments', () => {
+    const plan_info = { plan: 'titanium', name: 'Titanium', active: true, features: { website: true, online_payments: true } };
+    const s = toClientStore({
+      _id: 's1',
+      name: 'Shop',
+      sub_domain: 'shop',
+      plan: 'titanium',
+      plan_info,
+      addons: { khalti: true },
+    } as Store);
+    expect(s.plan_info).toEqual(plan_info);
+    expect(paymentMethodsFor(s, { codAllowed: false }).map((m) => m.name)).toEqual(['Khalti']);
   });
 });
 

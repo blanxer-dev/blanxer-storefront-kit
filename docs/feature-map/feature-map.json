@@ -1956,7 +1956,7 @@
     },
     "store-settings": {
       "name": "Store, plans and plugins: settings, subscription, domains, plugins, auth, POS-only plan",
-      "summary": "The store document, the generic store save, plans (pos / premium / business plus / platinum / elite) and their gates, subscriptions and expiry, the Plugins page (install / uninstall), domains and storefront_url, login.",
+      "summary": "The store document, the generic store save, plans (premium / business plus / platinum / elite; basic and pos off the pricing page) with their prices, renewal prices and gates, subscriptions and expiry, the Plugins page (install / uninstall), domains and storefront_url, login.",
       "keywords": [
         "store",
         "setting",
@@ -1973,15 +1973,24 @@
         "storefront_url",
         "kyc",
         "login",
-        "auth"
+        "auth",
+        "renewal",
+        "pricing",
+        "basic",
+        "trial"
       ],
       "rules": [
-        "backend:CLAUDE.md"
+        "backend:CLAUDE.md",
+        "backend:docs/plan-rules.md"
       ],
       "tests": [
         "backend:tests/money/pos-plan.test.ts",
         "backend:tests/storefront-site.test.ts",
-        "backend:tests/auth/customer-otp.test.ts"
+        "backend:tests/auth/customer-otp.test.ts",
+        "backend:tests/plans/catalog.test.ts",
+        "backend:tests/plans/subscription.test.ts",
+        "dashboard:src/shared/constants/plans.test.ts",
+        "app:src/constants/plan.test.ts"
       ],
       "paths": {
         "backend": [
@@ -2006,7 +2015,8 @@
           "src/core/middlewares",
           "src/core/handlers",
           "src/core/constants/blanxer.ts",
-          "src/core/constants/generic.constant.ts"
+          "src/core/constants/generic.constant.ts",
+          "src/core/constants/plans.ts"
         ],
         "dashboard": [
           "src/features/store_setting",
@@ -2024,7 +2034,10 @@
           "src/hooks/useStores.ts",
           "src/hooks/useSubscription.ts",
           "src/hooks/useMine.ts",
-          "src/hooks/useIssues.ts"
+          "src/hooks/useIssues.ts",
+          "src/hooks/usePlan.ts",
+          "src/shared/components/PremiumUpgradeModal.tsx",
+          "src/shared/components/PlanRenewalBanner.tsx"
         ],
         "app": [
           "src/app/settings",
@@ -2044,7 +2057,8 @@
           "src/hooks/useStoreId.ts",
           "src/hooks/useSoftAppUpdate.ts",
           "src/components/ui",
-          "src/components/drawer"
+          "src/components/drawer",
+          "src/constants/plan.ts"
         ],
         "storefront": [
           "pages/_app.tsx",
@@ -2063,9 +2077,11 @@
         ]
       },
       "watch": [
-        "Plan gating is checked in many places (isPremiumStore, isPremiumOrPos, isStorePremium, checkPremium / checkPosPlan middlewares, literal plan arrays, the dashboard's plans.ts, the app's useStorePlan). A plan change must keep them in step.",
+        "Plans live in one place: backend src/core/constants/plans.ts (ids, names, prices, renewal prices, features, what a store from before the 2026-11 pricing keeps). Gates call it (isPremiumStore, canUsePos, planIncludes, storeHas); clients read plan_info (dashboard usePlan, app useStorePlan) and keep only a fallback copy. Never write a plan list anywhere else: tests/plans/catalog.test.ts reads the source for one.",
         "Uninstalling a plugin, a plan downgrade or a subscription expiring must switch off or ignore every setting that needed it (see the settings table).",
-        "The generic store save must not overwrite fields that have their own endpoint (checkout.fulfilment, limits, advance)."
+        "The generic store save must not overwrite fields that have their own endpoint (checkout.fulfilment, limits, advance).",
+        "Plans live in one place: backend src/core/constants/plans.ts (ids, names, prices, renewal prices, features, what a store from before the 2026-11 pricing keeps). Gates call it (isPremiumStore, canUsePos, planIncludes, storeHas); clients read plan_info (dashboard usePlan, app useStorePlan) and keep only a fallback copy. Never write a plan list anywhere else: tests/plans/catalog.test.ts reads the source for one.",
+        "An existing store must not lose anything on a plan change: a store created before the cutover keeps what its plan could do before (LEGACY_FEATURES, plan-rules PL-8 to PL-12). New limits are applied by the screens, not refused by the API."
       ],
       "links": [
         {
@@ -3245,6 +3261,20 @@
       "mirrors": [
         "dashboard:src/features/orders/advance/advance.ts",
         "app:src/components/orders/ReconcileSheet.tsx"
+      ]
+    },
+    {
+      "rule": "Plans: ids, names, prices, renewal prices, what each includes, what a store from before the 2026-11 pricing keeps",
+      "home": "backend:src/core/constants/plans.ts",
+      "features": [
+        "store-settings"
+      ],
+      "mirrors": [
+        "dashboard:src/shared/constants/plans.ts (card words + fallback for a backend without plan_info)",
+        "app:src/constants/plan.ts (fallback)",
+        "mcp:src/constants.ts (fallback lists)",
+        "storefront:src/shared/helpers/general.helpers.ts (fallback list)",
+        "kit:packages/storefront/src/core/payments.ts (fallback list)"
       ]
     }
   ]
